@@ -32,7 +32,6 @@ function findBadge(expId) {
         :to="`/experiment/${e.id}`"
         class="card exp-item"
       >
-        <div class="exp-icon">{{ e.type === '测量' ? '📏' : '🔍' }}</div>
         <div class="exp-body">
           <h3>{{ e.title }}</h3>
           <p>第 {{ grade.chapters.findIndex(x => x.id === c.id) + 1 }} 章 · {{ e.type }}实验 · {{ e.level }}</p>

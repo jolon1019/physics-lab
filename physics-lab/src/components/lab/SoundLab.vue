@@ -1,0 +1,648 @@
+<script setup>
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import ParamSlider from './ParamSlider.vue'
+import FormulaPanel from './FormulaPanel.vue'
+import { createTone, playTone } from '../../lib/audio'
+
+const emit = defineEmits(['complete'])
+
+const canvasRef = ref(null)
+let ctx = null
+let raf = null
+let dpr = 1
+let flickerT = 0
+
+const W = 860
+const H = 460
+const deskY = 380
+
+const mode = ref('fork') // fork | vacuum
+const strike = ref(80)
+const vibr = ref(0)
+const struck = ref(false)
+const ballDisp = ref(0)
+const vacuum = ref(0)
+
+const particles = []
+for (let i = 0; i < 60; i++) particles.push({ x: Math.random(), y: Math.random() })
+
+const arcs = []
+
+const seen = { hit: false, hold: false, weak: false, restore: false }
+let completed = false
+
+// 音效
+const muted = ref(false)
+let forkTone = null
+let bellTimer = null
+
+function ringOnce() {
+  if (muted.value || mode.value !== 'vacuum') return
+  if (volume.value < 12) return
+  const vol = Math.min(1, Math.max(0.05, (volume.value - 8) / 90))
+  playTone({ freq: 880, duration: 0.32, volume: 0.22 * vol, type: 'square' })
+  setTimeout(() => playTone({ freq: 620, duration: 0.32, volume: 0.16 * vol, type: 'square' }), 140)
+}
+
+function startBell() {
+  stopBell()
+  bellTimer = setInterval(ringOnce, 700)
+}
+
+function stopBell() {
+  if (bellTimer) {
+    clearInterval(bellTimer)
+    bellTimer = null
+  }
+}
+
+watch(mode, (m) => {
+  forkTone?.stop()
+  forkTone = null
+  if (m === 'vacuum') startBell()
+  else stopBell()
+})
+
+const volume = computed(() => Math.round(98 - (vacuum.value / 100) * 90))
+
+const forkState = computed(() =>
+  vibr.value > 0.02 ? '发声（音叉振动）' : '停止发声'
+)
+const forkAmp = computed(() => Math.round(vibr.value * 100))
+
+const toneState = computed(() => {
+  if (vacuum.value < 40) return '铃声清晰'
+  if (vacuum.value < 80) return '🔉 铃声减弱'
+  return '几乎听不到'
+})
+
+const hint = ref('先敲击音叉，用乒乓球显示音叉的振动')
+
+function swingFork() {
+  vibr.value = strike.value / 100
+  struck.value = true
+  forkTone?.stop()
+  forkTone = muted.value
+    ? null
+    : createTone({ freq: 440, volume: 0.06 + (strike.value / 100) * 0.35, harmonics: [1, 0.12] })
+  if (vibr.value > 0.6) seen.hit = true
+  hint.value = '音叉在振动，乒乓球被弹开 —— 转换法显示振动'
+  tryComplete()
+}
+
+function holdFork() {
+  vibr.value = 0
+  struck.value = false
+  forkTone?.stop()
+  forkTone = null
+  seen.hold = true
+  hint.value = '振动停止，发声停止（声音仍在空气中传播一段距离）'
+  tryComplete()
+}
+
+function toggleMute() {
+  muted.value = !muted.value
+  if (muted.value) {
+    forkTone?.stop()
+    forkTone = null
+  } else if (vibr.value > 0.02) {
+    forkTone = createTone({ freq: 440, volume: 0.06 + (strike.value / 100) * 0.35, harmonics: [1, 0.12] })
+  }
+}
+
+function pumpOn() {
+  if (vacuum.value >= 80 && !seen.weak) {
+    seen.weak = true
+    hint.value = '抽去空气后铃声几乎听不到 —— 真空不能传声（推理法）'
+    tryComplete()
+  }
+}
+
+function restore() {
+  vacuum.value = 0
+  if (seen.weak && !seen.restore) {
+    seen.restore = true
+    hint.value = '放气后铃声恢复 —— 证明声音靠空气传播'
+    tryComplete()
+  }
+}
+
+function tryComplete() {
+  const forkDone = seen.hit && seen.hold
+  const vacuumDone = seen.weak && seen.restore
+  if ((forkDone || vacuumDone) && !completed) {
+    completed = true
+    emit('complete')
+  }
+}
+
+function reset() {
+  mode.value = 'fork'
+  vibr.value = 0
+  struck.value = false
+  vacuum.value = 0
+  arcs.length = 0
+  seen.hit = seen.hold = seen.weak = seen.restore = false
+  forkTone?.stop()
+  forkTone = null
+  stopBell()
+  hint.value = '先敲击音叉，用乒乓球显示音叉的振动'
+}
+
+function setupCanvas() {
+  const canvas = canvasRef.value
+  dpr = window.devicePixelRatio || 1
+  ctx = canvas.getContext('2d')
+  resizeCanvas()
+}
+
+let resizeObs = null
+
+function resizeCanvas() {
+  const canvas = canvasRef.value
+  if (!canvas || !ctx) return
+  const rect = canvas.getBoundingClientRect()
+  const cw = Math.max(200, rect.width)
+  const ch = Math.max(200, rect.height)
+  const scale = Math.min((cw * dpr) / W, (ch * dpr) / H)
+  canvas.width = Math.max(1, Math.round(cw * dpr))
+  canvas.height = Math.max(1, Math.round(ch * dpr))
+  canvas.style.height = ''
+  ctx.setTransform(scale, 0, 0, scale, (cw * dpr - W * scale) / 2, (ch * dpr - H * scale) / 2)
+}
+
+function cssVar(name, fallback) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name) || fallback
+}
+
+function pushArcs(cx, cy, intensity) {
+  if (intensity <= 0.03 || flickerT % 3 !== 0) return
+  arcs.push({ x: cx, y: cy, r: 8, a: 0.5 * intensity })
+}
+
+function drawGridAndDesk() {
+  const card = cssVar('--card', '#fff')
+  const lineCol = cssVar('--border', '#ccc')
+  ctx.fillStyle = card
+  ctx.fillRect(0, 0, W, H)
+
+  ctx.strokeStyle = lineCol
+  ctx.globalAlpha = 0.3
+  ctx.lineWidth = 1
+  for (let x = 30; x < W; x += 30) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke()
+  }
+  for (let y = 20; y < H; y += 20) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
+  }
+  ctx.globalAlpha = 1
+
+  // 桌面
+  ctx.fillStyle = '#c9a76b'
+  ctx.fillRect(0, deskY, W, H - deskY)
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'
+  ctx.fillRect(0, deskY, W, 6)
+}
+
+function drawFork() {
+  const accent = cssVar('--accent', '#4f6ef7')
+  const textH = cssVar('--text-h', '#111')
+  const textCol = cssVar('--text', '#555')
+
+  const x = 330
+  const boxY = deskY - 88
+  const amp = vibr.value > 0.02 ? vibr.value : 0
+  const sw = Math.sin(flickerT * 0.5) * amp
+
+  // 木制共鸣箱
+  const wg = ctx.createLinearGradient(0, boxY, 0, deskY)
+  wg.addColorStop(0, '#d9b98a')
+  wg.addColorStop(1, '#a97f4f')
+  ctx.fillStyle = wg
+  ctx.beginPath()
+  ctx.moveTo(x - 108, boxY)
+  ctx.lineTo(x + 108, boxY)
+  ctx.lineTo(x + 74, deskY)
+  ctx.lineTo(x - 74, deskY)
+  ctx.closePath()
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(90,60,25,0.5)'
+  ctx.lineWidth = 2
+  ctx.stroke()
+  // 木纹
+  ctx.strokeStyle = 'rgba(120,80,35,0.3)'
+  ctx.lineWidth = 1
+  for (let i = 1; i < 6; i++) {
+    const yy = boxY + (deskY - boxY) * (i / 6)
+    const ww = 74 + (108 - 74) * (i / 6)
+    ctx.beginPath()
+    ctx.moveTo(x - ww, yy)
+    ctx.lineTo(x + ww, yy)
+    ctx.stroke()
+  }
+  // 声孔
+  ctx.fillStyle = 'rgba(60,40,20,0.55)'
+  ctx.beginPath()
+  ctx.arc(x - 40, boxY + 44, 9, 0, Math.PI * 2)
+  ctx.arc(x + 40, boxY + 44, 9, 0, Math.PI * 2)
+  ctx.fill()
+
+  // 黄铜质感音叉
+  const mg = ctx.createLinearGradient(x - 34, 0, x + 34, 0)
+  mg.addColorStop(0, '#c8a05c')
+  mg.addColorStop(0.3, '#f2d492')
+  mg.addColorStop(0.5, '#fff0b8')
+  mg.addColorStop(0.7, '#e7c379')
+  mg.addColorStop(1, '#b0853f')
+  ctx.fillStyle = mg
+
+  const prongW = 13
+  const prongTop = boxY - 118
+  const prongBottom = boxY + 12
+  const gap = 26
+  const leftX = x - gap - prongW / 2 + sw * 7
+  const rightX = x + gap - prongW / 2 - sw * 7
+
+  // 叉臂（圆头）
+  for (const px of [leftX, rightX]) {
+    ctx.beginPath()
+    ctx.roundRect ? ctx.roundRect(px, prongTop, prongW, prongBottom - prongTop, 6) : ctx.rect(px, prongTop, prongW, prongBottom - prongTop)
+    ctx.fill()
+    // 高光
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'
+    ctx.fillRect(px + 2, prongTop + 5, 3, prongBottom - prongTop - 10)
+    ctx.fillStyle = mg
+  }
+
+  // 底部 U 形连接与柄
+  ctx.beginPath()
+  ctx.roundRect ? ctx.roundRect(x - 40, prongBottom - 18, 80, 18, 8) : ctx.rect(x - 40, prongBottom - 18, 80, 18)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.roundRect ? ctx.roundRect(x - 7, prongBottom - 4, 14, 34, 4) : ctx.rect(x - 7, prongBottom - 4, 14, 34)
+  ctx.fill()
+  ctx.fillStyle = 'rgba(255,255,255,0.3)'
+  ctx.fillRect(x - 3, prongBottom + 2, 3, 28)
+  ctx.fillStyle = mg
+
+  // 振动光晕
+  if (amp > 0.02) {
+    ctx.save()
+    ctx.shadowColor = accent
+    ctx.shadowBlur = 12
+    ctx.strokeStyle = accent
+    ctx.lineWidth = 2
+    for (const px of [leftX, rightX]) {
+      ctx.beginPath()
+      ctx.moveTo(px - 2, prongTop - 8)
+      ctx.lineTo(px - 2, prongTop - 20)
+      ctx.moveTo(px + prongW + 2, prongTop - 8)
+      ctx.lineTo(px + prongW + 2, prongTop - 20)
+      ctx.stroke()
+    }
+    ctx.restore()
+    pushArcs(x, boxY - 60, vibr.value)
+  }
+
+  // 乒乓球支架与球
+  const pivotX = 620
+  const pivotY = 140
+  const restY = 305
+  const dx = vibr.value > 0.02 ? vibr.value * 85 * (0.6 + 0.4 * Math.sin(flickerT * 0.35)) : 0
+  const dy = vibr.value > 0.02 ? vibr.value * 34 * Math.abs(Math.sin(flickerT * 0.3)) : 0
+  ballDisp.value = dx
+
+  ctx.fillStyle = '#8b7355'
+  ctx.fillRect(pivotX - 6, pivotY - 60, 12, 60)
+  ctx.fillRect(pivotX - 46, pivotY - 54, 92, 8)
+
+  ctx.strokeStyle = '#999'
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.moveTo(pivotX, pivotY)
+  ctx.lineTo(pivotX + dx, restY - dy + 14)
+  ctx.stroke()
+
+  const ballX = pivotX + dx
+  const ballY = restY - dy
+  ctx.fillStyle = '#e74c3c'
+  ctx.beginPath()
+  ctx.arc(ballX, ballY, 15, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'
+  ctx.beginPath()
+  ctx.arc(ballX - 4, ballY - 5, 4.5, 0, Math.PI * 2)
+  ctx.fill()
+
+  ctx.fillStyle = textH
+  ctx.font = 'bold 15px sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText('音叉与共鸣箱 · 乒乓球（转换法）', 40, 40)
+  ctx.fillStyle = textCol
+  ctx.font = '13px sans-serif'
+  ctx.fillText(
+    vibr.value > 0.02 ? '音叉振动带动乒乓球弹开，把不明显的振动“放大”显示' : '点击「敲击音叉」，再观察乒乓球',
+    40,
+    64
+  )
+}
+
+function drawVacuum() {
+  const textH = cssVar('--text-h', '#111')
+  const textCol = cssVar('--text', '#555')
+
+  const cx = 300
+  const pumpX = 620
+
+  // 闹钟
+  const ringing = volume.value > 30
+  ctx.save()
+  ctx.translate(cx, 315)
+  if (ringing) ctx.rotate(Math.sin(flickerT * 0.3) * 0.06)
+  ctx.fillStyle = '#f5f2e9'
+  ctx.strokeStyle = '#555'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.arc(0, 0, 38, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.stroke()
+  ctx.fillStyle = '#e74c3c'
+  ctx.beginPath()
+  ctx.arc(0, -34, 7, 0, Math.PI * 2)
+  ctx.arc(0, -34, 4, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = '#333'
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.moveTo(0, 0)
+  ctx.lineTo(0, -24)
+  ctx.moveTo(0, 0)
+  ctx.lineTo(16, 8)
+  ctx.stroke()
+  ctx.restore()
+
+  // 罩内空气粒子
+  const n = Math.round(60 * (1 - vacuum.value / 100))
+  ctx.fillStyle = 'rgba(90,130,200,0.55)'
+  for (let i = 0; i < n; i++) {
+    const p = particles[i]
+    const px = cx - 90 + p.x * 180
+    const py = 200 + p.y * 140 + Math.sin(flickerT * 0.05 + i) * 2
+    ctx.beginPath()
+    ctx.arc(px, py, 2.2, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // 玻璃罩
+  ctx.fillStyle = 'rgba(210,228,255,0.14)'
+  ctx.strokeStyle = 'rgba(140,170,220,0.85)'
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.moveTo(170, deskY - 8)
+  ctx.lineTo(170, 235)
+  ctx.quadraticCurveTo(170, 150, cx, 150)
+  ctx.quadraticCurveTo(430, 150, 430, 235)
+  ctx.lineTo(430, deskY - 8)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'
+  ctx.lineWidth = 5
+  ctx.beginPath()
+  ctx.moveTo(185, 230)
+  ctx.quadraticCurveTo(185, 175, 240, 165)
+  ctx.stroke()
+
+  // 底座与抽气管道
+  ctx.fillStyle = '#8b7355'
+  ctx.fillRect(130, deskY - 8, 340, 16)
+  ctx.strokeStyle = '#777'
+  ctx.lineWidth = 5
+  ctx.beginPath()
+  ctx.moveTo(430, deskY - 4)
+  ctx.quadraticCurveTo(520, deskY - 4, 560, deskY - 30)
+  ctx.lineTo(560, deskY - 66)
+  ctx.stroke()
+
+  // 抽气泵
+  ctx.fillStyle = '#7d8794'
+  ctx.fillRect(pumpX - 34, deskY - 96, 68, 92)
+  ctx.fillStyle = '#5b6570'
+  ctx.fillRect(pumpX - 44, deskY - 108, 88, 16)
+  ctx.fillStyle = '#c9a76b'
+  ctx.fillRect(pumpX - 6, deskY - 96, 12, 30)
+
+  // 气压表
+  const barW = 150
+  const pct = 1 - vacuum.value / 100
+  ctx.fillStyle = '#f0eee7'
+  ctx.strokeStyle = '#0b0b0b'
+  ctx.lineWidth = 2
+  ctx.fillRect(pumpX - 20, 150, barW, 26)
+  ctx.strokeRect(pumpX - 20, 150, barW, 26)
+  ctx.fillStyle = pct > 0.6 ? '#0d9b61' : pct > 0.2 ? '#b87915' : '#d92135'
+  ctx.fillRect(pumpX - 20, 150, barW * pct, 26)
+  ctx.fillStyle = textH
+  ctx.font = 'bold 13px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText(`罩内气压 ${(pct * 100).toFixed(0)} kPa`, pumpX + 55, 170)
+
+  if (ringing) pushArcs(cx, 240, (volume.value - 30) / 70)
+
+  ctx.fillStyle = textH
+  ctx.font = 'bold 15px sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText('真空罩 · 闹钟在玻璃罩内', 40, 40)
+  ctx.fillStyle = textCol
+  ctx.font = '13px sans-serif'
+  ctx.fillText(
+    vacuum.value < 40 ? '铃声清晰：空气传播声波' : vacuum.value < 80 ? '抽去空气，铃声逐渐减弱' : '空气几乎抽尽，铃声听不到 → 真空不能传声',
+    40,
+    64
+  )
+}
+
+function render() {
+  if (!ctx) return
+
+  // 更新声波圈
+  for (const a of arcs) {
+    a.r += 3.2
+    a.a *= 0.94
+  }
+  for (let i = arcs.length - 1; i >= 0; i--) {
+    if (arcs[i].a < 0.03) arcs.splice(i, 1)
+  }
+
+  drawGridAndDesk()
+
+  for (const a of arcs) {
+    ctx.strokeStyle = `rgba(255,59,77,${a.a})`
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.arc(a.x, a.y, a.r, 0, Math.PI * 2)
+    ctx.stroke()
+  }
+
+  if (mode.value === 'fork') drawFork()
+  else drawVacuum()
+}
+
+function loop() {
+  flickerT += 1
+
+  if (mode.value === 'fork' && vibr.value > 0) {
+    vibr.value *= 0.985
+    if (vibr.value < 0.02) {
+      vibr.value = 0
+      forkTone?.stop()
+      forkTone = null
+    }
+  }
+
+  render()
+  raf = requestAnimationFrame(loop)
+}
+
+onMounted(() => {
+  setupCanvas()
+  if (window.ResizeObserver) {
+    resizeObs = new ResizeObserver(() => resizeCanvas())
+    resizeObs.observe(canvasRef.value.parentElement)
+  }
+  raf = requestAnimationFrame(loop)
+})
+
+onBeforeUnmount(() => {
+  if (raf) cancelAnimationFrame(raf)
+  if (resizeObs) resizeObs.disconnect()
+  forkTone?.stop()
+  stopBell()
+})
+</script>
+
+<template>
+  <div class="lab-stage">
+    <div class="lab-left">
+      <div class="lab-panel" style="padding:0">
+        <canvas ref="canvasRef" style="display:block;width:100%;touch-action:none"></canvas>
+      </div>
+
+      <div class="lab-actions">
+        <button class="btn" :class="{ 'btn-primary': mode === 'fork' }" @click="mode = 'fork'">音叉发声</button>
+        <button class="btn" :class="{ 'btn-primary': mode === 'vacuum' }" @click="mode = 'vacuum'">真空罩</button>
+        <button
+          v-if="mode === 'fork'"
+          class="btn btn-primary"
+          @click="swingFork"
+        >{{ vibr > 0.02 ? '再敲一下' : '敲击音叉' }}</button>
+        <button v-if="mode === 'fork'" class="btn" @click="holdFork">按住音叉</button>
+        <button v-if="mode === 'vacuum'" class="btn btn-primary" @click="restore">放气</button>
+        <button class="btn" @click="reset">重置</button>
+        <button class="btn" :class="{ 'btn-primary': muted }" @click="toggleMute">{{ muted ? '静音' : '音效开' }}</button>
+        <span class="feedback" :class="completed ? 'ok' : 'no'">{{ hint }}</span>
+      </div>
+    </div>
+
+    <aside class="lab-right">
+      <div class="lab-panel">
+        <div class="lab-panel-head">
+          <strong>可调变量</strong>
+          <span>实时联动</span>
+        </div>
+        <div class="lab-params">
+          <ParamSlider
+            v-if="mode === 'fork'"
+            v-model="strike"
+            :min="10"
+            :max="100"
+            :step="5"
+            label="敲击力度"
+            unit=" %"
+            hint="力度越大，振动幅度越大，乒乓球弹得越高"
+          />
+          <ParamSlider
+            v-else
+            v-model="vacuum"
+            :min="0"
+            :max="100"
+            :step="5"
+            label="罩内抽气量"
+            unit=" %"
+            hint="抽气越多，罩内空气越少，铃声越弱"
+            @update:modelValue="pumpOn"
+          />
+        </div>
+      </div>
+
+      <div class="lab-panel">
+        <div class="lab-panel-head">
+          <strong>实时数据</strong>
+          <span>只读输出</span>
+        </div>
+        <div class="lab-readout">
+          <template v-if="mode === 'fork'">
+            <div class="lab-stat">
+              <span>发声状态</span>
+              <strong style="font-size:13px">{{ forkState }}</strong>
+            </div>
+            <div class="lab-stat accent">
+              <span>振动幅度</span>
+              <strong>{{ forkAmp }} %</strong>
+            </div>
+            <div class="lab-stat success">
+              <span>乒乓球位移</span>
+              <strong>{{ ballDisp.toFixed(0) }} px</strong>
+            </div>
+            <div class="lab-stat">
+              <span>说明</span>
+              <strong style="font-size:12px">振动→弹开</strong>
+            </div>
+          </template>
+          <template v-else>
+            <div class="lab-stat">
+              <span>罩内气压</span>
+              <strong>{{ (100 - vacuum).toFixed(0) }} kPa</strong>
+            </div>
+            <div class="lab-stat accent">
+              <span>铃声大小</span>
+              <strong>{{ volume }} dB</strong>
+            </div>
+            <div class="lab-stat success">
+              <span>状态</span>
+              <strong style="font-size:13px">{{ toneState }}</strong>
+            </div>
+            <div class="lab-stat">
+              <span>说明</span>
+              <strong style="font-size:12px">真空不传声</strong>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <FormulaPanel
+        title="声的产生与传播"
+        formula="发声：物体振动　传播：需要介质"
+        desc="声音由物体振动产生；以声波形式在固体、液体、气体中传播，真空不能传声。"
+        :rows="[
+          { label: '15℃ 空气声速', value: '340 m/s' },
+          { label: '水中声速', value: '约 1500 m/s' },
+          { label: '钢铁中声速', value: '约 5200 m/s' }
+        ]"
+        :result="mode === 'vacuum' ? [
+          { label: '当前铃声', value: volume + ' dB' },
+          { label: '罩内气压', value: (100 - vacuum).toFixed(0) + ' kPa' }
+        ] : [
+          { label: '振动幅度', value: forkAmp + ' %' },
+          { label: '乒乓球位移', value: ballDisp.toFixed(0) + ' px' }
+        ]"
+        :verify="[
+          '转换法：音叉振动不明显，用乒乓球弹开显示振动',
+          '真空罩实验用“推理法”：无法抽成绝对真空，在实验基础上推理得出真空不能传声',
+          'v固 > v液 > v气；声速只与介质种类和温度有关',
+          '“振动停止，发声停止” ≠ 声音立即消失——已发出的声音仍在介质中传播'
+        ]"
+      />
+    </aside>
+  </div>
+</template>

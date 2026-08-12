@@ -45,7 +45,6 @@ const summary = computed(() => {
         :to="`/experiment/${id}`"
         class="card exp-item"
       >
-        <div class="exp-icon">⭐</div>
         <div class="exp-body"><h3 style="font-size:15px">实验 {{ id }}</h3></div>
         <div class="exp-right"><span class="btn btn-sm">去巩固</span></div>
       </RouterLink>
@@ -57,7 +56,6 @@ const summary = computed(() => {
     <h3 style="margin-bottom:12px">做题记录</h3>
     <div v-if="summary.all.length" class="exp-grid">
       <div v-for="r in summary.all" :key="r.id" class="card exp-item">
-        <div class="exp-icon">{{ r.completed ? '✅' : '📝' }}</div>
         <div class="exp-body">
           <h3 style="font-size:15px">实验 {{ r.id }}</h3>
           <p>答题 {{ r.attempts }} 次，正确 {{ r.correct }} 次 · {{ r.latest }}</p>

@@ -61,7 +61,7 @@ const formulaResults = computed(() => {
   return [
     { label: '1/u + 1/v', value: `1/${u.toFixed(0)} + 1/${v.toFixed(0)} = ${lhs.toFixed(6)}` },
     { label: '1/f', value: `1/${f} = ${rhs.toFixed(6)}` },
-    { label: ok ? '✅ 高斯成像公式成立' : '推导中…', value: ok ? '相等' : '…' }
+    { label: ok ? '高斯成像公式成立' : '推导中…', value: ok ? '相等' : '…' }
   ]
 })
 
@@ -81,6 +81,8 @@ const verifySteps = computed(() => {
 // 逻辑坐标系（绘制用，实际按容器×DPR 缩放）
 const width = 860
 const heightPx = 460
+let viewScale = 1
+let viewTx = 0
 
 function setupCanvas() {
   const canvas = canvasRef.value
@@ -91,18 +93,20 @@ function setupCanvas() {
 
 let resizeObs = null
 
-// 逻辑坐标系恒为 W×H；内部像素 = 显示尺寸 × DPR，防止拉宽变形
+// 逻辑坐标系恒为 W×H；内部像素 = 显示尺寸 × DPR；等比缩放居中，高度不超出容器
 function resizeCanvas() {
   const canvas = canvasRef.value
   if (!canvas || !ctx) return
   const rect = canvas.getBoundingClientRect()
   const cw = Math.max(200, rect.width)
-  const ch = (cw * heightPx) / width
-  const scale = (cw * dpr) / width // 逻辑像素 → 物理像素
-  canvas.width = Math.round(cw * dpr)
-  canvas.height = Math.round(ch * dpr)
-  canvas.style.height = `${ch}px`
-  ctx.setTransform(scale, 0, 0, scale, 0, 0)
+  const ch = Math.max(200, rect.height)
+  const scale = Math.min((cw * dpr) / width, (ch * dpr) / heightPx)
+  viewScale = scale
+  viewTx = (cw * dpr - width * scale) / 2
+  canvas.width = Math.max(1, Math.round(cw * dpr))
+  canvas.height = Math.max(1, Math.round(ch * dpr))
+  canvas.style.height = ''
+  ctx.setTransform(scale, 0, 0, scale, viewTx, (ch * dpr - heightPx * scale) / 2)
 }
 
 const center = 315
@@ -249,7 +253,7 @@ function render() {
   )
   ctx.fillStyle = textCol
   ctx.font = '13px sans-serif'
-  ctx.fillText('拖动蜡烛调整物距 ✋', W - 180, 40)
+  ctx.fillText('拖动蜡烛调整物距', W - 180, 40)
 }
 
 function drawCandle(x, baseY, h, t) {
@@ -405,10 +409,9 @@ function drawRays({ ox, oTop, ix, iTop, virtual }) {
 function onPointerDown(e) {
   const canvas = canvasRef.value
   const rect = canvas.getBoundingClientRect()
-  const toLogical = width / rect.width // 显示像素 → 逻辑像素
   canvas.setPointerCapture(e.pointerId)
   const move = (ev) => {
-    const x = (ev.clientX - rect.left) * toLogical
+    const x = ((ev.clientX - rect.left) * dpr - viewTx) / viewScale
     const rel = center - x
     uTarget = Math.min(Math.max(rel, 70), 360)
     checkSeen(uTarget)
@@ -427,7 +430,7 @@ function checkSeen(du) {
   seen[stageOf(du)] = true
   if (seen.far && seen.mid && seen.near && !notified) {
     notified = true
-    hint.value = '已观察三种成像情况！实验完成 ✅'
+    hint.value = '已观察三种成像情况！实验完成'
     emit('complete')
   } else {
     hint.value = '拖动蜡烛调整物距，观察实像与虚像的变化'
@@ -481,23 +484,14 @@ onBeforeUnmount(() => {
 
       <div class="lab-actions">
         <span class="feedback" :class="notified ? 'ok' : 'no'">{{ hint }}</span>
-        <button class="btn btn-sm" @click="reset">↺ 重置</button>
+        <button class="btn btn-sm" @click="reset">重置</button>
       </div>
-
-      <FormulaPanel
-        title="🧮 公式与结果"
-        formula="1/u + 1/v = 1/f　　|m| = v/u"
-        desc="u 物距、v 像距、f 焦距。拖动蜡烛或调节焦距，下方数值实时更新并自动验证公式。"
-        :rows="formulaRows"
-        :result="formulaResults"
-        :verify="verifySteps"
-      />
     </div>
 
     <aside class="lab-right">
       <div class="lab-panel">
         <div class="lab-panel-head">
-          <strong>⚙ 可调变量</strong>
+          <strong>可调变量</strong>
           <span>实时联动</span>
         </div>
         <div class="lab-params">
@@ -508,7 +502,7 @@ onBeforeUnmount(() => {
 
       <div class="lab-panel">
         <div class="lab-panel-head">
-          <strong>📊 实时数据</strong>
+          <strong>实时数据</strong>
           <span>只读输出</span>
         </div>
         <div class="lab-readout">
@@ -530,6 +524,15 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
+
+      <FormulaPanel
+        title="公式与结果"
+        formula="1/u + 1/v = 1/f　　|m| = v/u"
+        desc="u 物距、v 像距、f 焦距。拖动蜡烛或调节焦距，下方数值实时更新并自动验证公式。"
+        :rows="formulaRows"
+        :result="formulaResults"
+        :verify="verifySteps"
+      />
     </aside>
   </div>
 </template>

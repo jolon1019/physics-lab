@@ -1,0 +1,9 @@
+# --- Agent working directory ---
+.workbuddy/
+
+# --- Logs ---
+*.log
+
+# --- Build caches ---
+**/.build-tmp/
+**/.vite-cache/

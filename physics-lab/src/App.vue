@@ -1,12 +1,16 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useProgressStore } from './stores/progress'
+import { useAuthStore } from './stores/auth'
 import { GRADES } from './data/experiments'
 import SideNav from './components/SideNav.vue'
+import LoginModal from './components/LoginModal.vue'
 
 const progress = useProgressStore()
+const auth = useAuthStore()
 onMounted(() => {
   progress.startSession()
+  auth.init()
 })
 
 const totalExps = computed(() =>
@@ -45,6 +49,14 @@ const totalChapters = computed(() => GRADES.reduce((s, g) => s + g.chapters.leng
           <strong>{{ progress.accuracy }}%</strong>
         </RouterLink>
       </div>
+
+      <div class="user-zone">
+        <template v-if="auth.isLoggedIn">
+          <span class="user-email" :title="auth.user?.email">{{ auth.user?.email }}</span>
+          <button class="btn btn-sm" @click="auth.logout()">退出</button>
+        </template>
+        <button v-else class="btn btn-sm btn-primary" @click="auth.openLogin()">登录</button>
+      </div>
     </header>
 
     <div class="workspace">
@@ -55,5 +67,7 @@ const totalChapters = computed(() => GRADES.reduce((s, g) => s + g.chapters.leng
     </div>
 
     <footer class="app-footer">人教版初中物理同步实验 · 学生自主学习平台</footer>
+
+    <LoginModal v-if="auth.showLogin" />
   </div>
 </template>

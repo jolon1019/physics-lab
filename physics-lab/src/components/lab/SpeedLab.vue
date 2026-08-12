@@ -1,87 +1,36 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 
 const emit = defineEmits(['complete'])
 
-const canvasRef = ref(null)
-let ctx = null
-let raf = null
-let dpr = 1
-let flickerT = 0
-
-// 可调变量
+// ===== 可调变量 =====
 const slope = ref(35) // 斜面坡度（度，20~55）
 const distanceCm = ref(120) // 总路程（cm，60~200）
 
-// 场景画布几何（逻辑像素）
-const W = 860
-const H = 640
-const botY = 590 // 斜面底端（桌面）纵坐标
-const deskY = botY + 30 // 桌面高度
-const topMargin = 46 // 顶部留白（标题 + 顶端挡板空间）
-const spanMax = 0.9 * W // 200cm 时斜面水平投影目标（占画面 90%）
+// ===== 物理常量 =====
+const L_M = 2.0 // 斜面全长代表的真实长度（米）
+const G = 9.8 // 重力加速度（m/s²）
+const SLOWMO = 2.4 // 动画放慢倍数（计时仍显示真实物理秒）
+const WHEEL_R = 7 // 车轮半径（画布像素），用于车轮转角计算
 
-// 坡度角（度）
-const angleDeg = computed(() => slope.value)
-// 斜面像素长度：优先让 200cm 的水平投影占满 90% 宽，受画面高度约束时自动截断
-const lengthPx = computed(() => {
-  const rad = (angleDeg.value * Math.PI) / 180
-  const span = spanMax * (distanceCm.value / 200)
-  const bySpan = span / Math.cos(rad)
-  const byHeight = (botY - topMargin) / Math.sin(rad)
-  return Math.min(bySpan, byHeight)
-})
-
-// 模拟加速度（像素/帧²，仅用于让小车看起来更自然）
-const ACCEL = computed(() => 0.32 * Math.sin((angleDeg.value * Math.PI) / 180))
-// 总路程（米）
-const S_TOTAL = computed(() => distanceCm.value / 100)
-
-// 三段坐标：0=顶端 1=中点 2=底端（斜面水平居中）
-const pts = computed(() => {
-  const rad = (angleDeg.value * Math.PI) / 180
-  const span = lengthPx.value * Math.cos(rad)
-  const bottom = { x: W / 2 + span / 2, y: botY }
-  const top = { x: W / 2 - span / 2, y: botY - lengthPx.value * Math.sin(rad) }
-  const mid = { x: (top.x + bottom.x) / 2, y: (top.y + bottom.y) / 2 }
-  return [top, mid, bottom]
-})
-const len = computed(() => {
-  const p = pts.value
-  return Math.hypot(p[2].x - p[0].x, p[2].y - p[0].y)
-})
-
-// 小车位置参数（0~1，沿斜面）
-const carPos = ref(0)
-let carPosNum = 0
-let dispPos = 0 // 显示位置（平滑跟随）
-let wheelAngle = 0
-let prevPos = 0
+// ===== 状态 =====
 const state = ref('ready') // ready | running | done
-let speed = 0 // 沿斜面方向速度（像素/帧）
-const elapsed = ref(0) // 秒
-
-// 自动记录的时刻
+const elapsed = ref(0) // 真实物理时间（秒）
 const marks = { mid: null, end: null }
 const results = ref(null)
 let completed = false
-
-// s-t 实时轨迹（绘制用）
-const trace = []
-
 const hint = ref('点击「开始计时」释放小车')
 const startBtn = ref('开始计时')
 
-// 公式面板：代入变量实时数值
+// ===== 公式面板 =====
+const S_TOTAL = computed(() => distanceCm.value / 100)
 const formulaRows = computed(() => [
   { label: '全程路程 s', value: `${S_TOTAL.value.toFixed(2)} m` },
   { label: '中点路程 s₁ = s/2', value: `${(S_TOTAL.value / 2).toFixed(2)} m` },
   { label: '后半程路程 s₂ = s/2', value: `${(S_TOTAL.value / 2).toFixed(2)} m` }
 ])
-
-// 公式面板：测量结果（实时）
 const formulaResults = computed(() => {
   if (state.value !== 'done' || !marks.mid || !marks.end) return []
   const total = S_TOTAL.value
@@ -94,475 +43,382 @@ const formulaResults = computed(() => {
     { label: '后半程 v̄ = (s/2)/(t₃−t₂)', value: `${(half / (tEnd - tMid)).toFixed(3)} m/s` }
   ]
 })
+const verifySteps = computed(() => [
+  '全程平均速度 v̄₁ = s/t₃，用全程路程除以全程时间',
+  '前半程平均速度 v̄₂ = (s/2)/t₂，用半程路程除以到中点的时刻',
+  '后半程平均速度 v̄₃ = (s/2)/(t₃−t₂)，用半程路程除以后半程时间',
+  '将三段 v̄ 对比：后半程比前半程快，说明小车越滑越快',
+  '多次测量取平均值，可减小误差'
+])
 
-// 求证方法（初中知识：只涉及平均速度）
-const verifySteps = computed(() => {
-  const steps = [
-    '全程平均速度 v̄₁ = s/t₃，用全程路程除以全程时间',
-    '前半程平均速度 v̄₂ = (s/2)/t₂，用半程路程除以到中点的时刻',
-    '后半程平均速度 v̄₃ = (s/2)/(t₃−t₂)，用半程路程除以后半程时间',
-    '将三段 v̄ 对比：后半程比前半程快，说明小车越滑越快（只描述现象，不涉及匀加速公式）',
-    '多次测量取平均值，可减小误差'
-  ]
-  return steps
-})
+// ===== 物理 =====
+function physics() {
+  const theta = (slope.value * Math.PI) / 180
+  const a = G * Math.sin(theta) // m/s²
+  const dM = distanceCm.value / 100 // 全程路程（米）
+  const tEnd = Math.sqrt((2 * dM) / Math.max(a, 1e-6)) // 从静止滑到终点所需时间
+  return { a, dM, tEnd }
+}
+
+// ===== Canvas 2D（纯矢量绘制，无 AI 生图）=====
+const canvasRef = ref(null)
+let ctx = null
+let raf = null
+let lastT = null
+let tScreen = 0
+const currentFrac = ref(0) // 当前已走路程占所选全程的比例（真实匀加速：∝ t²）
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
 function setupCanvas() {
   const canvas = canvasRef.value
-  dpr = window.devicePixelRatio || 1
-  ctx = canvas.getContext('2d')
-  resizeCanvas()
-}
-
-let resizeObs = null
-
-// 逻辑坐标系恒为 W×H；内部像素 = 显示尺寸 × DPR，防止拉宽变形
-function resizeCanvas() {
-  const canvas = canvasRef.value
-  if (!canvas || !ctx) return
   const rect = canvas.getBoundingClientRect()
-  const cw = Math.max(200, rect.width)
-  const ch = (cw * H) / W
-  const scale = (cw * dpr) / W // 逻辑像素 → 物理像素
-  canvas.width = Math.round(cw * dpr)
-  canvas.height = Math.round(ch * dpr)
-  canvas.style.height = `${ch}px`
-  ctx.setTransform(scale, 0, 0, scale, 0, 0)
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  canvas.width = Math.round(rect.width * dpr)
+  canvas.height = Math.round(rect.height * dpr)
+  ctx = canvas.getContext('2d')
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  return rect
 }
 
-// ===== 深色实验室配色 =====
-const C = {
-  bg0: '#0a0d14',
-  bg1: '#0e1320',
-  panel: '#111726',
-  grid: 'rgba(140,165,210,0.07)',
-  axis: 'rgba(150,170,210,0.35)',
-  accent: '#ff3b4d',
-  green: '#0d9b61',
-  amber: '#ffc94d',
-  blue: '#6ea8ff',
-  text: '#c9d1d9',
-  muted: '#7d8794',
-  white: '#eef3fa'
+function dims() {
+  const canvas = canvasRef.value
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  return { W: canvas.width / dpr, H: canvas.height / dpr }
 }
 
-function drawBackground() {
-  // 垂直渐变
-  const g = ctx.createLinearGradient(0, 0, 0, H)
-  g.addColorStop(0, C.bg0)
-  g.addColorStop(0.5, C.bg1)
-  g.addColorStop(1, '#0a0d14')
-  ctx.fillStyle = g
-  ctx.fillRect(0, 0, W, H)
+// 计算场景布局：斜面坡度真实改变斜面几何
+function layout() {
+  const { W, H } = dims()
+  const groundY = H - 78
+  const pivotX = W * 0.70 // 斜面底端支点
+  const pivotY = groundY - 4
+  // 斜面长度随总路程变化（60cm→170px，200cm→340px），让“总路程”真正改变动画
+  const RAMP_LEN = clamp(170 + ((distanceCm.value - 60) / 140) * 170, 170, 340)
+  const theta = (slope.value * Math.PI) / 180
+  const topX = pivotX - RAMP_LEN * Math.cos(theta)
+  const topY = pivotY - RAMP_LEN * Math.sin(theta)
+  return { W, H, groundY, pivotX, pivotY, RAMP_LEN, theta, topX, topY }
+}
 
-  // 细网格
-  ctx.strokeStyle = C.grid
+// 斜面表面上的点（f: 0=顶端起点, 1=底端）
+function ptOnPlank(L, f) {
+  return {
+    x: L.topX + (L.pivotX - L.topX) * f,
+    y: L.topY + (L.pivotY - L.topY) * f
+  }
+}
+
+function rr(x, y, w, h, r) {
+  if (ctx.roundRect) {
+    ctx.beginPath()
+    ctx.roundRect(x, y, w, h, r)
+    return
+  }
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
+}
+
+// 背景 + 米白实验底座
+function drawBackground(L) {
+  ctx.fillStyle = '#f2f0ec'
+  ctx.fillRect(0, 0, L.W, L.H)
+  const px = L.W * 0.08
+  const pw = L.W * 0.86
+  const py = L.groundY
+  const ph = 36
+  ctx.fillStyle = 'rgba(60,50,40,0.10)'
+  rr(px + 6, py + 12, pw, ph, 16)
+  ctx.fill()
+  ctx.fillStyle = '#efe9dd'
+  rr(px, py, pw, ph, 16)
+  ctx.fill()
+  ctx.fillStyle = '#e3d9c8'
+  rr(px, py + ph - 9, pw, 9, 9)
+  ctx.fill()
+}
+
+// 木质斜面（含支撑楔块、刻度尺与零刻度）
+function drawRamp(L) {
+  const top = { x: L.topX, y: L.topY }
+  const pivot = { x: L.pivotX, y: L.pivotY }
+  const n = { x: Math.sin(L.theta), y: -Math.cos(L.theta) }
+
+  // 支撑楔块（直角三角形：顶端、底端、底端正下方）
+  ctx.fillStyle = '#e3d2b0'
+  ctx.beginPath()
+  ctx.moveTo(top.x, top.y)
+  ctx.lineTo(pivot.x, pivot.y)
+  ctx.lineTo(top.x, pivot.y)
+  ctx.closePath()
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(120,90,50,0.25)'
   ctx.lineWidth = 1
-  for (let x = 30; x < W; x += 30) {
-    ctx.beginPath()
-    ctx.moveTo(x, 0)
-    ctx.lineTo(x, H)
-    ctx.stroke()
-  }
-  for (let y = 20; y < H; y += 20) {
-    ctx.beginPath()
-    ctx.moveTo(0, y)
-    ctx.lineTo(W, y)
-    ctx.stroke()
-  }
-
-  // 顶部呼吸光晕
-  const halo = ctx.createRadialGradient(W * 0.5, -40, 10, W * 0.5, -40, 420)
-  halo.addColorStop(0, 'rgba(110,168,255,0.10)')
-  halo.addColorStop(1, 'rgba(110,168,255,0)')
-  ctx.fillStyle = halo
-  ctx.fillRect(0, 0, W, H)
-}
-
-function drawDesk() {
-  // 桌面渐变
-  const dg = ctx.createLinearGradient(0, deskY, 0, deskY + 40)
-  dg.addColorStop(0, 'rgba(140,165,210,0.14)')
-  dg.addColorStop(1, 'rgba(140,165,210,0.02)')
-  ctx.fillStyle = dg
-  ctx.fillRect(0, deskY, W, H - deskY)
-
-  // 桌面亮线
-  ctx.strokeStyle = 'rgba(150,180,220,0.5)'
-  ctx.lineWidth = 1.5
-  ctx.beginPath()
-  ctx.moveTo(0, deskY)
-  ctx.lineTo(W, deskY)
   ctx.stroke()
-
-  // 桌面暗面
-  ctx.strokeStyle = 'rgba(150,180,220,0.14)'
+  // 楔块左侧竖直面阴影
+  ctx.fillStyle = 'rgba(0,0,0,0.05)'
   ctx.beginPath()
-  ctx.moveTo(0, deskY + 2)
-  ctx.lineTo(W, deskY + 2)
-  ctx.stroke()
-}
-
-function drawWedge() {
-  const p = pts.value
-  const rad = (angleDeg.value * Math.PI) / 180
-
-  // 斜面投下的阴影
-  ctx.save()
-  ctx.shadowColor = 'rgba(0,0,0,0.55)'
-  ctx.shadowBlur = 24
-  ctx.shadowOffsetY = 10
-  ctx.fillStyle = 'rgba(0,0,0,0.5)'
-  ctx.beginPath()
-  ctx.moveTo(p[0].x + 4, p[0].y + 16)
-  ctx.lineTo(p[2].x + 18, p[2].y + 16)
-  ctx.lineTo(p[2].x + 34, p[2].y + 26)
-  ctx.lineTo(p[0].x - 2, p[0].y + 26)
-  ctx.closePath()
-  ctx.fill()
-  ctx.restore()
-
-  // 木制斜面表面（带高光渐变）
-  const wg = ctx.createLinearGradient(p[0].x, p[0].y, p[2].x, p[2].y)
-  wg.addColorStop(0, '#c9a76b')
-  wg.addColorStop(0.5, '#b58f52')
-  wg.addColorStop(1, '#9a723a')
-  ctx.fillStyle = wg
-  ctx.beginPath()
-  ctx.moveTo(p[0].x, p[0].y)
-  ctx.lineTo(p[2].x, p[2].y)
-  ctx.lineTo(p[2].x + 14, p[2].y + 14)
-  ctx.lineTo(p[0].x - 14, p[0].y + 14)
+  ctx.moveTo(top.x, top.y)
+  ctx.lineTo(top.x, pivot.y)
+  ctx.lineTo(top.x - 8, pivot.y)
+  ctx.lineTo(top.x - 8, top.y + 8 * Math.tan(L.theta))
   ctx.closePath()
   ctx.fill()
 
-  // 斜面顶部高光带
-  ctx.save()
-  ctx.shadowColor = 'rgba(255,240,200,0.5)'
-  ctx.shadowBlur = 6
-  ctx.strokeStyle = 'rgba(255,235,190,0.85)'
+  // 木质斜面（厚线绘制，带底部阴影边）
+  const thick = 16
+  ctx.lineCap = 'round'
+  ctx.strokeStyle = '#a9824f'
+  ctx.lineWidth = thick + 4
+  ctx.beginPath()
+  ctx.moveTo(top.x, top.y + 3)
+  ctx.lineTo(pivot.x, pivot.y + 3)
+  ctx.stroke()
+  ctx.strokeStyle = '#c9a36b'
+  ctx.lineWidth = thick
+  ctx.beginPath()
+  ctx.moveTo(top.x, top.y)
+  ctx.lineTo(pivot.x, pivot.y)
+  ctx.stroke()
+
+  // 木纹（沿斜面两条细线）
+  ctx.strokeStyle = 'rgba(150,110,60,0.5)'
+  ctx.lineWidth = 1
+  for (const off of [5, -5]) {
+    ctx.beginPath()
+    ctx.moveTo(top.x + n.x * off, top.y + n.y * off)
+    ctx.lineTo(pivot.x + n.x * off, pivot.y + n.y * off)
+    ctx.stroke()
+  }
+
+  // 斜面保持简洁：仅起点/中点/终点由标记显示数字，不再绘制沿线刻度尺
+}
+
+// 起 / 中 / 末 测量标记（仅显示数字）
+function drawMarker(L, f, color, num) {
+  const p = ptOnPlank(L, f)
+  const n = { x: Math.sin(L.theta), y: -Math.cos(L.theta) }
+  const tip = { x: p.x + n.x * 24, y: p.y + n.y * 24 }
+  ctx.strokeStyle = color
   ctx.lineWidth = 2
   ctx.beginPath()
-  ctx.moveTo(p[0].x, p[0].y)
-  ctx.lineTo(p[2].x, p[2].y)
+  ctx.moveTo(p.x, p.y)
+  ctx.lineTo(tip.x, tip.y)
   ctx.stroke()
-  ctx.restore()
-
-  // 木纹
-  ctx.strokeStyle = 'rgba(120,85,40,0.5)'
-  ctx.lineWidth = 1
-  for (let i = 1; i < 8; i++) {
-    const t = i / 8
-    const x1 = p[0].x + (p[2].x - p[0].x) * t
-    const y1 = p[0].y + (p[2].y - p[0].y) * t
-    ctx.beginPath()
-    ctx.moveTo(x1 - 14, y1 + 6)
-    ctx.lineTo(x1 + 14, y1 + 14)
-    ctx.stroke()
-  }
-
-  // 深色支撑楔
-  const sg = ctx.createLinearGradient(0, p[0].y + 14, 0, deskY)
-  sg.addColorStop(0, '#5c4a2e')
-  sg.addColorStop(1, '#3a2f1e')
-  ctx.fillStyle = sg
+  ctx.fillStyle = color
   ctx.beginPath()
-  ctx.moveTo(p[0].x - 14, p[0].y + 14)
-  ctx.lineTo(p[2].x + 14, p[2].y + 14)
-  ctx.lineTo(p[2].x + 14, deskY)
-  ctx.lineTo(p[0].x - 14, deskY)
-  ctx.closePath()
+  ctx.arc(tip.x, tip.y, 4, 0, Math.PI * 2)
   ctx.fill()
-
-  // 支撑侧边高光
-  ctx.strokeStyle = 'rgba(255,220,160,0.12)'
-  ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(p[0].x - 14, p[0].y + 14)
-  ctx.lineTo(p[0].x - 14, deskY)
-  ctx.stroke()
-
-  // 顶端挡板
-  ctx.fillStyle = 'rgba(160,170,190,0.9)'
-  ctx.fillRect(p[0].x - 10, p[0].y - 26, 10, 26)
-  ctx.fillStyle = 'rgba(255,255,255,0.25)'
-  ctx.fillRect(p[0].x - 10, p[0].y - 26, 3, 26)
-
-  // 底部挡板
-  ctx.fillStyle = 'rgba(130,140,160,0.9)'
-  ctx.fillRect(p[2].x + 2, p[2].y - 26, 11, 26)
-  ctx.fillStyle = 'rgba(255,255,255,0.2)'
-  ctx.fillRect(p[2].x + 2, p[2].y - 26, 3, 26)
-
-  void rad
-}
-
-function drawScale() {
-  const p = pts.value
-  const total = S_TOTAL.value
-  const rad = (angleDeg.value * Math.PI) / 180
-  // 沿斜面法线方向的偏移（刻度画在斜面表面下方）
-  const offX = Math.sin(rad)
-  const offY = -Math.cos(rad)
-
-  const n = 12
-  for (let i = 0; i <= n; i++) {
-    const t = i / n
-    const gx = p[0].x + (p[2].x - p[0].x) * t
-    const gy = p[0].y + (p[2].y - p[0].y) * t
-    const big = i % 3 === 0
-    ctx.strokeStyle = big ? C.accent : 'rgba(160,175,205,0.5)'
-    ctx.lineWidth = big ? 2 : 1
-    ctx.beginPath()
-    ctx.moveTo(gx + offX * 8, gy + offY * 8)
-    ctx.lineTo(gx + offX * 24, gy + offY * 24)
-    ctx.stroke()
-    if (big) {
-      ctx.fillStyle = big ? C.accent : C.muted
-      ctx.font = '600 11px sans-serif'
-      ctx.textAlign = 'center'
-      ctx.fillText(`${Math.round((i * total * 100) / n)}`, gx + offX * 40, gy + offY * 40 + 4)
-    }
-  }
-
-  // 中点、底端发光标记
-  const tag = (label, px, py, color) => {
-    ctx.save()
-    ctx.shadowColor = color
-    ctx.shadowBlur = 10
-    ctx.fillStyle = color
-    ctx.font = '700 12px sans-serif'
-    ctx.textAlign = 'center'
-    ctx.fillText(`◮ ${label}`, px, py)
-    ctx.restore()
-  }
-  tag(`中点 ${Math.round(total * 50)} cm`, p[1].x - offX * 72, p[1].y - offY * 72, C.green)
-  tag(`底端 ${Math.round(total * 100)} cm`, p[2].x - 8 - offX * 72, p[2].y - offY * 72, C.accent)
-}
-
-function drawTrail(cx, cy, rad, speedK) {
-  // 尾部光带（速度越快越长）
-  const len = 26 + speedK * 90
-  const p = pts.value
-  const ang = Math.atan2(p[2].y - p[0].y, p[2].x - p[0].x)
-  const g = ctx.createLinearGradient(cx - Math.cos(ang) * len, cy - Math.sin(ang) * len, cx, cy)
-  g.addColorStop(0, 'rgba(255,59,77,0)')
-  g.addColorStop(1, 'rgba(255,120,120,0.75)')
-  ctx.fillStyle = g
-  ctx.beginPath()
-  ctx.moveTo(cx - Math.cos(ang) * len - Math.sin(ang) * 5, cy - Math.sin(ang) * len + Math.cos(ang) * 5)
-  ctx.lineTo(cx - Math.sin(ang) * 5, cy + Math.cos(ang) * 5)
-  ctx.lineTo(cx + Math.sin(ang) * 5, cy - Math.cos(ang) * 5)
-  ctx.lineTo(cx - Math.cos(ang) * len + Math.sin(ang) * 5, cy - Math.sin(ang) * len - Math.cos(ang) * 5)
-  ctx.closePath()
-  ctx.fill()
-}
-
-function drawWindLines(cx, cy, rad, speedK) {
-  if (speedK < 0.25) return
-  const p = pts.value
-  const ang = Math.atan2(p[2].y - p[0].y, p[2].x - p[0].x)
-  ctx.strokeStyle = `rgba(180,210,255,${0.4 * speedK})`
-  ctx.lineWidth = 1.4
-  for (let i = 0; i < 3; i++) {
-    const off = (i - 1) * 7
-    const ox = cx + Math.cos(ang + Math.PI / 2) * off
-    const oy = cy + Math.sin(ang + Math.PI / 2) * off
-    const len = 26 + speedK * 70
-    const travel = ((flickerT * (1.5 + i * 0.4) + i * 130) % 260)
-    const bx = ox - Math.cos(ang) * (travel * speedK)
-    const by = oy - Math.sin(ang) * (travel * speedK)
-    ctx.beginPath()
-    ctx.moveTo(bx, by)
-    ctx.lineTo(bx - Math.cos(ang) * len, by - Math.sin(ang) * len)
-    ctx.stroke()
-  }
-}
-
-function drawCar(x, y, speedK) {
-  const p = pts.value
-  const rad = Math.atan2(p[2].y - p[0].y, p[2].x - p[0].x)
-  ctx.save()
-  ctx.translate(x, y)
-  ctx.rotate(rad)
-
-  // 车底阴影
-  ctx.save()
-  ctx.shadowColor = 'rgba(0,0,0,0.6)'
-  ctx.shadowBlur = 12
-  ctx.shadowOffsetY = 3
-
-  // 车身主体（红渐变，跑车线条）
-  const cg = ctx.createLinearGradient(0, -17, 0, 12)
-  cg.addColorStop(0, '#ff6b5e')
-  cg.addColorStop(0.45, '#f23b3b')
-  cg.addColorStop(1, '#b01e28')
-  ctx.fillStyle = cg
-  ctx.beginPath()
-  ctx.moveTo(-20, -8)
-  ctx.quadraticCurveTo(-23, -17, -12, -16)
-  ctx.quadraticCurveTo(2, -17, 10, -14)
-  ctx.quadraticCurveTo(18, -13, 20, -6)
-  ctx.quadraticCurveTo(22, 0, 18, 4)
-  ctx.lineTo(-22, 4)
-  ctx.quadraticCurveTo(-27, 0, -20, -8)
-  ctx.closePath()
-  ctx.fill()
-  ctx.restore()
-
-  // 车身描边高光
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)'
-  ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(-18, -7)
-  ctx.quadraticCurveTo(-20, -15, -10, -14)
-  ctx.quadraticCurveTo(2, -15, 9, -12)
-  ctx.stroke()
-
-  // 侧面高光
-  const hg = ctx.createLinearGradient(0, -16, 0, 3)
-  hg.addColorStop(0, 'rgba(255,255,255,0.6)')
-  hg.addColorStop(0.4, 'rgba(255,255,255,0.06)')
-  hg.addColorStop(1, 'rgba(255,255,255,0)')
-  ctx.fillStyle = hg
-  ctx.beginPath()
-  ctx.moveTo(-19, -8)
-  ctx.quadraticCurveTo(-18, -15, -9, -14)
-  ctx.lineTo(8, -14)
-  ctx.lineTo(-19, -8)
-  ctx.closePath()
-  ctx.fill()
-
-  // 车窗（蓝色反光）
-  const wg = ctx.createLinearGradient(-6, -14, 6, -9)
-  wg.addColorStop(0, '#bfe3ff')
-  wg.addColorStop(1, '#4f95d9')
-  ctx.fillStyle = wg
-  ctx.beginPath()
-  ctx.moveTo(-11, -13)
-  ctx.quadraticCurveTo(-3, -15, 5, -13)
-  ctx.lineTo(2, -7)
-  ctx.lineTo(-13, -7)
-  ctx.closePath()
-  ctx.fill()
-  ctx.strokeStyle = 'rgba(10,20,35,0.5)'
-  ctx.lineWidth = 0.8
-  ctx.stroke()
-
-  // 尾灯（运动时亮起）
-  if (speedK > 0.05) {
-    ctx.save()
-    ctx.shadowColor = C.accent
-    ctx.shadowBlur = 10
-    ctx.fillStyle = '#ff4d4d'
-    ctx.fillRect(-24, -7, 4, 5)
-    ctx.restore()
-  }
-
-  // 车轮（辐条随运动旋转）
-  for (const wx of [-11, 8]) {
-    ctx.fillStyle = '#101218'
-    ctx.beginPath()
-    ctx.arc(wx, 5, 5.6, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.strokeStyle = '#2a2f3a'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.arc(wx, 5, 5.6, 0, Math.PI * 2)
-    ctx.stroke()
-    // 轮毂
-    ctx.fillStyle = '#d9dde6'
-    ctx.beginPath()
-    ctx.arc(wx, 5, 2.2, 0, Math.PI * 2)
-    ctx.fill()
-    // 旋转辐条
-    ctx.save()
-    ctx.translate(wx, 5)
-    ctx.rotate(wheelAngle * (wx > 0 ? 1 : 1))
-    ctx.strokeStyle = 'rgba(200,205,220,0.75)'
-    ctx.lineWidth = 0.9
-    for (let a = 0; a < 4; a++) {
-      const aa = a * (Math.PI / 2)
-      ctx.beginPath()
-      ctx.moveTo(Math.cos(aa) * 1.2, Math.sin(aa) * 1.2)
-      ctx.lineTo(Math.cos(aa) * 4.4, Math.sin(aa) * 4.4)
-      ctx.stroke()
-    }
-    ctx.restore()
-  }
-
-  // 底盘
-  ctx.fillStyle = '#262a33'
-  ctx.fillRect(-24, 2, 44, 4)
-
-  ctx.restore()
-}
-
-function drawHeader() {
-  const total = S_TOTAL.value
+  ctx.fillStyle = '#3a3026'
+  ctx.font = '700 12px system-ui, sans-serif'
   ctx.textAlign = 'center'
-  ctx.fillStyle = C.text
-  ctx.font = '700 14px sans-serif'
-  ctx.fillText(
-    state.value === 'ready' ? '小车静止在斜面顶端' : state.value === 'running' ? `计时中 … ${elapsed.value.toFixed(2)} s` : '测量完成！',
-    W / 2,
-    32
-  )
-  ctx.fillStyle = C.blue
-  ctx.font = '600 12px sans-serif'
-  ctx.fillText(`全程 s = ${total.toFixed(2)} m，中点 ${(total / 2).toFixed(2)} m，时刻自动记录`, W / 2, 50)
+  ctx.textBaseline = 'bottom'
+  ctx.fillText(`${num} cm`, tip.x, tip.y - 6)
+}
 
-  if (marks.mid !== null && state.value === 'running') {
-    ctx.fillStyle = C.green
-    ctx.font = '700 12px sans-serif'
-    ctx.fillText(`✅ 已自动记录中点时刻 t₂ = ${marks.mid.toFixed(2)} s`, W / 2, 68)
+// 停表 + 直尺道具
+function drawProps(L) {
+  // 停表（右上）
+  const sx = L.W - 56
+  const sy = 64
+  const r = 22
+  ctx.fillStyle = '#ffffff'
+  ctx.strokeStyle = '#3a3026'
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.arc(sx, sy, r, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.stroke()
+  ctx.fillStyle = '#3a3026'
+  rr(sx - 5, sy - r - 8, 10, 8, 2)
+  ctx.fill()
+  const frac = state.value === 'done' ? 1 : clamp(elapsed.value / Math.max(physics().tEnd, 1e-6), 0, 1)
+  const ang = -Math.PI / 2 + frac * Math.PI * 1.5
+  ctx.strokeStyle = '#e0584f'
+  ctx.lineWidth = 2.5
+  ctx.beginPath()
+  ctx.moveTo(sx, sy)
+  ctx.lineTo(sx + Math.cos(ang) * r * 0.7, sy + Math.sin(ang) * r * 0.7)
+  ctx.stroke()
+  ctx.fillStyle = '#3a3026'
+  ctx.beginPath()
+  ctx.arc(sx, sy, 2.5, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#3a3026'
+  ctx.font = '600 11px system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  ctx.fillText(elapsed.value.toFixed(2) + ' s', sx, sy + r + 4)
+
+  // 直尺（右下）
+  const rx = L.W - 156
+  const ry = L.H - 28
+  const rw = 130
+  const rh = 10
+  ctx.fillStyle = '#f6d7a0'
+  rr(rx, ry, rw, rh, 3)
+  ctx.fill()
+  ctx.strokeStyle = '#9a7b4f'
+  ctx.lineWidth = 1
+  rr(rx, ry, rw, rh, 3)
+  ctx.stroke()
+  ctx.strokeStyle = '#9a7b4f'
+  for (let i = 0; i <= 13; i++) {
+    const tx = rx + (i / 13) * rw
+    const h = i % 5 === 0 ? 6 : 3
+    ctx.beginPath()
+    ctx.moveTo(tx, ry)
+    ctx.lineTo(tx, ry + h)
+    ctx.stroke()
   }
-  if (results.value) {
-    ctx.fillStyle = C.accent
-    ctx.font = '700 12px sans-serif'
-    ctx.fillText(
-      `全程 v̄ = ${results.value.total}   ·   前半程 v̄ = ${results.value.half}   ·   后半程 v̄ = ${results.value.rest}`,
-      W / 2,
-      68
-    )
+}
+
+// 小车（矢量绘制，沿斜面倾斜，车轮转动）
+function drawCart(L, f, wheelAngle) {
+  const p = ptOnPlank(L, f)
+  const u = { x: Math.cos(L.theta), y: Math.sin(L.theta) }
+  const n = { x: Math.sin(L.theta), y: -Math.cos(L.theta) }
+  const L2W = (lx, ly) => ({ x: p.x + u.x * lx + n.x * ly, y: p.y + u.y * lx + n.y * ly })
+
+  const cartW = 48
+  const cartH = 18
+  const wheelR = WHEEL_R
+  const gap = 2
+
+  // 接触阴影
+  ctx.fillStyle = 'rgba(60,50,40,0.18)'
+  ctx.beginPath()
+  ctx.ellipse(p.x, p.y + 2, cartW * 0.55, 5, L.theta, 0, Math.PI * 2)
+  ctx.fill()
+
+  // 车轮
+  const wheelXs = [-cartW * 0.3, cartW * 0.3]
+  for (const wx of wheelXs) {
+    const c = L2W(wx, wheelR)
+    ctx.fillStyle = '#2b2b2b'
+    ctx.beginPath()
+    ctx.arc(c.x, c.y, wheelR, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = '#9a9a9a'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.arc(c.x, c.y, wheelR - 2.5, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.save()
+    ctx.translate(c.x, c.y)
+    ctx.rotate(wheelAngle)
+    ctx.strokeStyle = '#cfcfcf'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.moveTo(-wheelR + 2, 0)
+    ctx.lineTo(wheelR - 2, 0)
+    ctx.moveTo(0, -wheelR + 2)
+    ctx.lineTo(0, wheelR - 2)
+    ctx.stroke()
+    ctx.restore()
   }
+
+  // 车身
+  const b0 = L2W(-cartW / 2, wheelR + gap)
+  const b1 = L2W(cartW / 2, wheelR + gap)
+  const b2 = L2W(cartW / 2, wheelR + gap + cartH)
+  const b3 = L2W(-cartW / 2, wheelR + gap + cartH)
+  ctx.fillStyle = '#e0584f'
+  ctx.beginPath()
+  ctx.moveTo(b0.x, b0.y)
+  ctx.lineTo(b1.x, b1.y)
+  ctx.lineTo(b2.x, b2.y)
+  ctx.lineTo(b3.x, b3.y)
+  ctx.closePath()
+  ctx.fill()
+  // 车身底部深色条
+  const d0 = L2W(-cartW / 2, wheelR + gap)
+  const d1 = L2W(cartW / 2, wheelR + gap)
+  const d2 = L2W(cartW / 2, wheelR + gap + 5)
+  const d3 = L2W(-cartW / 2, wheelR + gap + 5)
+  ctx.fillStyle = '#c4453d'
+  ctx.beginPath()
+  ctx.moveTo(d0.x, d0.y)
+  ctx.lineTo(d1.x, d1.y)
+  ctx.lineTo(d2.x, d2.y)
+  ctx.lineTo(d3.x, d3.y)
+  ctx.closePath()
+  ctx.fill()
+  // 车窗
+  const w0 = L2W(-cartW / 2 + 8, wheelR + gap + 5)
+  const w1 = L2W(cartW / 2 - 8, wheelR + gap + 5)
+  const w2 = L2W(cartW / 2 - 8, wheelR + gap + cartH - 2)
+  const w3 = L2W(-cartW / 2 + 8, wheelR + gap + cartH - 2)
+  ctx.fillStyle = '#bfe3f0'
+  ctx.beginPath()
+  ctx.moveTo(w0.x, w0.y)
+  ctx.lineTo(w1.x, w1.y)
+  ctx.lineTo(w2.x, w2.y)
+  ctx.lineTo(w3.x, w3.y)
+  ctx.closePath()
+  ctx.fill()
+  // 小旗
+  const ft = L2W(0, wheelR + gap + cartH)
+  ctx.strokeStyle = '#7a7a7a'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(ft.x, ft.y)
+  ctx.lineTo(ft.x, ft.y - 16)
+  ctx.stroke()
+  ctx.fillStyle = '#e0584f'
+  ctx.beginPath()
+  ctx.moveTo(ft.x, ft.y - 16)
+  ctx.lineTo(ft.x + 12, ft.y - 12)
+  ctx.lineTo(ft.x, ft.y - 8)
+  ctx.closePath()
+  ctx.fill()
+}
+
+function drawOverlay() {
+  if (!ctx) return
+  const { W } = dims()
+  ctx.fillStyle = 'rgba(255,255,255,0.82)'
+  rr(12, 12, Math.min(W - 24, 360), 34, 8)
+  ctx.fill()
+  ctx.fillStyle = '#3a3026'
+  ctx.font = '600 13px system-ui, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(hint.value, 22, 29)
 }
 
 function render() {
   if (!ctx) return
-  ctx.clearRect(0, 0, W, H)
-
-  drawBackground()
-  drawDesk()
-  drawWedge()
-  drawScale()
-
-  // 小车位置插值（用平滑后的显示位置）
-  const p = pts.value
-  const cp = p[0].x + (p[2].x - p[0].x) * dispPos
-  const cpy = p[0].y + (p[2].y - p[0].y) * dispPos
-  const speedK = Math.min(1, speed / 3)
-  drawTrail(cp, cpy, 0, speedK)
-  drawWindLines(cp, cpy, 0, speedK)
-  drawCar(cp, cpy, speedK)
-
-  drawHeader()
+  const L = layout()
+  drawBackground(L)
+  drawRamp(L)
+  drawMarker(L, 0, '#8a8a8a', 0)
+  drawMarker(L, 0.5, '#3b6fd4', Math.round(distanceCm.value * 0.5))
+  drawMarker(L, 1, '#2faf6b', distanceCm.value)
+  drawProps(L)
+  const f = currentFrac.value
+  const traveledPx = f * L.RAMP_LEN
+  drawCart(L, f, traveledPx / WHEEL_R)
+  drawOverlay()
 }
 
+// ===== 控制 =====
 function startRun() {
   if (state.value === 'running') return
   state.value = 'running'
-  carPosNum = 0
-  dispPos = 0
-  prevPos = 0
-  speed = 0
-  wheelAngle = 0
+  tScreen = 0
+  currentFrac.value = 0
   elapsed.value = 0
   marks.mid = null
   marks.end = null
   results.value = null
   completed = false
-  trace.length = 0
+  lastT = performance.now()
   startBtn.value = '再次计时'
   hint.value = `小车下滑中，系统将自动记录中点(${Math.round((S_TOTAL.value / 2) * 100)}cm)与底端的时刻`
 }
@@ -571,7 +427,6 @@ function stopRun() {
   if (state.value !== 'running') return
   marks.end = elapsed.value
   state.value = 'done'
-
   const total = S_TOTAL.value
   const halfDist = total / 2
   const calc = (dist, t) => (t > 0 ? (dist / t).toFixed(2) : '—')
@@ -579,10 +434,9 @@ function stopRun() {
   const halfS = calc(halfDist, marks.mid)
   const restS = calc(halfDist, marks.end - marks.mid)
   results.value = { total: `${totalS} m/s`, half: `${halfS} m/s`, rest: `${restS} m/s` }
-
   if (!completed) {
     completed = true
-    hint.value = `测量完成！全程 ${totalS} m/s，中点 ${marks.mid.toFixed(2)} s，底端 ${marks.end.toFixed(2)} s ✅`
+    hint.value = `测量完成！全程 ${totalS} m/s，中点 ${marks.mid.toFixed(2)} s，底端 ${marks.end.toFixed(2)} s`
     emit('complete')
   } else {
     hint.value = `再次测量：全程 ${totalS} m/s（多次测量取平均值更准）`
@@ -592,60 +446,60 @@ function stopRun() {
 
 function resetAll() {
   state.value = 'ready'
-  carPosNum = 0
-  dispPos = 0
-  prevPos = 0
-  speed = 0
+  tScreen = 0
+  currentFrac.value = 0
   elapsed.value = 0
   marks.mid = null
   marks.end = null
   results.value = null
   completed = false
-  trace.length = 0
   startBtn.value = '开始计时'
   hint.value = '点击「开始计时」释放小车'
 }
 
-function loop() {
-  flickerT += 1
+function loop(now) {
+  if (!lastT) lastT = now
+  const dtRaw = (now - lastT) / 1000
+  lastT = now
+  const dt = Math.min(dtRaw, 0.05)
+
   if (state.value === 'running') {
-    const dt = 1
-    speed += ACCEL.value * dt
-    carPosNum += speed / len.value
-    elapsed.value += dt * 0.016 // 每帧 16ms
+    tScreen += dt
+    const { tEnd } = physics()
+    const tReal = Math.min(tScreen / SLOWMO, tEnd)
+    const frac = Math.min(1, Math.pow(tReal / tEnd, 2))
 
-    // 车轮转动
-    wheelAngle += (carPosNum - prevPos) * 6
-    prevPos = carPosNum
+    elapsed.value = tReal
 
-    // 记录 s-t 点
-    trace.push({ t: elapsed.value, s: carPosNum * S_TOTAL.value })
-
-    // 自动记录中点时刻（精确插值）
-    if (carPosNum >= 0.5 && marks.mid === null) {
-      marks.mid = elapsed.value
-      hint.value = `✅ 中点时刻 ${marks.mid.toFixed(2)} s 已记录，等待底端…`
+    if (frac >= 0.5 && marks.mid === null) {
+      marks.mid = tReal
+      hint.value = `中点时刻 ${marks.mid.toFixed(2)} s 已记录，等待底端…`
     }
-    // 自动记录底端时刻
-    if (carPosNum >= 1) {
-      carPosNum = 1
+    if (frac >= 1) {
       stopRun()
     }
+    currentFrac.value = frac
   }
-
-  // 显示位置平滑跟随（顺滑缓动）
-  const diff = carPosNum - dispPos
-  dispPos += diff * 0.16
-  if (Math.abs(diff) < 0.001) dispPos = carPosNum
 
   render()
   raf = requestAnimationFrame(loop)
 }
 
+function resizeCanvas() {
+  if (!canvasRef.value) return
+  setupCanvas()
+  render()
+}
+
+watch(slope, render)
+watch(distanceCm, render)
+
+let resizeObs = null
 onMounted(() => {
   setupCanvas()
+  render()
   if (window.ResizeObserver) {
-    resizeObs = new ResizeObserver(() => resizeCanvas())
+    resizeObs = new ResizeObserver(resizeCanvas)
     resizeObs.observe(canvasRef.value.parentElement)
   }
   raf = requestAnimationFrame(loop)
@@ -663,41 +517,32 @@ onBeforeUnmount(() => {
       <div class="lab-panel" style="padding:0">
         <canvas
           ref="canvasRef"
-          style="display:block;width:100%;background:#0a0d14;touch-action:none"
+          style="display:block;width:100%;height:520px;background:#f2f0ec;touch-action:none;border-radius:8px"
         ></canvas>
       </div>
 
       <div class="lab-actions">
-        <button v-if="state !== 'running'" class="btn btn-primary" @click="startRun">▶ {{ startBtn }}</button>
-        <button class="btn" @click="resetAll">↺ 重置</button>
+        <button v-if="state !== 'running'" class="btn btn-primary" @click="startRun">{{ startBtn }}</button>
+        <button class="btn" @click="resetAll">重置</button>
         <span class="feedback" :class="completed ? 'ok' : 'no'">{{ hint }}</span>
       </div>
-
-      <FormulaPanel
-        title="🧮 公式与结果"
-        formula="v̄ = s / t"
-        desc="平均速度 = 路程 ÷ 时间。小车沿斜面下滑，用停表测出各段时间，即可算出各段平均速度。"
-        :rows="formulaRows"
-        :result="formulaResults"
-        :verify="verifySteps"
-      />
     </div>
 
     <aside class="lab-right">
       <div class="lab-panel">
         <div class="lab-panel-head">
-          <strong>⚙ 可调变量</strong>
+          <strong>可调变量</strong>
           <span>实时联动</span>
         </div>
         <div class="lab-params">
-          <ParamSlider v-model="slope" :min="20" :max="55" :step="1" label="斜面坡度 θ" unit="°" hint="坡度越大，小车下滑越快，计时误差越大" />
+          <ParamSlider v-model="slope" :min="20" :max="55" :step="1" label="斜面坡度 θ" unit="°" hint="坡度越大，小车下滑越快，斜面会实时倾斜" />
           <ParamSlider v-model="distanceCm" :min="60" :max="200" :step="10" label="总路程 s" unit=" cm" hint="改变斜面长度，测不同路程的平均速度" />
         </div>
       </div>
 
       <div class="lab-panel">
         <div class="lab-panel-head">
-          <strong>📊 实时数据</strong>
+          <strong>实时数据</strong>
           <span>自动记录</span>
         </div>
         <div class="lab-readout">
@@ -719,6 +564,15 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
+
+      <FormulaPanel
+        title="公式与结果"
+        formula="v̄ = s / t"
+        desc="平均速度 = 路程 ÷ 时间。小车沿斜面下滑，用停表测出各段时间，即可算出各段平均速度。"
+        :rows="formulaRows"
+        :result="formulaResults"
+        :verify="verifySteps"
+      />
     </aside>
   </div>
 </template>

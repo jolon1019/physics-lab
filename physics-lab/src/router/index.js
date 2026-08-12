@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import { findExpId } from '../data/experiments'
+import { useAuthStore } from '../stores/auth'
 
 const routes = [
   {
@@ -25,7 +26,7 @@ const routes = [
     path: '/record',
     name: 'record',
     component: () => import('../views/RecordView.vue'),
-    meta: { title: '学习记录' }
+    meta: { title: '学习记录', requiresAuth: true }
   }
 ]
 
@@ -35,6 +36,14 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
+  // 需要登录但未登录：打开登录弹窗，并记住登录后要去的页面
+  if (to.meta.requiresAuth) {
+    const auth = useAuthStore()
+    if (!auth.token) {
+      auth.openLogin(to.fullPath)
+      return { path: '/' }
+    }
+  }
   // 支持 liziwuli 风格 ?experiment=slug 直达
   const slug = to.query.experiment
   if (slug) {

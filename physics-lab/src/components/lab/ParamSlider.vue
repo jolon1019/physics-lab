@@ -22,10 +22,10 @@ function onChange(e) {
 </script>
 
 <template>
-  <div style="padding:12px 14px">
-    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px">
-      <span style="font-size:13px;font-weight:600;color:var(--text-h)">{{ label }}</span>
-      <span style="font-size:14px;font-weight:700;color:var(--accent);font-family:var(--mono)">{{ display }}</span>
+  <div style="padding:8px 12px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px">
+      <span style="font-size:12px;font-weight:600;color:var(--text-h)">{{ label }}</span>
+      <span style="font-size:13px;font-weight:700;color:var(--accent);font-family:var(--mono)">{{ display }}</span>
     </div>
     <input
       type="range"
@@ -34,8 +34,8 @@ function onChange(e) {
       :step="step"
       :value="modelValue"
       @input="onChange"
-      style="width:100%;accent-color:var(--accent);cursor:pointer"
+      style="width:100%;accent-color:var(--accent);cursor:pointer;height:16px"
     />
-    <p v-if="hint" style="font-size:11px;color:var(--text-dim);margin-top:4px">{{ hint }}</p>
+    <p v-if="hint" style="font-size:11px;color:var(--text-dim);margin-top:3px">{{ hint }}</p>
   </div>
 </template>
