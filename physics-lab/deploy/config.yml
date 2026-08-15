@@ -1,0 +1,32 @@
+# ============================================================
+# Cloudflare Tunnel 配置模板  (项目: physics-lab)
+# ------------------------------------------------------------
+# 使用前请先完成:
+#   1. 安装 cloudflared
+#      https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/
+#   2. 登录 (浏览器选你的域名, 域名需托管在 Cloudflare):
+#        cloudflared tunnel login
+#   3. 创建隧道:
+#        cloudflared tunnel create physics-lab
+#      -> 记下输出的 Tunnel ID, 并确认 credentials 文件已生成到:
+#         C:\Users\Administrator\.cloudflared\<TUNNEL_ID>.json
+#   4. 把下面 <TUNNEL_ID> 换成真实 ID, 把 hostname 换成你的子域名
+#   5. (首次) 绑定 DNS:
+#        cloudflared tunnel route dns physics-lab lab.yourdomain.com
+#
+# 运行方式:
+#   - 推荐: 把本文件放到 C:\Users\Administrator\.cloudflared\config.yml
+#           (cloudflared 默认读取该路径)
+#   - 或:   cloudflared tunnel --config deploy/config.yml run physics-lab
+# ============================================================
+
+tunnel: <TUNNEL_ID>
+credentials-file: C:/Users/Administrator/.cloudflared/<TUNNEL_ID>.json
+
+ingress:
+  # 你的域名 -> 本机 Node 服务
+  # server/index.mjs 同时托管 dist 前端 + /api 后端 (默认端口 3001)
+  - hostname: lab.yourdomain.com
+    service: http://localhost:3001
+  # 兜底
+  - service: http_status:404

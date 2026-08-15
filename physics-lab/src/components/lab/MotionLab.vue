@@ -5,72 +5,54 @@ import FormulaPanel from './FormulaPanel.vue'
 
 const emit = defineEmits(['complete'])
 
-const canvasRef = ref(null)
-let ctx = null
-let raf = null
-let dpr = 1
-let flickerT = 0
+// 动态 viewBox：高度固定，宽度跟随容器宽高比实时计算
+// => 画面始终满铺容器、零留白、永不变形（无论右侧如何拉长）
+const H = 520
+const W = ref(1000)
+const groundY = 360
+const MIN_W = 420
+const MAX_W = 2600
 
-const W = 860
-const H = 460
-const groundY = 330
+const stageEl = ref(null)
+let ro = null
+
+const carCenter = () => W.value / 2
+const cloudCenter = () => W.value * 0.56
+const trackLeft = () => -140
+const trackRight = () => W.value + 140
+const trackSpan = () => W.value + 280
 
 const speed = ref(2) // 车速 m/s
 const cloudSpeed = ref(2) // 白云速度 m/s（默认与车相同 → 相对静止）
 const reference = ref('ground') // ground | car | cloud
 
-// 车/云的连续位置（始终单向增大，从左向右行驶、循环，绝不反向）
-let carPos = 470
-let cloudPos = 512
+// 连续位置（始终单向增大、循环，绝不反向）
+let carPos = carCenter()
+let cloudPos = cloudCenter()
 let wheelAngle = 0
-
-// 屏幕循环轨道：物体始终从左向右行驶，超出右界则从左侧重新进入
-const TRACK_LEFT = -90
-const TRACK_RIGHT = W + 90
-const TRACK_SPAN = TRACK_RIGHT - TRACK_LEFT
-// 把连续位置映射到屏幕 X（左→右循环）
-function trackX(pos) {
-  return mod(pos - TRACK_LEFT, TRACK_SPAN) + TRACK_LEFT
-}
-// 记录汽车的屏幕 X，供尾气粒子定位
-let carScreenXCur = 470
-
-// 现成精美车模：内嵌侧视小车 SVG，运行时作为图片绘制（叠加旋转车轮）
-// 车身整体水平镜像，使长车头（引擎盖）朝右、前大灯在右，车头明确朝右
-const CAR_SVG =
-  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 220 120' width='220' height='120'>" +
-  "<defs><linearGradient id='bd' x1='0' y1='34' x2='0' y2='104' gradientUnits='userSpaceOnUse'>" +
-  "<stop offset='0' stop-color='#ff8a7d'/><stop offset='0.5' stop-color='#e6454d'/><stop offset='1' stop-color='#a51d27'/>" +
-  "</linearGradient></defs>" +
-  "<g transform='translate(220,0) scale(-1,1)'>" +
-  "<path d='M14 98 L14 76 Q14 68 24 68 L70 68 L96 40 Q102 34 114 34 L146 34 Q158 34 166 44 L196 68 Q206 70 206 80 L206 98 Z' fill='url(#bd)'/>" +
-  "<path d='M14 88 L206 88 L206 98 L14 98 Z' fill='#8c1620' opacity='0.55'/>" +
-  "<path d='M76 66 L96 46 L110 46 L110 66 Z' fill='#bfe3ff'/>" +
-  "<path d='M114 46 L144 46 L160 66 L114 66 Z' fill='#bfe3ff'/>" +
-  "<path d='M74 68 L96 44 L112 44 L112 68 Z' fill='none' stroke='#16212c' stroke-width='3'/>" +
-  "<path d='M114 44 L146 44 L162 68 L114 68 Z' fill='none' stroke='#16212c' stroke-width='3'/>" +
-  "<line x1='112' y1='46' x2='112' y2='88' stroke='#8c1620' stroke-width='2'/>" +
-  "<circle cx='58' cy='96' r='17' fill='#15181f'/>" +
-  "<circle cx='162' cy='96' r='17' fill='#15181f'/>" +
-  "</g>" +
-  // 镜像后的车灯：黄色前大灯在右、红色尾灯在左
-  "<ellipse cx='204' cy='76' rx='5' ry='4' fill='#fff3c4'/>" +
-  "<rect x='11' y='74' width='5' height='8' rx='1' fill='#ff5252'/>" +
-  "</svg>"
-let carImg = null
-
-// 固定在地面上的景物（车道线、路灯），以地面为参照物时不动
-const LANES = [180, 420, 660, 900]
-const LAMPS = [320, 780]
-const MOD = 1100
-
-// 尾气粒子
-const puffs = []
+let frame = 0
+// 背景氛围云的累计偏移：随白云速度推进，w=0 时冻结（不再用 frame 驱动）
+let cloudDrift1 = 140
+let cloudDrift2 = 640
 
 const seen = { ground: false, car: false, cloud: false }
 let completed = false
 
 const hint = ref('切换参照物，观察同一物体是运动还是静止')
+
+// 响应式渲染状态
+const carX = ref(carCenter())
+const carBounce = ref(0)
+const cloudX = ref(cloudCenter())
+const cloudY = ref(groundY - 188)
+const worldOffset = ref(0)
+const laneOffset = ref(0)
+const lampOffset = ref(0)
+const hillOffset = ref(0)
+const cityOffset = ref(0)
+const wheelAngleVal = ref(0)
+const puffs = ref([])
+const speedLines = ref([])
 
 // 运动状态取决于各物体相对参照物的速度是否相同
 const EPS = 0.001
@@ -95,7 +77,6 @@ const verdict = computed(() => {
       ground: cs > 0 ? '向后运动' : '静止'
     }
   }
-  // 以白云为参照物：白云恒静止；车/人是否静止取决于白云速度是否等于车速
   return {
     car: relState(cs, ws),
     person: relState(cs, ws),
@@ -111,20 +92,33 @@ const refLabel = computed(() =>
   reference.value === 'car' ? '车厢' : reference.value === 'cloud' ? '白云' : '地面'
 )
 
-// 切换参照物时重置运动学状态：非地面参照下参照物居中、单向循环不反向
-function resetMotion(r) {
-  if (r === 'ground') {
-    carPos = 470
-    cloudPos = 512
-  } else {
-    carPos = 470
-    cloudPos = 512
-  }
+// 玻璃拟态结论卡片（窄屏自动收窄）
+const cardW = computed(() => (W.value < 680 ? 196 : 256))
+const cardH = 132
+const cardX = computed(() => W.value - 14 - cardW.value)
+
+function mod(x, n) {
+  return ((x % n) + n) % n
 }
+function trackX(pos) {
+  return mod(pos - trackLeft(), trackSpan()) + trackLeft()
+}
+function wrapX(v) {
+  const span = W.value + 140
+  return mod(v + 70, span) - 70
+}
+
+// 背景星点（相对坐标，随宽度铺开）
+const stars = Array.from({ length: 54 }, () => ({
+  rx: Math.random(),
+  ry: Math.random() * 0.42,
+  r: 0.7 + Math.random() * 1.6,
+  o: 0.25 + Math.random() * 0.6,
+  d: (Math.random() * 6).toFixed(2)
+}))
 
 function pickReference(r) {
   reference.value = r
-  resetMotion(r)
   seen[r] = true
   if (r === 'cloud') {
     hint.value = '以白云为参照物：白云速度 = 车速时，车和人相对白云静止；调高白云速度，车相对白云向前运动'
@@ -143,371 +137,366 @@ function pickReference(r) {
 
 function reset() {
   reference.value = 'ground'
-  resetMotion('ground')
+  carPos = carCenter()
+  cloudPos = cloudCenter()
   seen.ground = seen.car = seen.cloud = false
   hint.value = '切换参照物，观察同一物体是运动还是静止'
 }
 
-function setupCanvas() {
-  const canvas = canvasRef.value
-  dpr = window.devicePixelRatio || 1
-  ctx = canvas.getContext('2d')
-  resizeCanvas()
-}
-
-let resizeObs = null
-
-function resizeCanvas() {
-  const canvas = canvasRef.value
-  if (!canvas || !ctx) return
-  const rect = canvas.getBoundingClientRect()
-  const cw = Math.max(200, rect.width)
-  const ch = Math.max(200, rect.height)
-  const scale = Math.min((cw * dpr) / W, (ch * dpr) / H)
-  canvas.width = Math.max(1, Math.round(cw * dpr))
-  canvas.height = Math.max(1, Math.round(ch * dpr))
-  canvas.style.height = ''
-  ctx.setTransform(scale, 0, 0, scale, (cw * dpr - W * scale) / 2, (ch * dpr - H * scale) / 2)
-}
-
-function cssVar(name, fallback) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name) || fallback
-}
-
-function mod(x, n) {
-  return ((x % n) + n) % n
-}
-
-// 将坐标环绕到屏幕内 [−60, W+60]，用于非地面参照时让另一物体循环而不反向
-function wrapX(v) {
-  const span = W + 120
-  return (((v + 60) % span) + span) % span - 60
-}
-
-function drawClouds() {
-  const clouds = [
-    { y: 58, s: 1.0, sp: 0.14 },
-    { y: 112, s: 0.72, sp: 0.2 }
-  ]
-  for (const c of clouds) {
-    const px = mod(c.y * 9 + flickerT * c.sp, W + 260) - 130
-    ctx.fillStyle = 'rgba(255,255,255,0.88)'
-    ctx.beginPath()
-    ctx.arc(px, c.y, 27 * c.s, 0, Math.PI * 2)
-    ctx.arc(px + 26 * c.s, c.y - 13 * c.s, 21 * c.s, 0, Math.PI * 2)
-    ctx.arc(px + 52 * c.s, c.y + 2 * c.s, 23 * c.s, 0, Math.PI * 2)
-    ctx.arc(px + 30 * c.s, c.y + 10 * c.s, 20 * c.s, 0, Math.PI * 2)
-    ctx.fill()
-  }
-}
-
-function drawHills(worldOffset) {
-  // 远山（视差 0.25，随参照系缓慢移动）
-  const off = worldOffset * 0.25
-  ctx.fillStyle = 'rgba(150,185,215,0.6)'
-  for (const hx of [110, 430, 750]) {
-    const px = mod(hx - off, MOD) - 160
-    if (px > -180 && px < W + 180) {
-      ctx.beginPath()
-      ctx.arc(px, 360, 150, Math.PI, 0)
-      ctx.fill()
-    }
-  }
-}
-
-function drawLamp(x) {
-  // 灯杆（带底座）
-  ctx.fillStyle = '#5a6672'
-  ctx.fillRect(x - 10, groundY - 6, 20, 8)
-  ctx.fillRect(x - 4, groundY - 66, 8, 62)
-  // 灯臂与灯头
-  ctx.fillRect(x - 4, groundY - 82, 34, 8)
-  ctx.fillRect(x + 18, groundY - 82, 10, 14)
-  // 灯光光晕
-  ctx.save()
-  ctx.shadowColor = '#ffd98a'
-  ctx.shadowBlur = 14
-  ctx.fillStyle = '#ffd98a'
-  ctx.beginPath()
-  ctx.arc(x + 23, groundY - 70, 6, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.restore()
-}
-
-function drawScene() {
-  const g = ctx.createLinearGradient(0, 0, 0, H)
-  g.addColorStop(0, '#cfe6fa')
-  g.addColorStop(0.55, '#eaf4fd')
-  g.addColorStop(1, '#f6f1e6')
-  ctx.fillStyle = g
-  ctx.fillRect(0, 0, W, H)
-
-  // 依据参照物计算各物体屏幕位置：非地面参照时，参照物居中、世界连续滚动、
-  // 另一物体环绕循环——均“不再改变方向（反向）”
-  let worldOffset, carScreenX, cloudScreenX
+// 由参照物决定“世界”滚动：让所选参照物居中、世界连续滚动、另一物体环绕
+function computeOffsets() {
+  let wo, cx, clx
   if (reference.value === 'ground') {
-    worldOffset = 0
-    carScreenX = trackX(carPos)
-    cloudScreenX = trackX(cloudPos)
+    wo = 0
+    cx = trackX(carPos)
+    clx = trackX(cloudPos)
   } else if (reference.value === 'car') {
-    worldOffset = carPos - 470
-    carScreenX = 470
-    cloudScreenX = wrapX((cloudPos - carPos) + 470)
+    wo = carPos - carCenter()
+    cx = carCenter()
+    clx = wrapX(cloudPos - carPos + carCenter())
   } else {
-    worldOffset = cloudPos - 512
-    cloudScreenX = 512
-    carScreenX = wrapX((carPos - cloudPos) + 512)
+    wo = cloudPos - cloudCenter()
+    clx = cloudCenter()
+    cx = wrapX(carPos - cloudPos + carCenter())
   }
-  carScreenXCur = carScreenX
-
-  drawClouds()
-  drawHills(worldOffset)
-
-  // 柏油路面
-  const rg = ctx.createLinearGradient(0, groundY, 0, groundY + 34)
-  rg.addColorStop(0, '#9c9da2')
-  rg.addColorStop(1, '#6d6e74')
-  ctx.fillStyle = rg
-  ctx.fillRect(0, groundY, W, 34)
-  // 路缘白线
-  ctx.fillStyle = 'rgba(255,255,255,0.65)'
-  ctx.fillRect(0, groundY + 3, W, 3)
-  ctx.fillRect(0, groundY + 29, W, 3)
-
-  // 车道虚线（地面系固定）
-  for (const lane of LANES) {
-    const px = mod(lane - worldOffset, MOD) - 120
-    if (px > -90 && px < W + 90) {
-      ctx.fillStyle = 'rgba(255,255,255,0.85)'
-      ctx.fillRect(px, groundY + 15, 64, 6)
-    }
-  }
-
-  // 路边草地
-  const gg = ctx.createLinearGradient(0, groundY + 34, 0, H)
-  gg.addColorStop(0, '#82b262')
-  gg.addColorStop(1, '#5d8a44')
-  ctx.fillStyle = gg
-  ctx.fillRect(0, groundY + 34, W, H - groundY - 34)
-  // 草叶纹理
-  ctx.strokeStyle = 'rgba(70,120,50,0.35)'
-  ctx.lineWidth = 1.5
-  for (let i = 0; i < 70; i++) {
-    const gx = (i * 37) % W
-    const gy = groundY + 42 + ((i * 53) % 62)
-    ctx.beginPath()
-    ctx.moveTo(gx, gy)
-    ctx.lineTo(gx + 3, gy - 9)
-    ctx.stroke()
-  }
-
-  for (const lp of LAMPS) {
-    const px = mod(lp - worldOffset, MOD) - 120
-    if (px > -90 && px < W + 90) drawLamp(px)
-  }
-
-  drawCar(carScreenX)
-  drawCloud(cloudScreenX, groundY - 165 + Math.sin(flickerT * 0.06) * 6)
-
-  // 尾气粒子（固定在汽车屏幕位置后方，随屏向左飘散）
-  for (const p of puffs) {
-    ctx.fillStyle = `rgba(205,208,216,${Math.max(0, p.a)})`
-    ctx.beginPath()
-    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-    ctx.fill()
-  }
+  return { wo, cx, clx }
 }
 
-function drawCar(x) {
-  const bounce = Math.sin(flickerT * 0.22) * 1.4
-  const CW = 160
-  const s = CW / 220
-  const CH = 120 * s
-  const carLeft = x - CW / 2
-  const carTop = groundY - 96 * s - bounce
-  const wheelY = groundY - bounce
-
-  // 车底阴影（落在路面上）
-  ctx.fillStyle = 'rgba(0,0,0,0.2)'
-  ctx.beginPath()
-  ctx.ellipse(x, wheelY + 6, 78, 9, 0, 0, Math.PI * 2)
-  ctx.fill()
-
-  // 车身（现成内嵌 SVG 车模）
-  if (carImg && carImg.complete && carImg.naturalWidth) {
-    ctx.drawImage(carImg, carLeft, carTop, CW, CH)
-  } else {
-    ctx.fillStyle = '#e6454d'
-    ctx.fillRect(carLeft + 10, carTop + CH * 0.32, CW - 20, CH * 0.55)
-  }
-
-  // 车内人（车窗中的小乘客）
-  const dx = x - 8
-  const dy = carTop + 56 * s
-  ctx.fillStyle = '#33465a'
-  ctx.beginPath()
-  ctx.moveTo(dx - 6, dy + 12)
-  ctx.quadraticCurveTo(dx, dy - 4, dx + 6, dy + 12)
-  ctx.closePath()
-  ctx.fill()
-  ctx.fillStyle = '#f0c9a0'
-  ctx.beginPath()
-  ctx.arc(dx, dy - 2, 5, 0, Math.PI * 2)
-  ctx.fill()
-
-  // 车轮（旋转：轮胎 + 轮辋 + 辐条 + 中心盖）
-  for (const wx of [x - 38, x + 38]) {
-    ctx.fillStyle = '#15181f'
-    ctx.beginPath()
-    ctx.arc(wx, wheelY, 13, 0, Math.PI * 2)
-    ctx.fill()
-    const rg = ctx.createRadialGradient(wx - 3, wheelY - 3, 2, wx, wheelY, 11)
-    rg.addColorStop(0, '#eef1f5')
-    rg.addColorStop(1, '#9aa1ab')
-    ctx.fillStyle = rg
-    ctx.beginPath()
-    ctx.arc(wx, wheelY, 10.5, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.save()
-    ctx.translate(wx, wheelY)
-    ctx.rotate(wheelAngle)
-    ctx.strokeStyle = '#5b626d'
-    ctx.lineWidth = 2.2
-    for (let a = 0; a < 5; a++) {
-      const ang = a * (Math.PI * 2 / 5)
-      ctx.beginPath()
-      ctx.moveTo(0, 0)
-      ctx.lineTo(Math.cos(ang) * 9, Math.sin(ang) * 9)
-      ctx.stroke()
-    }
-    ctx.restore()
-    ctx.fillStyle = '#c9d1d9'
-    ctx.beginPath()
-    ctx.arc(wx, wheelY, 3, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.strokeStyle = '#0c0e12'
-    ctx.lineWidth = 1.5
-    ctx.beginPath()
-    ctx.arc(wx, wheelY, 13, 0, Math.PI * 2)
-    ctx.stroke()
-  }
-}
-
-function drawCloud(x, y) {
-  if (x < -90 || x > W + 90) return
-  const drift = Math.sin(flickerT * 0.05) * 3
-
-  // 柔和投影（增加体积感，区别于背景装饰云）
-  ctx.fillStyle = 'rgba(150,162,180,0.28)'
-  ctx.beginPath()
-  ctx.ellipse(x + 4 + drift, y + 20, 50, 15, 0, 0, Math.PI * 2)
-  ctx.fill()
-
-  // 白云本体（多圆叠加）
-  ctx.fillStyle = 'rgba(255,255,255,0.98)'
-  ctx.beginPath()
-  ctx.arc(x - 32 + drift, y + 6, 18, 0, Math.PI * 2)
-  ctx.arc(x - 8 + drift, y - 10, 25, 0, Math.PI * 2)
-  ctx.arc(x + 20 + drift, y - 6, 21, 0, Math.PI * 2)
-  ctx.arc(x + 40 + drift, y + 6, 16, 0, Math.PI * 2)
-  ctx.arc(x + 4 + drift, y + 12, 23, 0, Math.PI * 2)
-  ctx.fill()
-
-  // 底部阴影，增强立体感
-  ctx.fillStyle = 'rgba(206,216,230,0.55)'
-  ctx.beginPath()
-  ctx.ellipse(x + 2 + drift, y + 16, 42, 8, 0, 0, Math.PI)
-  ctx.fill()
-}
-
-function render() {
-  if (!ctx) return
-  drawScene()
-
-  const textH = cssVar('--text-h', '#111')
-  const textCol = cssVar('--text', '#555')
-  const accent = cssVar('--accent', '#ff3b4d')
-
-  ctx.textAlign = 'left'
-  ctx.fillStyle = textH
-  ctx.font = 'bold 15px sans-serif'
-  ctx.fillText('运动的描述 · 参照物', 40, 40)
-  ctx.fillStyle = textCol
-  ctx.font = '13px sans-serif'
-  ctx.fillText('白云有独立速度：换一个参照物，再看谁动谁静', 40, 64)
-
-  // 结论卡片（右上角，缩小，避免遮挡画面主体）
-  const cardW = 250
-  const cardH = 116
-  const cardX = W - cardW - 16
-  const cardY = 14
-  ctx.fillStyle = 'rgba(255,254,249,0.92)'
-  ctx.strokeStyle = textH
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.roundRect ? ctx.roundRect(cardX, cardY, cardW, cardH, 10) : ctx.rect(cardX, cardY, cardW, cardH)
-  ctx.fill()
-  ctx.stroke()
-
-  ctx.font = '700 12px sans-serif'
-  ctx.fillStyle = accent
-  ctx.fillText('参照物：' + refLabel.value, cardX + 16, cardY + 24)
-  ctx.fillStyle = textH
-  ctx.font = '12px sans-serif'
-  ctx.fillText(`汽车：${verdict.value.car}`, cardX + 16, cardY + 46)
-  ctx.fillText(`车内人：${verdict.value.person}`, cardX + 16, cardY + 64)
-  ctx.fillText(`白云：${verdict.value.cloud}`, cardX + 16, cardY + 82)
-  ctx.fillText(`地面景物：${verdict.value.ground}`, cardX + 16, cardY + 100)
-}
+let raf = null
 
 function loop() {
-  flickerT += 1
-  const vCar = 0.7 + speed.value * 0.35 // 视觉速度
-  const vCloud = 0.7 + cloudSpeed.value * 0.35
-  // 始终从左向右，纯单向递增、循环，绝不反向
+  frame++
+  const vCar = 0.8 + speed.value * 0.4 // 视觉速度（车速滑块最小值为 1，恒动）
+  const vCloud = cloudSpeed.value * 0.8 // 白云视觉速度：w=0 时为 0，白云真正静止
   carPos += vCar
   cloudPos += vCloud
-  wheelAngle += vCar * 0.05
+  cloudDrift1 += vCloud * 0.14
+  cloudDrift2 += vCloud * 0.1
+  wheelAngle += vCar * 0.06
+
+  const { wo, cx, clx } = computeOffsets()
+  worldOffset.value = wo
+  laneOffset.value = mod(wo, 150)
+  lampOffset.value = mod(wo, 460)
+  hillOffset.value = mod(wo * 0.22, 460)
+  cityOffset.value = mod(wo * 0.4, 520)
+  carX.value = cx
+  cloudX.value = clx
+  cloudY.value = groundY - 190 + (cloudSpeed.value > 0 ? Math.sin(frame * 0.05) * 4 : 0)
+  carBounce.value = Math.sin(frame * 0.22) * 1.6
+  wheelAngleVal.value = wheelAngle
 
   // 尾气粒子（从车尾后方冒出，向左飘散）
-  if (flickerT % 12 === 0) {
-    puffs.push({ x: carScreenXCur - 80, y: groundY - 26, a: 0.3, r: 3.5 })
+  if (frame % 10 === 0 && reference.value !== 'car') {
+    puffs.value.push({ id: frame, x: cx - 96, y: groundY - 34, a: 0.34, r: 4 })
   }
-  for (const p of puffs) {
-    p.x -= 1.4
-    p.a -= 0.02
-    p.r += 0.35
+  const arr = puffs.value
+  for (const p of arr) {
+    p.x -= 1.8
+    p.a -= 0.018
+    p.r += 0.5
   }
-  for (let i = puffs.length - 1; i >= 0; i--) {
-    if (puffs[i].a <= 0) puffs.splice(i, 1)
-  }
+  puffs.value = arr.filter((p) => p.a > 0)
 
-  render()
+  // 速度线（增强流动感）
+  if (frame % 6 === 0) {
+    const y = groundY - 60 - Math.random() * 120
+    speedLines.value.push({ id: frame, x: W.value * 0.5 + 160, y, len: 26 + Math.random() * 30, a: 0.5 })
+  }
+  const sl = speedLines.value
+  for (const s of sl) {
+    s.x -= 6 + speed.value * 1.2
+    s.a -= 0.018
+  }
+  speedLines.value = sl.filter((s) => s.a > 0 && s.x > -40)
+
   raf = requestAnimationFrame(loop)
 }
 
-onMounted(() => {
-  setupCanvas()
-  carImg = new Image()
-  carImg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(CAR_SVG)
-  if (window.ResizeObserver) {
-    resizeObs = new ResizeObserver(() => resizeCanvas())
-    resizeObs.observe(canvasRef.value.parentElement)
+function resize() {
+  const el = stageEl.value
+  if (!el) return
+  const w = el.clientWidth
+  const h = el.clientHeight
+  if (w > 0 && h > 0) {
+    W.value = Math.min(MAX_W, Math.max(MIN_W, Math.round(H * (w / h))))
   }
+}
+
+onMounted(() => {
+  resize()
+  ro = new ResizeObserver(resize)
+  if (stageEl.value) ro.observe(stageEl.value)
   raf = requestAnimationFrame(loop)
 })
 
 onBeforeUnmount(() => {
   if (raf) cancelAnimationFrame(raf)
-  if (resizeObs) resizeObs.disconnect()
+  if (ro) ro.disconnect()
 })
 </script>
 
 <template>
   <div class="lab-stage">
     <div class="lab-left">
-      <div class="lab-panel" style="padding:0">
-        <canvas ref="canvasRef" style="display:block;width:100%"></canvas>
+      <div class="lab-panel motion-panel" style="padding: 0">
+        <div ref="stageEl" class="motion-stage">
+          <svg
+            class="motion-svg"
+            :viewBox="`0 0 ${W} ${H}`"
+            preserveAspectRatio="none"
+            role="img"
+            aria-label="运动的描述：小车载着乘客在霓虹公路上行驶，可切换地面、车厢、白云为参照物观察运动状态"
+          >
+            <defs>
+              <!-- 黄昏霓虹天空 -->
+              <linearGradient id="ml-sky" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#1a1240" />
+                <stop offset="0.38" stop-color="#3b2a6b" />
+                <stop offset="0.66" stop-color="#9b4a8c" />
+                <stop offset="0.86" stop-color="#f2885a" />
+                <stop offset="1" stop-color="#ffd18a" />
+              </linearGradient>
+              <linearGradient id="ml-road" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#3a3550" />
+                <stop offset="1" stop-color="#211d33" />
+              </linearGradient>
+              <linearGradient id="ml-grass" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#2c3b4a" />
+                <stop offset="1" stop-color="#16222e" />
+              </linearGradient>
+              <linearGradient id="ml-hill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#5a3f7a" />
+                <stop offset="1" stop-color="#33245a" />
+              </linearGradient>
+              <linearGradient id="ml-city" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#241a47" />
+                <stop offset="1" stop-color="#3a2a63" />
+              </linearGradient>
+              <linearGradient id="ml-car" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#46e8d2" />
+                <stop offset="0.5" stop-color="#19b6c9" />
+                <stop offset="1" stop-color="#0e7aa6" />
+              </linearGradient>
+              <linearGradient id="ml-car2" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#ff8fb0" />
+                <stop offset="1" stop-color="#e6396b" />
+              </linearGradient>
+              <radialGradient id="ml-win" cx="0.4" cy="0.3" r="0.9">
+                <stop offset="0" stop-color="#bff6ff" />
+                <stop offset="1" stop-color="#5fc8e8" />
+              </radialGradient>
+              <radialGradient id="ml-sun" cx="0.5" cy="0.5" r="0.5">
+                <stop offset="0" stop-color="#fff1c0" />
+                <stop offset="0.55" stop-color="#ffb15a" />
+                <stop offset="1" stop-color="#ff8a5a" stop-opacity="0" />
+              </radialGradient>
+              <linearGradient id="ml-lampglow" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#9ff6ff" stop-opacity="0.9" />
+                <stop offset="1" stop-color="#9ff6ff" stop-opacity="0" />
+              </linearGradient>
+              <filter id="ml-soft" x="-30%" y="-30%" width="160%" height="160%">
+                <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0a0a1a" flood-opacity="0.4" />
+              </filter>
+              <filter id="ml-glow" x="-80%" y="-80%" width="260%" height="260%">
+                <feGaussianBlur stdDeviation="7" result="b" />
+                <feMerge>
+                  <feMergeNode in="b" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+
+              <!-- 车道虚线（滚动） -->
+              <pattern id="ml-lane" x="0" y="0" width="150" height="14" patternUnits="userSpaceOnUse">
+                <rect x="0" y="3" width="64" height="8" rx="4" fill="rgba(255,236,170,0.92)" />
+              </pattern>
+              <!-- 远山（视差滚动） -->
+              <pattern id="ml-hill" x="0" y="0" width="460" height="200" patternUnits="userSpaceOnUse">
+                <path d="M0 200 Q115 36 230 200 Z" fill="url(#ml-hill)" />
+                <path d="M230 200 Q330 86 460 200 Z" fill="url(#ml-hill)" opacity="0.65" />
+              </pattern>
+              <!-- 城市剪影（中景视差滚动） -->
+              <pattern id="ml-city" x="0" y="0" width="520" height="150" patternUnits="userSpaceOnUse">
+                <rect x="10" y="60" width="46" height="90" fill="url(#ml-city)" />
+                <rect x="70" y="30" width="34" height="120" fill="url(#ml-city)" />
+                <rect x="118" y="78" width="58" height="72" fill="url(#ml-city)" />
+                <rect x="190" y="44" width="30" height="106" fill="url(#ml-city)" />
+                <rect x="232" y="20" width="42" height="130" fill="url(#ml-city)" />
+                <rect x="290" y="70" width="52" height="80" fill="url(#ml-city)" />
+                <rect x="356" y="40" width="36" height="110" fill="url(#ml-city)" />
+                <rect x="406" y="84" width="60" height="66" fill="url(#ml-city)" />
+                <rect x="478" y="52" width="30" height="98" fill="url(#ml-city)" />
+                <g fill="#ffd98a" opacity="0.55">
+                  <rect x="20" y="74" width="6" height="6" /><rect x="34" y="92" width="6" height="6" />
+                  <rect x="78" y="46" width="6" height="6" /><rect x="90" y="70" width="6" height="6" />
+                  <rect x="242" y="36" width="6" height="6" /><rect x="258" y="60" width="6" height="6" />
+                  <rect x="364" y="56" width="6" height="6" /><rect x="486" y="68" width="6" height="6" />
+                </g>
+              </pattern>
+              <!-- 霓虹街灯（滚动） -->
+              <pattern id="ml-lamp" x="0" y="0" width="460" height="120" patternUnits="userSpaceOnUse">
+                <g>
+                  <rect x="40" y="20" width="7" height="80" rx="2" fill="#2a2740" />
+                  <path d="M40 20 q30 -2 56 0 l0 8 q-28 2 -56 0 Z" fill="#2a2740" />
+                  <circle cx="68" cy="30" r="10" fill="#9ff6ff" filter="url(#ml-glow)" />
+                  <rect x="44" y="34" width="22" height="10" fill="url(#ml-lampglow)" opacity="0.8" />
+                  <circle cx="68" cy="30" r="4.5" fill="#ffffff" />
+                </g>
+              </pattern>
+            </defs>
+
+            <!-- 天空（满铺） -->
+            <rect x="0" y="0" :width="W" :height="H" fill="url(#ml-sky)" />
+            <!-- 星点 -->
+            <g>
+              <circle
+                v-for="(s, i) in stars" :key="i"
+                :cx="s.rx * W" :cy="s.ry * H" :r="s.r"
+                fill="#ffffff" :opacity="s.o" class="star" :style="{ animationDelay: s.d + 's' }"
+              />
+            </g>
+            <!-- 落日辉光 -->
+            <circle :cx="W - 130" cy="96" r="150" fill="url(#ml-sun)" />
+            <circle :cx="W - 130" cy="96" r="42" fill="#ffe7a6" />
+            <circle :cx="W - 130" cy="96" r="42" fill="#fff4cf" opacity="0.5" filter="url(#ml-glow)" />
+
+            <!-- 远山（视差） -->
+            <rect x="0" :y="groundY - 200" :width="W" height="200" fill="url(#ml-hill)" :transform="`translate(${-hillOffset} 0)`" opacity="0.85" />
+            <!-- 城市剪影（中景视差） -->
+            <rect x="0" :y="groundY - 150" :width="W" height="150" fill="url(#ml-city)" :transform="`translate(${-cityOffset} 0)`" opacity="0.9" />
+
+            <!-- 背景氛围云（随白云速度漂移，w=0 时静止） -->
+            <g fill="rgba(255,255,255,0.14)">
+              <g :transform="`translate(${mod(cloudDrift1, W + 320) - 160} 78)`">
+                <circle cx="0" cy="0" r="22" /><circle cx="24" cy="-13" r="28" /><circle cx="54" cy="-4" r="24" /><circle cx="28" cy="11" r="26" />
+              </g>
+              <g :transform="`translate(${mod(cloudDrift2, W + 320) - 160} 132)`">
+                <circle cx="0" cy="0" r="17" /><circle cx="20" cy="-11" r="22" /><circle cx="44" cy="-3" r="19" /><circle cx="22" cy="10" r="20" />
+              </g>
+            </g>
+
+            <!-- 地面 -->
+            <rect x="0" :y="groundY" :width="W" :height="H - groundY" fill="url(#ml-grass)" />
+            <!-- 柏油路面 -->
+            <rect x="0" :y="groundY" :width="W" height="48" fill="url(#ml-road)" />
+            <!-- 路缘霓虹线 -->
+            <rect x="0" :y="groundY + 2" :width="W" height="3" fill="#46e8d2" opacity="0.8" />
+            <rect x="0" :y="groundY + 44" :width="W" height="3" fill="#ff8fb0" opacity="0.8" />
+            <!-- 车道虚线（滚动） -->
+            <rect x="0" :y="groundY + 20" :width="W" height="14" fill="url(#ml-lane)" :transform="`translate(${-laneOffset} 0)`" />
+            <!-- 霓虹街灯（滚动） -->
+            <rect x="0" :y="groundY - 110" :width="W" height="120" fill="url(#ml-lamp)" :transform="`translate(${-lampOffset} 0)`" />
+
+            <!-- 速度线 -->
+            <g>
+              <line
+                v-for="s in speedLines" :key="s.id"
+                :x1="s.x" :y1="s.y" :x2="s.x + s.len" :y2="s.y"
+                stroke="rgba(159,246,255,0.7)" stroke-width="2" :stroke-opacity="Math.max(0, s.a)"
+                stroke-linecap="round"
+              />
+            </g>
+
+            <!-- 参照物高亮：选白云时圈出白云 -->
+            <circle
+              v-if="reference === 'cloud'"
+              :cx="cloudX" :cy="cloudY + 4" r="66"
+              fill="none" stroke="#ff4d7d" stroke-width="3" stroke-dasharray="10 9"
+              opacity="0.9"
+            >
+              <animate attributeName="stroke-dashoffset" from="0" to="-38" dur="1.1s" repeatCount="indefinite" />
+            </circle>
+            <!-- 参照物高亮：选车厢时圈出汽车 -->
+            <circle
+              v-if="reference === 'car'"
+              :cx="carX" :cy="groundY - 56" r="84"
+              fill="none" stroke="#ff4d7d" stroke-width="3" stroke-dasharray="10 9"
+              opacity="0.9"
+            >
+              <animate attributeName="stroke-dashoffset" from="0" to="-38" dur="1.1s" repeatCount="indefinite" />
+            </circle>
+
+            <!-- 白云（参照物本体） -->
+            <g :transform="`translate(${cloudX} ${cloudY})`" filter="url(#ml-soft)">
+              <ellipse cx="6" cy="24" rx="60" ry="17" fill="rgba(10,12,28,0.45)" />
+              <g fill="rgba(255,255,255,0.96)">
+                <circle cx="-36" cy="6" r="21" />
+                <circle cx="-8" cy="-13" r="29" />
+                <circle cx="26" cy="-6" r="24" />
+                <circle cx="48" cy="9" r="18" />
+                <circle cx="4" cy="15" r="26" />
+              </g>
+              <ellipse cx="2" cy="20" rx="48" ry="9" fill="rgba(180,200,230,0.7)" />
+            </g>
+
+            <!-- 汽车（霓虹流光扁平风） -->
+            <g :transform="`translate(${carX} ${groundY}) scale(0.66) translate(0 ${-carBounce})`" filter="url(#ml-soft)">
+              <!-- 车底霓虹倒影 -->
+              <ellipse cx="0" cy="6" rx="96" ry="13" fill="rgba(70,232,210,0.28)" />
+              <ellipse cx="0" cy="2" rx="92" ry="11" fill="rgba(0,0,0,0.35)" />
+              <!-- 车身下半 -->
+              <path d="M-96 -24 L96 -24 L96 -52 Q96 -58 90 -58 L-90 -58 Q-96 -58 -96 -52 Z" fill="url(#ml-car)" />
+              <!-- 车厢 -->
+              <path d="M-64 -58 L-46 -92 Q-44 -98 -36 -98 L32 -98 Q42 -98 44 -90 L64 -58 Z" fill="url(#ml-car2)" />
+              <!-- 车窗 -->
+              <path d="M-36 -60 L-28 -92 L-6 -92 L-14 -60 Z" fill="url(#ml-win)" />
+              <path d="M6 -60 L2 -92 L26 -92 L34 -60 Z" fill="url(#ml-win)" />
+              <!-- 乘客（后排） -->
+              <ellipse cx="-6" cy="-68" rx="10" ry="7" fill="#1b2740" />
+              <circle cx="-6" cy="-75" r="6" fill="#ffd9b0" />
+              <!-- 前大灯霓虹 + 灯 -->
+              <ellipse cx="88" cy="-40" rx="13" ry="9" fill="#bff6ff" filter="url(#ml-glow)" />
+              <ellipse cx="86" cy="-40" rx="7" ry="5" fill="#ffffff" />
+              <!-- 尾灯 -->
+              <rect x="-95" y="-50" width="7" height="12" rx="2" fill="#ff4d7d" filter="url(#ml-glow)" />
+              <!-- 车轮 -->
+              <g v-for="wx in [-54, 54]" :key="wx" :transform="`rotate(${wheelAngleVal} ${wx} -24)`">
+                <circle :cx="wx" cy="-24" r="24" fill="#0c0e16" />
+                <circle :cx="wx" cy="-24" r="12" fill="#e9edf3" />
+                <circle :cx="wx" cy="-24" r="12" fill="none" stroke="#19b6c9" stroke-width="2" />
+                <g stroke="#3a4252" stroke-width="2.6">
+                  <line v-for="a in 6" :key="a" :x1="wx" :y1="-24" :x2="wx + Math.cos(a * (Math.PI * 2 / 6)) * 11" :y2="-24 + Math.sin(a * (Math.PI * 2 / 6)) * 11" />
+                </g>
+                <circle :cx="wx" cy="-24" r="3.6" fill="#19b6c9" />
+                <circle :cx="wx" cy="-24" r="24" fill="none" stroke="#05060c" stroke-width="1.8" />
+              </g>
+            </g>
+
+            <!-- 尾气粒子 -->
+            <g>
+              <circle
+                v-for="p in puffs" :key="p.id"
+                :cx="p.x" :cy="p.y" :r="p.r"
+                :fill="`rgba(159,246,255,${Math.max(0, p.a)})`"
+              />
+            </g>
+
+            <!-- 物体状态标签 -->
+            <g :transform="`translate(${carX} ${groundY - 156})`" v-if="verdict.car !== '静止' || reference !== 'ground'">
+              <rect x="-46" y="-16" width="92" height="27" rx="13" fill="rgba(20,16,40,0.82)" stroke="#46e8d2" stroke-width="1.6" />
+              <text x="0" y="4" text-anchor="middle" font-size="14" font-weight="800" fill="#46e8d2">{{ verdict.car }}</text>
+            </g>
+            <g :transform="`translate(${cloudX} ${cloudY - 60})`">
+              <rect x="-46" y="-16" width="92" height="27" rx="13" fill="rgba(20,16,40,0.82)" stroke="#ff8fb0" stroke-width="1.6" />
+              <text x="0" y="4" text-anchor="middle" font-size="14" font-weight="800" :fill="verdict.cloud === '静止' ? '#5fe6a0' : '#ff8fb0'">{{ verdict.cloud }}</text>
+            </g>
+
+            <!-- 标题 -->
+            <text x="34" y="42" font-size="22" font-weight="900" fill="#ffffff">运动的描述 · 参照物</text>
+            <text x="34" y="64" font-size="14" fill="rgba(255,255,255,0.75)">换一个参照物，再看谁动谁静</text>
+
+            <!-- 玻璃拟态结论卡片（右上角；窄屏自动隐藏，避免遮挡汽车） -->
+            <g class="ml-card">
+              <rect :x="cardX" y="16" :width="cardW" :height="cardH" rx="14" fill="rgba(18,14,38,0.62)" stroke="rgba(159,246,255,0.5)" stroke-width="1.4" />
+              <rect :x="cardX" y="16" :width="cardW" height="30" rx="14" fill="rgba(70,232,210,0.16)" />
+              <text :x="cardX + 18" y="37" font-size="14" font-weight="800" fill="#46e8d2">参照物：{{ refLabel }}</text>
+              <text :x="cardX + 18" y="66" font-size="13" fill="#f3f6ff">汽车：{{ verdict.car }}</text>
+              <text :x="cardX + 18" y="88" font-size="13" fill="#f3f6ff">车内人：{{ verdict.person }}</text>
+              <text :x="cardX + 18" y="110" font-size="13" fill="#f3f6ff">白云：{{ verdict.cloud }}</text>
+              <text :x="cardX + 18" y="132" font-size="13" fill="#f3f6ff">地面景物：{{ verdict.ground }}</text>
+            </g>
+          </svg>
+        </div>
       </div>
 
       <div class="lab-actions">
@@ -598,3 +587,45 @@ onBeforeUnmount(() => {
     </aside>
   </div>
 </template>
+
+<style scoped>
+.motion-panel {
+  overflow: hidden;
+}
+/* 容器保持 viewBox 比例，配合动态 viewBox 使画面满铺、零留白 */
+.motion-stage {
+  width: 100%;
+  aspect-ratio: 1000 / 520;
+  max-height: 72vh;
+  background: linear-gradient(180deg, #1a1240 0%, #3b2a6b 38%, #9b4a8c 66%, #f2885a 86%, #ffd18a 100%);
+}
+.motion-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.star {
+  animation: ml-twinkle 2.6s ease-in-out infinite;
+}
+@keyframes ml-twinkle {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.95; }
+}
+
+/* ===== 移动端优化 ===== */
+/* 平板/手机：取消 1000:520 的扁比例，改为按视口高度给足动画区，避免被压成细条 */
+@media (max-width: 768px) {
+  .motion-stage {
+    aspect-ratio: auto;
+    height: 42vh;
+    min-height: 220px;
+    max-height: 360px;
+  }
+}
+/* 手机：隐藏 SVG 内结论卡片，避免遮挡居中汽车（判定信息已在下方数据面板呈现） */
+@media (max-width: 640px) {
+  .ml-card {
+    display: none;
+  }
+}
+</style>

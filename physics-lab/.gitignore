@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# SakuraFrp 凭据 (含密钥, 切勿提交)
+deploy/sakura.env
+deploy/*.log
+

@@ -22,7 +22,7 @@ import ForceLab from '../components/lab/ForceLab.vue'
 import FrictionLab from '../components/lab/FrictionLab.vue'
 import PressureLab from '../components/lab/PressureLab.vue'
 import BuoyancyLab from '../components/lab/BuoyancyLab.vue'
-import CircuitLab from '../components/lab/CircuitLab.vue'
+import CircuitSimLab from '../components/lab/CircuitSimLab.vue'
 import ResistanceLab from '../components/lab/ResistanceLab.vue'
 import OhmLab from '../components/lab/OhmLab.vue'
 import PowerLab from '../components/lab/PowerLab.vue'
@@ -34,7 +34,7 @@ const progress = useProgressStore()
 const info = computed(() => findExperiment(route.params.id))
 const detail = computed(() => getExperiment(route.params.id))
 
-const showCognition = ref(true)
+const showCognition = ref(false)
 const showChallenge = ref(false)
 
 const selected = ref(null)
@@ -46,7 +46,7 @@ const quizIndex = ref(0)
 watch(
   () => route.params.id,
   () => {
-    showCognition.value = true
+    showCognition.value = false
     showChallenge.value = false
     selected.value = null
     answered.value = false
@@ -144,7 +144,7 @@ function nextQuiz() {
           <FrictionLab v-else-if="detail && detail.id === 'e-friction'" @complete="onLabComplete" />
           <PressureLab v-else-if="detail && detail.id === 'e-pressure'" @complete="onLabComplete" />
           <BuoyancyLab v-else-if="detail && detail.id === 'e-buoyancy'" @complete="onLabComplete" />
-          <CircuitLab v-else-if="detail && detail.id === 'e-circuit'" @complete="onLabComplete" />
+          <CircuitSimLab v-else-if="detail && detail.id === 'e-circuit'" @complete="onLabComplete" />
           <ResistanceLab v-else-if="detail && detail.id === 'e-resistance'" @complete="onLabComplete" />
           <OhmLab v-else-if="detail && detail.id === 'e-ohm'" @complete="onLabComplete" />
           <PowerLab v-else-if="detail && detail.id === 'e-power'" @complete="onLabComplete" />

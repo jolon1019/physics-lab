@@ -1,26 +1,24 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useProgressStore } from './stores/progress'
 import { useAuthStore } from './stores/auth'
-import { GRADES } from './data/experiments'
+import { useLayoutStore } from './stores/layout'
 import SideNav from './components/SideNav.vue'
 import LoginModal from './components/LoginModal.vue'
 
 const progress = useProgressStore()
 const auth = useAuthStore()
+const layout = useLayoutStore()
 onMounted(() => {
   progress.startSession()
   auth.init()
+  // 移动端首屏默认收起目录（不持久化，避免影响桌面端的展开偏好）
+  if (window.matchMedia('(max-width: 1180px)').matches) layout.navCollapsed = true
 })
-
-const totalExps = computed(() =>
-  GRADES.reduce((s, g) => s + g.chapters.reduce((x, c) => x + c.experiments.length, 0), 0)
-)
-const totalChapters = computed(() => GRADES.reduce((s, g) => s + g.chapters.length, 0))
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'nav-collapsed': layout.navCollapsed }">
     <header class="topbar">
       <div class="brand-block">
         <div class="brand-mark" aria-hidden="true"></div>
@@ -29,25 +27,6 @@ const totalChapters = computed(() => GRADES.reduce((s, g) => s + g.chapters.leng
           <h1>物理实验平台</h1>
         </div>
         <RouterLink to="/record" class="progress-chip">⑤ 已通过 {{ progress.completedCount }} 个实验</RouterLink>
-      </div>
-
-      <div class="source-strip">
-        <div>
-          <span>年级册次</span>
-          <strong>{{ GRADES.length }} 册</strong>
-        </div>
-        <div>
-          <span>章节</span>
-          <strong>{{ totalChapters }} 章</strong>
-        </div>
-        <div>
-          <span>实验</span>
-          <strong>{{ totalExps }} 个</strong>
-        </div>
-        <RouterLink to="/record" class="strip-link">
-          <span>答题正确率</span>
-          <strong>{{ progress.accuracy }}%</strong>
-        </RouterLink>
       </div>
 
       <div class="user-zone">
@@ -67,6 +46,22 @@ const totalChapters = computed(() => GRADES.reduce((s, g) => s + g.chapters.leng
     </div>
 
     <footer class="app-footer">人教版初中物理同步实验 · 学生自主学习平台</footer>
+
+    <!-- 移动端抽屉遮罩：目录展开时点击收起 -->
+    <div
+      class="nav-backdrop"
+      v-if="!layout.navCollapsed"
+      @click="layout.setNav(true)"
+      aria-hidden="true"
+    ></div>
+
+    <!-- 移动端悬浮按钮：目录收起时一键打开 -->
+    <button
+      class="nav-fab"
+      v-if="layout.navCollapsed"
+      @click="layout.setNav(false)"
+      aria-label="打开实验目录"
+    >≡</button>
 
     <LoginModal v-if="auth.showLogin" />
   </div>
