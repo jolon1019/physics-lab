@@ -1,0 +1,19 @@
+[
+  {
+    "email": "smoke@lab.com",
+    "salt": "b76d32419b90252e4b9155242c82b60d",
+    "hash": "9abbaa078b8c863e7c447e21a5c60a295647c3dbb8c5878be2d83ba06c616b3c6ff0b9c872314ef8cb11cb1ae3ab53588d398f275b700e73d3834522f32c8930",
+    "createdAt": "2026-08-12T09:31:48.639Z",
+    "progress": {
+      "records": {
+        "exp1": {
+          "attempts": 2,
+          "correct": 1,
+          "completed": true
+        }
+      },
+      "sessions": 3,
+      "lastVisit": "2026"
+    }
+  }
+]
