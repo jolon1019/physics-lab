@@ -1,9 +1,43 @@
-# --- Agent working directory ---
-.workbuddy/
-
-# --- Logs ---
+# Logs
+logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# --- Build caches ---
-**/.build-tmp/
-**/.vite-cache/
+node_modules
+dist
+dist-ssr
+.build-verify
+.build-*
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# SakuraFrp 凭据 (含密钥, 切勿提交)
+deploy/sakura.env
+deploy/*.log
+
+# WorkBuddy 本地数据（个人记忆/配置，不入库）
+.workbuddy
+
+# Vite / 临时缓存
+.vite-cache
+.vite-cache-old
+.tmp-*
+*.tmp
+
+# 临时构建产物
+.bchk
+
