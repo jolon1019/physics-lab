@@ -370,24 +370,13 @@ function animate(now) {
   uiAcc += dt
   if (uiAcc > 0.12) { uiAcc = 0; updateTexts() }
 }
-/* 移动端吸顶偏移：实测全局顶栏渲染高度，写入 --lab-stick-top，
-   使动画舞台吸顶时恰好贴在顶栏正下方（顶栏在移动端会换行变高） */
-function syncStickTop() {
-  const tb = document.querySelector('.topbar')
-  if (tb) document.documentElement.style.setProperty('--lab-stick-top', tb.offsetHeight + 'px')
-}
-function onResize() { syncStickTop() }
-
 onMounted(() => {
   lastT = performance.now()
   syncBattery(); syncSwitch(); updateTexts()
   raf = requestAnimationFrame(animate)
-  syncStickTop()
-  window.addEventListener('resize', onResize)
 })
 onBeforeUnmount(() => {
   if (raf) cancelAnimationFrame(raf)
-  window.removeEventListener('resize', onResize)
 })
 
 /* ============ 公式面板 ============ */
@@ -422,7 +411,7 @@ const verifyList = [
             <div class="flip-note">↺ 装置已翻转 180°（电池固定）：B 与 I 同时反向 → 受力方向不变</div>
           </div>
 
-          <svg viewBox="0 0 920 600" preserveAspectRatio="xMidYMid meet" aria-label="通电线圈在磁场中转动互动演示">
+          <svg class="stage-svg" viewBox="0 0 920 600" preserveAspectRatio="xMidYMid meet" aria-label="通电线圈在磁场中转动互动演示">
             <defs>
               <linearGradient id="gN" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0" stop-color="#a01c12" /><stop offset="0.55" stop-color="#e0352b" /><stop offset="1" stop-color="#7a120b" />
@@ -819,55 +808,4 @@ const verifyList = [
 .ref-list { margin: 0; padding: 8px 18px 12px 24px; font-size: 12px; color: var(--text); line-height: 1.7; }
 .ref-list li { margin-bottom: 4px; }
 .ref-list strong { color: var(--accent-strong); }
-@media (max-width: 1180px) {
-  .lab-stage { grid-template-columns: 1fr; }
-  /* 动画舞台吸顶：上滑时固定在顶栏下方，其余说明面板随页面向上滚动 */
-  .lab-left {
-    position: sticky;
-    top: var(--lab-stick-top, var(--topbar));
-    z-index: 5;
-    height: auto;
-    background: var(--surface);
-  }
-  /* 解除桌面端右侧栏内部滚动，整页才能滚动、动画才能吸顶 */
-  .lab-right { max-height: none; overflow: visible; }
-  /* 容器改纵向 flex：SVG 自适应填充、控制栏固定底部，动画按比例缩放不变形 */
-  .lab-container {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    height: clamp(400px, 66vh, 660px);
-  }
-  .lab-container > svg {
-    position: relative;
-    inset: auto;
-    flex: 1 1 0;
-    width: 100%;
-    min-height: 0;
-  }
-  .panel {
-    position: relative;
-    flex: 0 0 auto;
-    height: auto;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 8px 10px;
-  }
-  /* 移动端控制栏紧凑化：长段说明移出底部栏（右侧面板/实时数据已含解释），给动画留空间 */
-  .panel .info { display: none; }
-  .lab-title { font-size: 14px; letter-spacing: 1px; white-space: normal; max-width: 92%; line-height: 1.2; }
-  .legend { font-size: 9px; line-height: 1.6; }
-  .legend .flip-note { display: none; }
-}
-
-@media (max-width: 640px) {
-  .lab-container { height: clamp(300px, 52vh, 520px); }
-  .panel { gap: 6px; padding: 8px; }
-  .chips { gap: 4px; }
-  .chip { padding: 4px 7px; font-size: 10px; }
-  .btns { gap: 5px; }
-  .btn { padding: 4px 8px; font-size: 11px; }
-  .lab-title { font-size: 12px; }
-  .lab-actions { gap: 8px; }
-}
 </style>

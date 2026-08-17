@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted } from 'vue'
+import { onBeforeUnmount, onMounted } from 'vue'
 import { useProgressStore } from './stores/progress'
 import { useAuthStore } from './stores/auth'
 import { useLayoutStore } from './stores/layout'
@@ -10,11 +10,26 @@ import LoginModal from './components/LoginModal.vue'
 const progress = useProgressStore()
 const auth = useAuthStore()
 const layout = useLayoutStore()
+
+// 实测全局顶栏渲染高度，写入 --lab-stick-top，使各实验动画舞台吸顶时
+// 恰好贴在顶栏正下方（顶栏在移动端会换行变高，无法用固定常量）
+function syncStickTop() {
+  const tb = document.querySelector('.topbar')
+  if (tb) document.documentElement.style.setProperty('--lab-stick-top', tb.offsetHeight + 'px')
+}
+function onResize() { syncStickTop() }
+
 onMounted(() => {
   progress.startSession()
   auth.init()
   // 移动端首屏默认收起目录（不持久化，避免影响桌面端的展开偏好）
   if (window.matchMedia('(max-width: 1180px)').matches) layout.navCollapsed = true
+  // 首帧布局完成后再测量顶栏高度，避免字体未加载导致高度不准
+  requestAnimationFrame(syncStickTop)
+  window.addEventListener('resize', onResize)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResize)
 })
 </script>
 

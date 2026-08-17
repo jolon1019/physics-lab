@@ -1089,16 +1089,68 @@ p { margin: 0; }
     grid-template-columns: 1fr;
   }
 
-  /* 移动端/平板：解除桌面固定高度，让实验区按内容自然展开 */
+  /* 统一移动端布局（适用于所有使用 .lab-stage 的互动实验）：
+     动画+控制列吸顶固定在顶栏下方，说明列随页面向上滚动 */
   .lab-left {
+    position: sticky;
+    top: var(--lab-stick-top, var(--topbar));
+    z-index: 5;
     height: auto;
     min-height: 0;
+    background: var(--surface);
   }
 
+  /* 解除桌面端右侧栏内部滚动，整页才能滚动、动画才能吸顶 */
   .lab-right {
     max-height: none;
     overflow: visible;
   }
+
+  /* 动画容器：给确定高度（避免 .lab-left 高度塌缩导致动画消失）；
+     内部绝对定位元素（透镜/线圈等）相对容器定位，不受影响 */
+  .lab-left .lab-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: clamp(360px, 60vh, 620px);
+  }
+
+  /* 仅大动画 svg 撑满容器、按比例缩放不变形（用 .stage-svg 限定，
+     不误伤透镜实验室内部 52px 宽的小 svg） */
+  .lab-left .lab-container .stage-svg {
+    position: relative;
+    inset: auto;
+    flex: 1 1 0;
+    width: 100%;
+    min-height: 0;
+  }
+
+  /* 控制栏：移动端改为流式子项贴容器底部（原为绝对定位 bottom:0，视觉一致） */
+  .lab-left .panel {
+    position: relative;
+    flex: 0 0 auto;
+    height: auto;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  /* 移动端控制栏紧凑化：长段说明移出底部栏（右侧面板/实时数据已含解释），给动画留空间 */
+  .lab-left .panel .info { display: none; }
+  .lab-left .lab-title { font-size: 14px; letter-spacing: 1px; white-space: normal; max-width: 92%; line-height: 1.2; }
+  .lab-left .legend { font-size: 9px; line-height: 1.6; }
+  .lab-left .legend .flip-note { display: none; }
+}
+
+@media (max-width: 640px) {
+  .lab-left .lab-container { height: clamp(300px, 52vh, 520px); }
+  .lab-left .panel { gap: 6px; padding: 8px; }
+  .lab-left .chips { gap: 4px; }
+  .lab-left .chip { padding: 4px 7px; font-size: 10px; }
+  .lab-left .btns { gap: 5px; }
+  .lab-left .btn { padding: 4px 8px; font-size: 11px; }
+  .lab-left .lab-title { font-size: 12px; }
+  .lab-left .lab-actions { gap: 8px; }
 }
 
 /* ===== 页脚 ===== */
