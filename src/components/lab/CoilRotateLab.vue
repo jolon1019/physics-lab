@@ -2,7 +2,7 @@
 // 通电线圈在磁场中转动（直流电动机结构 · 直接供电 · 无滑环）—— three.js 3D 版本
 // 物理设定（轴系）：
 //   - 转轴 = 水平 Z 轴，线圈为矩形开口导体，绕 Z 轴转动（转子）
-//   - 磁场 B：由 N(-X) 指向 S(+X)，四边形磁极提供径向场（气隙非闭合）
+//   - 磁场 B：由 N(-X) 指向 S(+X)，外方内弧磁极（外缘正方块、内弧面包裹线圈）提供径向场（气隙非闭合）
 //   - 线圈两条有效边位于 ±X（磁极之间），电流沿 ±Z，受力 F = I·L×B 沿 ±Y（绕 Z 轴形成力矩）
 //   - 无换向器：电流方向恒定，线圈摆到平衡位（法线∥B）即停；但手动点击「换向」在每次侧立位翻转电流可使其持续旋转（手摇换向）
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -27,7 +27,10 @@ const speedScale = ref(1) // 演示速度倍率
 /* ============ 几何常量（three 世界单位） ============ */
 const W = 0.55 // 线圈有效边到中轴(X)距离（半宽）
 const D = 0.8 // 线圈半深（Z 方向）
-const MAG_X = 2.6 // 磁极中心 X
+const POLE_RIN = 0.85 // 磁极内弧面半径（包裹线圈，留气隙）
+const POLE_ROUT = 1.7 // 磁极外缘半径
+const POLE_PHI = (60 * Math.PI) / 180 // 极弧半张角（极靴张开 120°）
+const MAG_X = (POLE_RIN * Math.cos(POLE_PHI) + POLE_ROUT) / 2 // 磁极中心 X（用于标签/参考）
 const shaftR = 0.14
 const shaftLen = 5.6 // 转子轴贯穿两端轴承座（z: -2.8 ~ +2.8）
 const commZ = 2.3 // 电源接线处 z（线圈延长线末端）
@@ -100,21 +103,26 @@ function makeWire(p1, p2, color = 0xffd166) {
   return mesh
 }
 
-/* ============ 四边形（梯形）极靴，沿 Z 拉伸 ============ */
+/* ============ 外方内弧极靴（外缘正方块·内弧面包裹线圈），沿 Z 拉伸 ============ */
 function makePoleShoe(isN) {
-  const ri = 1.5, ro = 2.1, h = 2.6, depth = 2.2
+  const rIn = POLE_RIN, rOut = POLE_ROUT, phi = POLE_PHI
+  const tipX = rIn * Math.cos(phi) // 弧两端 x
+  const tipY = rIn * Math.sin(phi) // 弧两端 y
+  const square = rOut - tipX // 外缘正方块边长（宽=高 → 正方形）
   const shape = new THREE.Shape()
-  shape.moveTo(ri, h / 2)
-  shape.lineTo(ro, (h / 2) * 1.12)
-  shape.lineTo(ro, -(h / 2) * 1.12)
-  shape.lineTo(ri, -h / 2)
+  // 下弧端 → 内弧面（包裹线圈的弧形面，绕转子轴）→ 外缘正方块 → 闭合
+  shape.moveTo(tipX, -tipY)
+  shape.absarc(0, 0, rIn, -phi, phi, false) // 内弧面（凹向线圈）
+  shape.lineTo(rOut, square / 2) // 外缘上角
+  shape.lineTo(rOut, -square / 2) // 外缘下角
+  shape.lineTo(tipX, -tipY) // 回到下弧端
   shape.closePath()
+  const depth = 2.4
   const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false })
   geo.translate(0, 0, -depth / 2)
   const color = isN ? 0xd92135 : 0x145fd2
   const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.55 }))
-  const sign = isN ? -1 : 1
-  mesh.position.set(sign * MAG_X, 0, 0)
+  mesh.rotation.y = isN ? Math.PI : 0 // N 极翻到 -X 侧，S 极在 +X 侧
   return mesh
 }
 
@@ -187,14 +195,14 @@ function buildScene() {
   shaft.position.z = 0
   scene.add(shaft)
 
-  // 四边形磁极：N（红，左 -X）/ S（蓝，右 +X），分离 = 非闭合
+  // 外方内弧磁极：N（红，左 -X）/ S（蓝，右 +X）；外缘正方块、内弧面包裹线圈，分离 = 非闭合
   const poleN = makePoleShoe(true)
   const poleS = makePoleShoe(false)
   scene.add(poleN, poleS)
   const nLabel = makeLabel('N', '#ffffff')
-  nLabel.position.set(-MAG_X, 1.9, 0)
+  nLabel.position.set(-MAG_X, 1.5, 0)
   const sLabel = makeLabel('S', '#ffffff')
-  sLabel.position.set(MAG_X, 1.9, 0)
+  sLabel.position.set(MAG_X, 1.5, 0)
   scene.add(nLabel, sLabel)
 
   // 定子轴承座 ×2（带轴构造）：位于轴两端，固定支撑转子轴
@@ -502,12 +510,14 @@ const verifyList = [
           </div>
           <div class="ref-card">
             <svg viewBox="0 0 200 110" class="ref-svg">
-              <polygon points="22,38 56,28 56,82 22,72" fill="#d92135" />
-              <text x="37" y="58" text-anchor="middle" fill="#fff" font-size="16" font-weight="900">N</text>
-              <polygon points="178,38 144,28 144,82 178,72" fill="#145fd2" />
-              <text x="163" y="58" text-anchor="middle" fill="#fff" font-size="16" font-weight="900">S</text>
-              <line x1="100" y1="22" x2="100" y2="88" stroke="#7a6045" stroke-dasharray="3 3" stroke-width="1.5" />
-              <text x="100" y="108" text-anchor="middle" font-size="11" font-weight="800" fill="#3a3026">四边形磁极（气隙非闭合）</text>
+              <!-- N 极：外缘正方块 + 内弧面（凹向中心包裹线圈） -->
+              <path d="M54,33 L22,33 L22,77 L54,77 Q80,55 54,33 Z" fill="#d92135" />
+              <text x="38" y="59" text-anchor="middle" fill="#fff" font-size="16" font-weight="900">N</text>
+              <!-- S 极 -->
+              <path d="M146,33 L178,33 L178,77 L146,77 Q120,55 146,33 Z" fill="#145fd2" />
+              <text x="162" y="59" text-anchor="middle" fill="#fff" font-size="16" font-weight="900">S</text>
+              <line x1="100" y1="20" x2="100" y2="90" stroke="#7a6045" stroke-dasharray="3 3" stroke-width="1.5" />
+              <text x="100" y="106" text-anchor="middle" font-size="10.5" font-weight="800" fill="#3a3026">外方内弧磁极（气隙非闭合）</text>
             </svg>
           </div>
           <div class="ref-card">
@@ -530,7 +540,7 @@ const verifyList = [
         <div class="lab-panel-head"><strong>操作要点</strong></div>
         <ul class="op-list">
           <li>点击「▶ 播放」看开口线圈在磁场中受恒定电流：从偏角摆向平衡位（θ≈0）后静止，演示「无换向器不能自动连续转」</li>
-          <li>用鼠标拖拽场景可自由改变视角，从 3/4 角度看清四边形磁极、气隙、线圈与延长线</li>
+          <li>用鼠标拖拽场景可自由改变视角，从 3/4 角度看清外方内弧磁极、气隙、线圈与延长线</li>
           <li>想让线圈<strong>一直转</strong>：在每次经过侧立位（按钮发光「现在点！」、θ≈±90°）时点击「⇄ 手动换向」翻转电流——力矩延续，线圈便持续旋转（手摇换向）</li>
           <li>「↺ 复位」让线圈回到小偏角起始位，重新观察摆动</li>
         </ul>
