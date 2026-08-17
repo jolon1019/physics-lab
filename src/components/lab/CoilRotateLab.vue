@@ -1,10 +1,12 @@
 <script setup>
-// 通电线圈在磁场中转动（直流电动机结构 · 直接供电 · 无滑环）—— three.js 3D 版本
+// 通电线圈在磁场中转动（直流电动机结构 · 直接供电 · 换向器可选）—— three.js 3D 版本
 // 物理设定（轴系）：
 //   - 转轴 = 水平 Z 轴，线圈为矩形开口导体，绕 Z 轴转动（转子）
 //   - 磁场 B：由 N(-X) 指向 S(+X)，外方内弧磁极（外缘正方块、内弧面包裹线圈）提供径向场（气隙非闭合）
 //   - 线圈两条有效边位于 ±X（磁极之间），电流沿 ±Z，受力 F = I·L×B 沿 ±Y（绕 Z 轴形成力矩）
-//   - 无换向器：电流方向恒定，线圈摆到平衡位（法线∥B）即停；但手动点击「换向」在每次侧立位翻转电流可使其持续旋转（手摇换向）
+//   - 换向器（轴上 E/F 半环 + 静止电刷）可选：
+//       · 关（手动换向演示）：电流方向恒定，线圈摆到平衡位即停；需在侧立位点「⇄ 手动换向」维持旋转
+//       · 开（自动换向）：线圈越过平衡位时电流自动翻转 → 连续旋转（真实直流电机行为）
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -21,24 +23,27 @@ function mark() {
 
 /* ============ 可调参数 ============ */
 const playing = ref(false)
-const reverseCurrent = ref(false) // 电流反向 → 受力方向也随之反向
+const reverseCurrent = ref(false) // 电流反向 → 受力方向也随之反向（手动模式即手动换向；自动模式即翻转整体转向）
+const commutatorOn = ref(false) // 换向器开关：关=手动换向演示，开=自动连续旋转
 const speedScale = ref(1) // 演示速度倍率
 
 /* ============ 几何常量（three 世界单位） ============ */
 const W = 0.55 // 线圈有效边到中轴(X)距离（半宽）
 const D = 0.8 // 线圈半深（Z 方向）
-const POLE_RIN = 0.85 // 磁极内弧面半径（包裹线圈，留气隙）
-const POLE_ROUT = 1.7 // 磁极外缘半径
-const POLE_PHI = (60 * Math.PI) / 180 // 极弧半张角（极靴张开 120°）
+const POLE_RIN = 1.0 // 磁极内弧面半径（包裹线圈，留气隙）——较旧版增大以降低对展示的干扰并拉开间距
+const POLE_ROUT = 1.9 // 磁极外缘半径
+const POLE_PHI = (38 * Math.PI) / 180 // 极弧半张角（较旧版 60° 减小，弧度更收敛、降低对展示的干扰）
 const MAG_X = (POLE_RIN * Math.cos(POLE_PHI) + POLE_ROUT) / 2 // 磁极中心 X（用于标签/参考）
 const shaftR = 0.14
-const shaftLen = 5.6 // 转子轴贯穿两端轴承座（z: -2.8 ~ +2.8）
-const commZ = 2.3 // 电源接线处 z（线圈延长线末端）
+const shaftLen = 6.0 // 转子轴贯穿两端轴承座（z: -3.0 ~ +3.0），末端承载换向器
+const COMM_Z = 2.9 // 换向器 z（位于转轴末端、电源一侧）
+const rC = 0.22 // 换向器半径
 const K = 2.0 // 力矩系数
+const ROOT_Y = 0.9 // 整体抬高 3D 平面高度，确保动画中平面始终可见、不被遮挡
 
 /* ============ three.js 运行时 ============ */
 const containerRef = ref(null)
-let renderer, scene, camera, controls, coilGroup, fLeft, fRight, iL, iR
+let renderer, scene, camera, controls, root, coilGroup, fLeft, fRight, iL, iR
 let coilLeadA = null, coilLeadB = null
 let electrons = [] // 沿线圈流动的电子小球
 let electronT = [] // 各电子的路径参数 t∈[0,1)
@@ -164,15 +169,15 @@ function buildScene() {
   scene.background = new THREE.Color(0x0e1320)
 
   camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100)
-  camera.position.set(5.6, 3.4, 7.2)
-  camera.lookAt(0, 0, 0)
+  camera.position.set(5.8, 3.0, 7.8)
+  camera.lookAt(0, 0.3, 0)
 
   controls = new OrbitControls(camera, renderer.domElement)
   controls.enableDamping = true
   controls.dampingFactor = 0.08
   controls.minDistance = 4
   controls.maxDistance = 18
-  controls.target.set(0, 0, 0)
+  controls.target.set(0, 0.3, 0)
 
   // 灯光
   scene.add(new THREE.AmbientLight(0xffffff, 0.75))
@@ -183,50 +188,51 @@ function buildScene() {
   dir2.position.set(-6, 3, -4)
   scene.add(dir2)
 
-  // 地面网格（景深参考）
+  // 整体抬高：所有几何放进 root，root 上移 ROOT_Y
+  root = new THREE.Group()
+  root.position.y = ROOT_Y
+  scene.add(root)
+
+  // 地面网格（景深参考，随 root 抬高）
   const grid = new THREE.GridHelper(20, 20, 0x2a3350, 0x1c2236)
-  grid.position.y = -2.2
-  scene.add(grid)
+  grid.position.y = -2.6
+  root.add(grid)
 
   // 转子轴（沿 Z，贯穿两端轴承座）
   const axleMat = new THREE.MeshStandardMaterial({ color: 0x9aa3b2, metalness: 0.6, roughness: 0.4 })
   const shaft = new THREE.Mesh(new THREE.CylinderGeometry(shaftR, shaftR, shaftLen, 20), axleMat)
   shaft.rotation.x = Math.PI / 2
   shaft.position.z = 0
-  scene.add(shaft)
+  root.add(shaft)
 
   // 外方内弧磁极：N（红，左 -X）/ S（蓝，右 +X）；外缘正方块、内弧面包裹线圈，分离 = 非闭合
   const poleN = makePoleShoe(true)
   const poleS = makePoleShoe(false)
-  scene.add(poleN, poleS)
+  root.add(poleN, poleS)
   const nLabel = makeLabel('N', '#ffffff')
-  nLabel.position.set(-MAG_X, 1.5, 0)
+  nLabel.position.set(-MAG_X, 1.7, 0)
   const sLabel = makeLabel('S', '#ffffff')
-  sLabel.position.set(MAG_X, 1.5, 0)
-  scene.add(nLabel, sLabel)
+  sLabel.position.set(MAG_X, 1.7, 0)
+  root.add(nLabel, sLabel)
 
-  // 定子轴承座 ×2（带轴构造）：位于轴两端，固定支撑转子轴
+  // 定子轴承座 ×2（带轴构造）：位于轴两端，固定支撑转子轴（仅几何，标注文字已移除）
   const seatMat = new THREE.MeshStandardMaterial({ color: 0x394763, roughness: 0.7 })
   for (const sz of [2.8, -2.8]) {
     const seat = new THREE.Mesh(new THREE.BoxGeometry(0.8, 2.2, 0.5), seatMat)
     seat.position.set(0, -1.1, sz)
-    scene.add(seat)
+    root.add(seat)
     const hole = new THREE.Mesh(
       new THREE.CylinderGeometry(shaftR + 0.06, shaftR + 0.06, 0.6, 16),
       new THREE.MeshStandardMaterial({ color: 0x10141f, roughness: 0.9 })
     )
     hole.rotation.x = Math.PI / 2
     hole.position.set(0, 0, sz)
-    scene.add(hole)
-    const lab = makeLabel('定子轴承座', '#cdd6e2')
-    lab.position.set(0, -2.45, sz)
-    lab.scale.set(1.5, 0.8, 1)
-    scene.add(lab)
+    root.add(hole)
   }
 
   // 线圈（旋转组，绕 Z）
   coilGroup = new THREE.Group()
-  scene.add(coilGroup)
+  root.add(coilGroup)
   const coilMat = new THREE.MeshStandardMaterial({ color: 0xc0742a, metalness: 0.5, roughness: 0.45 })
 
   // 开口线圈：4 点矩形（XZ 平面），不闭合
@@ -245,10 +251,34 @@ function buildScene() {
   const labD = makeLabel('d', '#ffe2b0'); labD.position.set(-W - 0.3, 0.25, D); labD.scale.set(0.5, 0.3, 1)
   coilGroup.add(labA, labB, labC, labD)
 
-  // 线圈延长线（平行轴 Z，直连电源）：从线圈两端引到 commZ
-  coilLeadA = makeWire(pA, new THREE.Vector3(W, 0, commZ), 0xffd166)
-  coilLeadB = makeWire(pD, new THREE.Vector3(-W, 0, commZ), 0xffd166)
-  coilGroup.add(coilLeadA, coilLeadB)
+  // 线圈延长线（平行轴 Z，引向转轴末端的换向器）+ 接到 E/F 半环的短接
+  coilLeadA = makeWire(pA, new THREE.Vector3(W, 0, COMM_Z), 0xffd166)
+  coilLeadB = makeWire(pD, new THREE.Vector3(-W, 0, COMM_Z), 0xffd166)
+  const stubA = makeWire(new THREE.Vector3(W, 0, COMM_Z), new THREE.Vector3(0.12, rC - 0.02, COMM_Z), 0xffd166)
+  const stubB = makeWire(new THREE.Vector3(-W, 0, COMM_Z), new THREE.Vector3(-0.12, -(rC - 0.02), COMM_Z), 0xffd166)
+  coilGroup.add(coilLeadA, coilLeadB, stubA, stubB)
+
+  // 换向器（随线圈转动，位于转轴末端）：E/F 两铜半环（留绝缘缝）+ 绝缘毂
+  const commMat = new THREE.MeshStandardMaterial({ color: 0xb87333, metalness: 0.7, roughness: 0.35 })
+  const commGap = 0.16 // 半环间绝缘缝（弧度）
+  const lenC = 0.55
+  const commE = new THREE.Mesh(new THREE.CylinderGeometry(rC, rC, lenC, 28, 1, false, commGap / 2, Math.PI - commGap), commMat)
+  const commF = new THREE.Mesh(new THREE.CylinderGeometry(rC, rC, lenC, 28, 1, false, Math.PI + commGap / 2, Math.PI - commGap), commMat)
+  commE.rotation.x = Math.PI / 2
+  commF.rotation.x = Math.PI / 2
+  commE.position.set(0, 0, COMM_Z)
+  commF.position.set(0, 0, COMM_Z)
+  coilGroup.add(commE, commF)
+  const hub = new THREE.Mesh(
+    new THREE.CylinderGeometry(rC * 0.5, rC * 0.5, lenC * 1.05, 16),
+    new THREE.MeshStandardMaterial({ color: 0x222831, roughness: 0.9 })
+  )
+  hub.rotation.x = Math.PI / 2
+  hub.position.set(0, 0, COMM_Z)
+  coilGroup.add(hub)
+  const labE = makeLabel('E', '#ffe2b0'); labE.position.set(0, rC + 0.2, COMM_Z); labE.scale.set(0.5, 0.3, 1)
+  const labF = makeLabel('F', '#ffe2b0'); labF.position.set(0, -(rC + 0.2), COMM_Z); labF.scale.set(0.5, 0.3, 1)
+  coilGroup.add(labE, labF)
 
   // 电流方向小箭头（有效边中部，沿 ±Z）
   const iMat = new THREE.MeshStandardMaterial({ color: 0xff8a3d, emissive: 0x3a1c00 })
@@ -280,43 +310,54 @@ function buildScene() {
   const fLabR = makeLabel('F', '#ff8090'); fLabR.position.set(W, 1.2, 0); fLabR.scale.set(0.5, 0.3, 1)
   coilGroup.add(fLabL, fLabR)
 
+  // 静止电刷（不随线圈转）：从换向器上/下引出，接到电源（导线随电刷固定，不再断开）
+  const brushMat = new THREE.MeshStandardMaterial({ color: 0x2b2b2b, roughness: 0.8 })
+  const brushPos = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.42), brushMat)
+  brushPos.position.set(0, rC + 0.14, COMM_Z)
+  root.add(brushPos)
+  const brushNeg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.42), brushMat)
+  brushNeg.position.set(0, -(rC + 0.14), COMM_Z)
+  root.add(brushNeg)
+  const labBrush = makeLabel('电刷', '#cdd6e2'); labBrush.position.set(0.6, rC + 0.14, COMM_Z); labBrush.scale.set(1.1, 0.6, 1)
+  root.add(labBrush)
+
   // 外接电源 + 开关（置于换向器一侧，与外电路同侧，z 取正值）
   const supply = new THREE.Mesh(
     new THREE.BoxGeometry(1.5, 0.9, 0.9),
     new THREE.MeshStandardMaterial({ color: 0x394763, roughness: 0.7 })
   )
   supply.position.set(0, -1.7, 3.6)
-  scene.add(supply)
+  root.add(supply)
   const labSupply = makeLabel('电源', '#cdd6e2')
   labSupply.position.set(0, -1.0, 3.6)
-  scene.add(labSupply)
+  root.add(labSupply)
   // + / - 端子
   const termPos = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 10), new THREE.MeshStandardMaterial({ color: 0xff5a5a }))
-  termPos.position.set(-0.5, -1.15, 3.6)
+  termPos.position.set(0.5, -1.15, 3.6)
   const termNeg = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 10), new THREE.MeshStandardMaterial({ color: 0x5a7bff }))
-  termNeg.position.set(0.5, -1.15, 3.6)
-  scene.add(termPos, termNeg)
-  const labP = makeLabel('+', '#ff9a9a'); labP.position.set(-0.5, -0.85, 3.6); scene.add(labP)
-  const labN = makeLabel('−', '#9ab0ff'); labN.position.set(0.5, -0.85, 3.6); scene.add(labN)
+  termNeg.position.set(-0.5, -1.15, 3.6)
+  root.add(termPos, termNeg)
+  const labP = makeLabel('+', '#ff9a9a'); labP.position.set(0.5, -0.85, 3.6); root.add(labP)
+  const labN = makeLabel('−', '#9ab0ff'); labN.position.set(-0.5, -0.85, 3.6); root.add(labN)
 
   // 开关（底座 + 两触点 + 拨杆）
   const swBase = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.18, 0.5), new THREE.MeshStandardMaterial({ color: 0x2b3550 }))
   swBase.position.set(0, -1.7, 2.7)
-  scene.add(swBase)
+  root.add(swBase)
   const postMat = new THREE.MeshStandardMaterial({ color: 0x9aa6bd })
   const postL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4, 10), postMat)
   postL.position.set(-0.45, -1.5, 2.7)
   const postR = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4, 10), postMat)
   postR.position.set(0.45, -1.5, 2.7)
-  scene.add(postL, postR)
+  root.add(postL, postR)
   const leverBar = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.07, 0.07), new THREE.MeshStandardMaterial({ color: 0xd7dcea }))
   leverBar.position.set(0, -1.28, 2.7)
-  scene.add(leverBar)
+  root.add(leverBar)
 
-  // 导线：电源+ → 线圈延长线①末端；电源− → 线圈延长线②末端（直连，无滑环）
-  const wirePos = makeWire(new THREE.Vector3(0.5, -1.15, 3.6), new THREE.Vector3(W, 0, commZ), 0xffd166)
-  const wireNeg = makeWire(new THREE.Vector3(-0.5, -1.15, 3.6), new THREE.Vector3(-W, 0, commZ), 0xffd166)
-  scene.add(wirePos, wireNeg)
+  // 导线：电源+ → 上电刷；电源− → 下电刷（电刷静止，导线不再随线圈转动而断开）
+  const wPos = makeWire(new THREE.Vector3(0.5, -1.15, 3.6), new THREE.Vector3(0, rC + 0.25, COMM_Z), 0xffd166)
+  const wNeg = makeWire(new THREE.Vector3(-0.5, -1.15, 3.6), new THREE.Vector3(0, -(rC + 0.25), COMM_Z), 0xffd166)
+  root.add(wPos, wNeg)
 
   // 应用初始电流方向
   applyCurrentDirection()
@@ -345,13 +386,22 @@ function animate() {
   if (!(dt > 0)) dt = 0.016
   if (dt > 0.05) dt = 0.05
 
-  // 物理积分（无换向器：力矩使线圈摆向平衡位，不会连续转动）
+  // 物理积分
   if (playing.value) {
-    const sign = reverseCurrent.value ? -1 : 1
-    const alpha = -K * Math.cos(angle) * sign
-    angVel += alpha * dt * speedScale.value
-    angVel *= 0.992 // 阻尼，最终静止于平衡位
-    angle += angVel * dt * speedScale.value
+    const base = reverseCurrent.value ? -1 : 1
+    if (commutatorOn.value) {
+      // 换向器自动换向：力矩始终沿同一方向驱动 → 连续旋转
+      const alpha = K * Math.abs(Math.cos(angle)) * base
+      angVel += alpha * dt * speedScale.value
+      angVel *= 0.999 // 轻微阻尼
+      angle += angVel * dt * speedScale.value
+    } else {
+      // 无自动换向：恒定电流 → 摆向平衡位，需手动换向维持
+      const alpha = -K * Math.cos(angle) * base
+      angVel += alpha * dt * speedScale.value
+      angVel *= 0.992 // 阻尼，最终静止于平衡位
+      angle += angVel * dt * speedScale.value
+    }
     coilGroup.rotation.z = angle
   }
 
@@ -371,12 +421,14 @@ function animate() {
   deg = ((deg % 360) + 360) % 360
   const norm = deg > 180 ? deg - 360 : deg
   liveTheta.value = Math.round(norm)
-  if (Math.abs(norm + 90) < 12) liveState.value = '平衡位：线圈正对（法线∥B，力矩≈0，稳定）'
+  if (commutatorOn.value) {
+    liveState.value = '换向器自动换向：线圈持续旋转'
+  } else if (Math.abs(norm + 90) < 12) liveState.value = '平衡位：线圈正对（法线∥B，力矩≈0，稳定）'
   else if (Math.abs(norm) < 12) liveState.value = '线圈侧立（法线⊥B，力矩最大）'
   else if (Math.abs(norm - 180) < 12) liveState.value = '线圈背面（法线∥−B，不稳定平衡）'
   else liveState.value = '摆动中…'
-  // 接近侧立位（θ≈±90°）时提示手动换向：此刻翻转电流可使力矩延续，线圈持续旋转
-  liveNearFlip.value = Math.abs(Math.abs(norm) - 90) < 9
+  // 接近侧立位（θ≈±90°）且处于手动模式时提示手动换向
+  liveNearFlip.value = !commutatorOn.value && Math.abs(Math.abs(norm) - 90) < 9
 
   controls.update()
   renderer.render(scene, camera)
@@ -402,8 +454,13 @@ function reset() {
   liveTheta.value = Math.round((0.6 * 180) / Math.PI)
   liveState.value = '开口线圈：偏离平衡位，受摆动力矩'
 }
+function toggleCommutator() {
+  commutatorOn.value = !commutatorOn.value
+  liveCurrent.value = commutatorOn.value ? '自动换向' : (reverseCurrent.value ? '反向' : '正向')
+  mark()
+}
 watch(reverseCurrent, () => {
-  liveCurrent.value = reverseCurrent.value ? '反向' : '正向'
+  if (!commutatorOn.value) liveCurrent.value = reverseCurrent.value ? '反向' : '正向'
   applyCurrentDirection()
   mark()
 })
@@ -435,12 +492,12 @@ onBeforeUnmount(() => {
 })
 
 /* ============ 公式与结果 ============ */
-const formula = '力矩 τ = −K·cosθ·I （θ 为线圈法线与 B 夹角；无换向器 → 摆到平衡位静止）'
+const formula = '力矩 τ = −K·cosθ·I （无换向器：摆到平衡位静止；有换向器：自动翻转 → 连续旋转）'
 const verifyList = [
-  '无换向器时电流方向恒定：线圈受恒定力矩只能摆到平衡位（法线∥B）即停，不会连续转动',
-  '平衡位（θ≈0，法线∥B）：有效边力矩为 0 且稳定',
-  '切换「反向电流」再播放：两侧受力方向整体翻转，线圈摆向另一侧平衡位',
-  '本结构刻意去掉换向器，用于反衬「换向器（铜半环 + 电刷）是连续转动的必要条件」'
+  '换向器关：电流方向恒定，线圈受恒定力矩只摆到平衡位（法线∥B）即停，需手动点「⇄ 手动换向」维持旋转',
+  '换向器开：线圈越过平衡位（θ≈±90°）时电流被自动翻转，力矩始终同向 → 连续旋转（真实直流电机行为）',
+  '平衡位（θ≈0，法线∥B）：有效边力矩为 0 且稳定；侧立位（θ≈±90°）力矩最大',
+  '换向器 = 轴上 E/F 两铜半环 + 静止电刷：线圈两端接 E/F，电源经电刷接到换向器，导线随电刷固定不再断开'
 ]
 </script>
 
@@ -457,33 +514,43 @@ const verifyList = [
       <div class="lab-actions">
         <span class="r-readout">
           <span class="r-readout-item">偏角 θ <strong>{{ liveTheta }}°</strong></span>
-          <span class="r-readout-item">电流方向 <strong>{{ liveCurrent }}</strong></span>
+          <span class="r-readout-item">电流 <strong>{{ liveCurrent }}</strong></span>
           <span class="r-readout-item">演示速度 <strong>{{ speedScale.toFixed(1) }}×</strong></span>
         </span>
         <button class="btn" @click="togglePlay">{{ playing ? '⏸ 暂停' : '▶ 播放' }}</button>
         <button class="btn" @click="reset">↺ 复位</button>
-        <button class="btn btn-flip" :class="{ 'btn-glow': liveNearFlip }" @click="reverseCurrent = !reverseCurrent" title="在每次经过侧立位（θ≈±90°）时点击，翻转电流方向即可让线圈持续旋转">
+        <button class="btn btn-comm" :class="{ 'btn-on': commutatorOn }" @click="toggleCommutator">
+          换向器：{{ commutatorOn ? '开' : '关' }}
+        </button>
+        <button v-if="!commutatorOn" class="btn btn-flip" :class="{ 'btn-glow': liveNearFlip }" @click="reverseCurrent = !reverseCurrent" title="在每次经过侧立位（θ≈±90°）时点击，翻转电流方向即可让线圈持续旋转">
           ⇄ 手动换向<span v-if="liveNearFlip" class="flip-now">· 现在点！</span>
+        </button>
+        <button v-else class="btn" @click="reverseCurrent = !reverseCurrent" title="翻转整体旋转方向">
+          ↺ 反向旋转
         </button>
         <ParamSlider v-model="speedScale" :min="0.5" :max="2" :step="0.1" :precision="1" label="演示速度" unit="×" hint="数值越大演示越快" />
       </div>
       <div class="state-line">当前：<strong>{{ liveState }}</strong></div>
-      <div class="manual-hint">
+      <div v-if="!commutatorOn" class="manual-hint">
         <span class="manual-hint-ico">💡</span>
-        <span><strong>无换向器也能转：</strong>恒定电流下线圈只会摆到平衡位（θ≈0）停住。想让它持续旋转，就在每次经过<strong>侧立位（θ≈±90°，按钮会发光提示「现在点！」）</strong>时点击 <strong>⇄ 手动换向</strong> 翻转电流方向——力矩随之翻转、推动线圈继续前进，便一圈圈转下去。这正是换向器自动完成的工作（手摇换向演示）。</span>
+        <span><strong>手动换向演示：</strong>换向器关闭时，恒定电流下线圈只会摆到平衡位（θ≈0）停住。想让它持续旋转，就在每次经过<strong>侧立位（θ≈±90°，按钮会发光提示「现在点！」）</strong>时点击 <strong>⇄ 手动换向</strong> 翻转电流方向——力矩随之翻转、推动线圈继续前进，便一圈圈转下去。这正是换向器自动完成的工作（手摇换向演示）。</span>
+      </div>
+      <div v-else class="auto-hint">
+        <span class="auto-hint-ico">⚙️</span>
+        <span><strong>换向器已接入：</strong>线圈越过平衡位（θ≈±90°）时电流被自动翻转，力矩始终同向 → <strong>线圈连续旋转</strong>（真实直流电机行为）。电源经静止电刷接到轴上 E/F 半环，导线随电刷固定、动画中不再断开。</span>
       </div>
     </div>
 
     <!-- 右：公式 + 结构要点卡 -->
     <aside class="lab-right">
       <FormulaPanel
-        title="直流电动机结构（直接供电 · 无滑环）"
+        title="直流电动机结构（直接供电 · 换向器可选）"
         :formula="formula"
         :rows="[
           { label: '磁场方向 B', value: '由 N 指向 S（水平径向）' },
           { label: '电流方向 I', value: liveCurrent },
           { label: '受力 F = BIL', value: '沿 ±Y（绕 Z 轴形成力矩）' },
-          { label: '线圈状态', value: '开口导体 · 直连电源 · 无滑环' }
+          { label: '线圈状态', value: commutatorOn ? '经换向器·电刷供电' : '开口导体 · 直连电源' }
         ]"
         :result="[{ label: '当前位置', value: liveState }]"
         :verify="verifyList"
@@ -492,7 +559,7 @@ const verifyList = [
       <div class="lab-panel">
         <div class="lab-panel-head">
           <strong>结构要点（对照教材 20.4）</strong>
-          <span>去掉换向器</span>
+          <span>换向器可选</span>
         </div>
         <div class="ref-cards">
           <div class="ref-card">
@@ -522,26 +589,33 @@ const verifyList = [
           </div>
           <div class="ref-card">
             <svg viewBox="0 0 200 110" class="ref-svg">
-              <rect x="78" y="18" width="44" height="26" fill="#394763" rx="3" />
-              <text x="100" y="35" text-anchor="middle" fill="#cdd6e2" font-size="11" font-weight="700">电源</text>
-              <circle cx="89" cy="13" r="3" fill="#ff5a5a" />
-              <circle cx="111" cy="13" r="3" fill="#5a7bff" />
-              <line x1="89" y1="44" x2="72" y2="68" stroke="#ffd166" stroke-width="2.5" />
-              <line x1="111" y1="44" x2="128" y2="68" stroke="#ffd166" stroke-width="2.5" />
-              <rect x="55" y="66" width="90" height="22" fill="none" stroke="#c0742a" stroke-width="3" />
-              <text x="100" y="108" text-anchor="middle" font-size="11" font-weight="800" fill="#3a3026">直连供电（无滑环）</text>
+              <!-- 换向器：两半环 + 电刷 -->
+              <rect x="60" y="40" width="80" height="30" rx="6" fill="#394763" />
+              <text x="100" y="35" text-anchor="middle" font-size="10" font-weight="800" fill="#394763">电源</text>
+              <circle cx="78" cy="40" r="3" fill="#ff5a5a" />
+              <circle cx="122" cy="40" r="3" fill="#5a7bff" />
+              <line x1="78" y1="40" x2="84" y2="62" stroke="#ffd166" stroke-width="2.5" />
+              <line x1="122" y1="40" x2="116" y2="62" stroke="#ffd166" stroke-width="2.5" />
+              <rect x="80" y="60" width="40" height="10" rx="3" fill="#b87333" />
+              <text x="100" y="80" text-anchor="middle" font-size="9" font-weight="700" fill="#b87333">E</text>
+              <rect x="80" y="72" width="40" height="10" rx="3" fill="#9c5a2a" />
+              <text x="100" y="92" text-anchor="middle" font-size="9" font-weight="700" fill="#9c5a2a">F</text>
+              <text x="100" y="106" text-anchor="middle" font-size="10.5" font-weight="800" fill="#3a3026">换向器+电刷（可选）</text>
             </svg>
           </div>
         </div>
-        <p class="ref-hint">本结构无换向器，电流方向恒定时线圈只摆到平衡位（θ≈0，法线∥B）即停。但可在每次经过侧立位（θ≈±90°）时手动点击「⇄ 手动换向」翻转电流，力矩随之翻转、线圈便持续旋转——这正是换向器自动完成的工作（手摇换向演示）。</p>
+        <p class="ref-hint">
+          换向器关：电流恒定，线圈只摆到平衡位（θ≈0）即停，可手动点「⇄ 手动换向」维持旋转。<br />
+          换向器开：线圈越过平衡位（θ≈±90°）电流自动翻转 → 连续旋转。线圈两端接轴上 E/F 半环，电源经静止电刷接到换向器，导线随电刷固定、不再断开。
+        </p>
       </div>
 
       <div class="lab-panel">
         <div class="lab-panel-head"><strong>操作要点</strong></div>
         <ul class="op-list">
-          <li>点击「▶ 播放」看开口线圈在磁场中受恒定电流：从偏角摆向平衡位（θ≈0）后静止，演示「无换向器不能自动连续转」</li>
-          <li>用鼠标拖拽场景可自由改变视角，从 3/4 角度看清外方内弧磁极、气隙、线圈与延长线</li>
-          <li>想让线圈<strong>一直转</strong>：在每次经过侧立位（按钮发光「现在点！」、θ≈±90°）时点击「⇄ 手动换向」翻转电流——力矩延续，线圈便持续旋转（手摇换向）</li>
+          <li>点击「▶ 播放」观察线圈在磁场中受力；默认换向器<strong>关</strong>，线圈从偏角摆向平衡位（θ≈0）后静止</li>
+          <li>想让线圈<strong>一直转</strong>：先点「换向器：关→开」开启自动换向，线圈即连续旋转；或在关闭态下每次经过侧立位（按钮发光「现在点！」、θ≈±90°）时点击「⇄ 手动换向」翻转电流（手摇换向）</li>
+          <li>用鼠标拖拽场景可自由改变视角，从 3/4 角度看清外方内弧磁极、气隙、轴上换向器 E/F 与静止电刷</li>
           <li>「↺ 复位」让线圈回到小偏角起始位，重新观察摆动</li>
         </ul>
       </div>
@@ -599,7 +673,7 @@ const verifyList = [
   line-height: 1.5;
   font-style: italic;
 }
-/* 手动换向提示横幅（3D 区下方） */
+/* 手动换向提示横幅（换向器关时显示） */
 .manual-hint {
   display: flex;
   gap: 8px;
@@ -620,6 +694,27 @@ const verifyList = [
 .manual-hint strong {
   color: var(--accent-strong);
 }
+/* 自动换向提示横幅（换向器开时显示） */
+.auto-hint {
+  display: flex;
+  gap: 8px;
+  margin: 10px 2px 4px;
+  padding: 10px 12px;
+  border: 1.5px solid #2e8b57;
+  border-radius: 10px;
+  background: rgba(46, 139, 87, 0.12);
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text);
+}
+.auto-hint-ico {
+  font-size: 15px;
+  line-height: 1.3;
+  flex: 0 0 auto;
+}
+.auto-hint strong {
+  color: #4fd28a;
+}
 /* 手动换向按钮：接近侧立位（θ≈±90°）时发光，提示此刻点击可维持旋转 */
 .btn-flip {
   border-color: #c0742a;
@@ -636,6 +731,16 @@ const verifyList = [
   margin-left: 4px;
   font-weight: 800;
   color: #ffd166;
+}
+/* 换向器开关按钮（开态高亮） */
+.btn-comm {
+  border-color: #5a7bff;
+  color: #aebfff;
+}
+.btn-comm.btn-on {
+  border-color: #2e8b57;
+  color: #4fd28a;
+  background: rgba(46, 139, 87, 0.15);
 }
 .op-list {
   margin: 0;
