@@ -604,7 +604,9 @@ p { margin: 0; }
 
 /* ===== 实验详情页（liziwuli 式） ===== */
 .exp-detail {
-  overflow: hidden;
+  /* 用 clip 而非 hidden：仍裁切溢出，但不创建滚动容器，
+     以便实验内 .lab-left 的 position:sticky 能相对视口吸附（移动端动画吸顶） */
+  overflow: clip;
 }
 
 .exp-detail-head {
