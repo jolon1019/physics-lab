@@ -35,11 +35,11 @@ const POLE_ROUT = 1.9 // 磁极外缘半径
 const POLE_PHI = (38 * Math.PI) / 180 // 极弧半张角（较旧版 60° 减小，弧度更收敛、降低对展示的干扰）
 const MAG_X = (POLE_RIN * Math.cos(POLE_PHI) + POLE_ROUT) / 2 // 磁极中心 X（用于标签/参考）
 const shaftR = 0.14
-const shaftLen = 6.0 // 转子轴贯穿两端轴承座（z: -3.0 ~ +3.0），末端承载换向器
-const COMM_Z = 2.9 // 换向器 z（位于转轴末端、电源一侧）
+const shaftLen = 8.0 // 转子轴贯穿两端轴承座（z: -4.0 ~ +4.0），末端伸到换向器处
+const COMM_Z = 3.5 // 换向器 z（移至转轴末端、明显越过 +Z 轴承座，电刷不再压在轴承座上）
 const rC = 0.22 // 换向器半径
 const K = 2.0 // 力矩系数
-const ROOT_Y = 0.9 // 整体抬高 3D 平面高度，确保动画中平面始终可见、不被遮挡
+const ROOT_Y = 1.9 // 整体抬高 3D 平面高度，确保动画中平面始终可见、不被遮挡
 
 /* ============ three.js 运行时 ============ */
 const containerRef = ref(null)
@@ -326,37 +326,37 @@ function buildScene() {
     new THREE.BoxGeometry(1.5, 0.9, 0.9),
     new THREE.MeshStandardMaterial({ color: 0x394763, roughness: 0.7 })
   )
-  supply.position.set(0, -1.7, 3.6)
+  supply.position.set(0, -1.7, 4.3)
   root.add(supply)
   const labSupply = makeLabel('电源', '#cdd6e2')
-  labSupply.position.set(0, -1.0, 3.6)
+  labSupply.position.set(0, -1.0, 4.3)
   root.add(labSupply)
   // + / - 端子
   const termPos = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 10), new THREE.MeshStandardMaterial({ color: 0xff5a5a }))
-  termPos.position.set(0.5, -1.15, 3.6)
+  termPos.position.set(0.5, -1.15, 4.3)
   const termNeg = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 10), new THREE.MeshStandardMaterial({ color: 0x5a7bff }))
-  termNeg.position.set(-0.5, -1.15, 3.6)
+  termNeg.position.set(-0.5, -1.15, 4.3)
   root.add(termPos, termNeg)
-  const labP = makeLabel('+', '#ff9a9a'); labP.position.set(0.5, -0.85, 3.6); root.add(labP)
-  const labN = makeLabel('−', '#9ab0ff'); labN.position.set(-0.5, -0.85, 3.6); root.add(labN)
+  const labP = makeLabel('+', '#ff9a9a'); labP.position.set(0.5, -0.85, 4.3); root.add(labP)
+  const labN = makeLabel('−', '#9ab0ff'); labN.position.set(-0.5, -0.85, 4.3); root.add(labN)
 
   // 开关（底座 + 两触点 + 拨杆）
   const swBase = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.18, 0.5), new THREE.MeshStandardMaterial({ color: 0x2b3550 }))
-  swBase.position.set(0, -1.7, 2.7)
+  swBase.position.set(0, -1.7, 3.9)
   root.add(swBase)
   const postMat = new THREE.MeshStandardMaterial({ color: 0x9aa6bd })
   const postL = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4, 10), postMat)
-  postL.position.set(-0.45, -1.5, 2.7)
+  postL.position.set(-0.45, -1.5, 3.9)
   const postR = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4, 10), postMat)
-  postR.position.set(0.45, -1.5, 2.7)
+  postR.position.set(0.45, -1.5, 3.9)
   root.add(postL, postR)
   const leverBar = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.07, 0.07), new THREE.MeshStandardMaterial({ color: 0xd7dcea }))
-  leverBar.position.set(0, -1.28, 2.7)
+  leverBar.position.set(0, -1.28, 3.9)
   root.add(leverBar)
 
   // 导线：电源+ → 上电刷；电源− → 下电刷（电刷静止，导线不再随线圈转动而断开）
-  const wPos = makeWire(new THREE.Vector3(0.5, -1.15, 3.6), new THREE.Vector3(0, rC + 0.25, COMM_Z), 0xffd166)
-  const wNeg = makeWire(new THREE.Vector3(-0.5, -1.15, 3.6), new THREE.Vector3(0, -(rC + 0.25), COMM_Z), 0xffd166)
+  const wPos = makeWire(new THREE.Vector3(0.5, -1.15, 4.3), new THREE.Vector3(0, rC + 0.25, COMM_Z), 0xffd166)
+  const wNeg = makeWire(new THREE.Vector3(-0.5, -1.15, 4.3), new THREE.Vector3(0, -(rC + 0.25), COMM_Z), 0xffd166)
   root.add(wPos, wNeg)
 
   // 应用初始电流方向
