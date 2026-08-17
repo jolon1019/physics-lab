@@ -4,7 +4,7 @@
 //   - 转轴 = 水平 Z 轴，线圈为矩形开口导体，绕 Z 轴转动（转子）
 //   - 磁场 B：由 N(-X) 指向 S(+X)，四边形磁极提供径向场（气隙非闭合）
 //   - 线圈两条有效边位于 ±X（磁极之间），电流沿 ±Z，受力 F = I·L×B 沿 ±Y（绕 Z 轴形成力矩）
-//   - 无换向器：电流方向恒定，线圈摆到平衡位（法线∥B）即停，不会连续转动
+//   - 无换向器：电流方向恒定，线圈摆到平衡位（法线∥B）即停；但手动点击「换向」在每次侧立位翻转电流可使其持续旋转（手摇换向）
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
@@ -49,6 +49,7 @@ let angVel = 0
 const liveTheta = ref(0)
 const liveState = ref('开口线圈：偏离平衡位，受摆动力矩')
 const liveCurrent = ref('正向')
+const liveNearFlip = ref(false) // 线圈接近侧立位（θ≈±90°），提示此刻手动换向可维持旋转
 
 /* ============ 标签精灵 ============ */
 function makeLabel(text, color = '#ffffff', bg = null) {
@@ -366,6 +367,8 @@ function animate() {
   else if (Math.abs(norm) < 12) liveState.value = '线圈侧立（法线⊥B，力矩最大）'
   else if (Math.abs(norm - 180) < 12) liveState.value = '线圈背面（法线∥−B，不稳定平衡）'
   else liveState.value = '摆动中…'
+  // 接近侧立位（θ≈±90°）时提示手动换向：此刻翻转电流可使力矩延续，线圈持续旋转
+  liveNearFlip.value = Math.abs(Math.abs(norm) - 90) < 9
 
   controls.update()
   renderer.render(scene, camera)
@@ -451,10 +454,16 @@ const verifyList = [
         </span>
         <button class="btn" @click="togglePlay">{{ playing ? '⏸ 暂停' : '▶ 播放' }}</button>
         <button class="btn" @click="reset">↺ 复位</button>
-        <button class="btn" @click="reverseCurrent = !reverseCurrent">{{ reverseCurrent ? '→ 正向电流' : '↺ 反向电流' }}</button>
+        <button class="btn btn-flip" :class="{ 'btn-glow': liveNearFlip }" @click="reverseCurrent = !reverseCurrent" title="在每次经过侧立位（θ≈±90°）时点击，翻转电流方向即可让线圈持续旋转">
+          ⇄ 手动换向<span v-if="liveNearFlip" class="flip-now">· 现在点！</span>
+        </button>
         <ParamSlider v-model="speedScale" :min="0.5" :max="2" :step="0.1" :precision="1" label="演示速度" unit="×" hint="数值越大演示越快" />
       </div>
       <div class="state-line">当前：<strong>{{ liveState }}</strong></div>
+      <div class="manual-hint">
+        <span class="manual-hint-ico">💡</span>
+        <span><strong>无换向器也能转：</strong>恒定电流下线圈只会摆到平衡位（θ≈0）停住。想让它持续旋转，就在每次经过<strong>侧立位（θ≈±90°，按钮会发光提示「现在点！」）</strong>时点击 <strong>⇄ 手动换向</strong> 翻转电流方向——力矩随之翻转、推动线圈继续前进，便一圈圈转下去。这正是换向器自动完成的工作（手摇换向演示）。</span>
+      </div>
     </div>
 
     <!-- 右：公式 + 结构要点卡 -->
@@ -514,16 +523,16 @@ const verifyList = [
             </svg>
           </div>
         </div>
-        <p class="ref-hint">注意：本结构无换向器，电流方向恒定 → 线圈只能绕平衡位摆动并停在 θ≈0（法线∥B），无法连续旋转；这正是教材要说明的「换向器之必要」。</p>
+        <p class="ref-hint">本结构无换向器，电流方向恒定时线圈只摆到平衡位（θ≈0，法线∥B）即停。但可在每次经过侧立位（θ≈±90°）时手动点击「⇄ 手动换向」翻转电流，力矩随之翻转、线圈便持续旋转——这正是换向器自动完成的工作（手摇换向演示）。</p>
       </div>
 
       <div class="lab-panel">
         <div class="lab-panel-head"><strong>操作要点</strong></div>
         <ul class="op-list">
-          <li>点击「▶ 播放」看开口线圈在磁场中受恒定电流：从偏角摆向平衡位（θ≈0）后静止，演示「无换向器不能连续转」</li>
+          <li>点击「▶ 播放」看开口线圈在磁场中受恒定电流：从偏角摆向平衡位（θ≈0）后静止，演示「无换向器不能自动连续转」</li>
           <li>用鼠标拖拽场景可自由改变视角，从 3/4 角度看清四边形磁极、气隙、线圈与延长线</li>
-          <li>切换「反向电流」再播放：两侧受力方向整体翻转，物理图像对称</li>
-          <li>「↺ 复位」让线圈回到小偏角起始位</li>
+          <li>想让线圈<strong>一直转</strong>：在每次经过侧立位（按钮发光「现在点！」、θ≈±90°）时点击「⇄ 手动换向」翻转电流——力矩延续，线圈便持续旋转（手摇换向）</li>
+          <li>「↺ 复位」让线圈回到小偏角起始位，重新观察摆动</li>
         </ul>
       </div>
     </aside>
@@ -579,6 +588,44 @@ const verifyList = [
   color: var(--text-dim);
   line-height: 1.5;
   font-style: italic;
+}
+/* 手动换向提示横幅（3D 区下方） */
+.manual-hint {
+  display: flex;
+  gap: 8px;
+  margin: 10px 2px 4px;
+  padding: 10px 12px;
+  border: 1.5px dashed #c0742a;
+  border-radius: 10px;
+  background: rgba(192, 116, 42, 0.10);
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text);
+}
+.manual-hint-ico {
+  font-size: 15px;
+  line-height: 1.3;
+  flex: 0 0 auto;
+}
+.manual-hint strong {
+  color: var(--accent-strong);
+}
+/* 手动换向按钮：接近侧立位（θ≈±90°）时发光，提示此刻点击可维持旋转 */
+.btn-flip {
+  border-color: #c0742a;
+  color: #f0c98a;
+}
+.btn-glow {
+  animation: flipPulse 0.85s ease-in-out infinite;
+}
+@keyframes flipPulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.5), 0 0 10px 1px rgba(255, 209, 102, 0.55); }
+  50% { box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.85), 0 0 18px 4px rgba(255, 209, 102, 0.9); }
+}
+.flip-now {
+  margin-left: 4px;
+  font-weight: 800;
+  color: #ffd166;
 }
 .op-list {
   margin: 0;
