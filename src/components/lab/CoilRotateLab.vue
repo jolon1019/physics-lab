@@ -26,10 +26,10 @@ const reverseCurrent = ref(false) // 电流反向 → 受力方向也随之反�
 const speedScale = ref(1) // 演示速度倍率
 
 /* ============ 几何常量（three 世界单位） ============ */
-const POLE_RIN = 1.0 // 磁极内弧面半径（包裹线圈，留气隙）
-const POLE_ROUT = 1.9 // 磁极外缘半径
+const POLE_RIN = 1.5 // 磁极内弧面半径（包裹线圈，留气隙；↑ 从 1.0 让线圈 X 端有空间变宽）
+const POLE_ROUT = 3.5 // 磁极外缘半径（↑ 从 1.9 让磁极整体外推，X 宽 2.3 > Z 厚 1.2，横置锤型）
 const POLE_PHI = (38 * Math.PI) / 180 // 极弧半张角
-const POLE_DEPTH = 2.4 // 磁极 Z 向拉伸厚度（线圈 Z 向宽度与之对齐）
+const POLE_DEPTH = 1.2 // 磁极 Z 向拉伸厚度（↓ 从 2.4 减半，让线圈 Z 厚 1.2 < X 宽 2.3，横置）
 const MAG_X = (POLE_RIN * Math.cos(POLE_PHI) + POLE_ROUT) / 2 // 磁极中心 X（用于标签/参考）
 const MAG_W = POLE_ROUT - POLE_RIN * Math.cos(POLE_PHI) // 磁极 X 向（径向）宽度 = 外缘−内弧端
 const W = MAG_W / 2 // 线圈有效边到中轴(X)距离（半宽）= 磁极 X 宽一半 → 线圈 X 宽(2W)与磁极一致
