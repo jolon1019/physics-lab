@@ -580,6 +580,10 @@ onBeforeUnmount(() => {
   display: block;
   width: 100%;
   height: 100%;
+  /* 关键：SVG 经 .motion-stage 包裹，不是 .lab-panel 直接子元素，
+     必须自己浮到 ::before 黑板背景之上（否则被 z-index:0 的伪元素盖住，画面全空） */
+  position: relative;
+  z-index: 1;
 }
 .star {
   animation: ml-twinkle 2.6s ease-in-out infinite;
