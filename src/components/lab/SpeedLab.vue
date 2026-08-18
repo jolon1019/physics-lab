@@ -69,6 +69,12 @@ let lastT = null
 let tScreen = 0
 const currentFrac = ref(0) // 当前已走路程占所选全程的比例（真实匀加速：∝ t²）
 
+// ===== 贴纸资源（小车 / 滑道，PNG 已放置在 public/assets/lab/）=====
+const imgCart = ref(null) // 小车贴纸（che.png）
+const imgRamp = ref(null) // 滑道贴纸（huadao.png）
+const TRACK_H = 24 // 滑道贴纸在画布上的厚度（px）
+const CART_W = 54 // 小车贴纸在画布上的宽度（px），高度按原图比例自动
+
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
 function setupCanvas() {
@@ -139,11 +145,10 @@ function drawBackground(L) {
   ctx.stroke()
 }
 
-// 木质斜面（含支撑楔块、刻度尺与零刻度）
+// 木质斜面（保留支撑楔块；斜面表面改用贴纸 huadao.png，沿斜面方向铺满）
 function drawRamp(L) {
   const top = { x: L.topX, y: L.topY }
   const pivot = { x: L.pivotX, y: L.pivotY }
-  const n = { x: Math.sin(L.theta), y: -Math.cos(L.theta) }
 
   // 支撑楔块（直角三角形：顶端、底端、底端正下方）
   ctx.fillStyle = '#e3d2b0'
@@ -166,33 +171,30 @@ function drawRamp(L) {
   ctx.closePath()
   ctx.fill()
 
-  // 木质斜面（厚线绘制，带底部阴影边）
-  const thick = 16
-  ctx.lineCap = 'round'
-  ctx.strokeStyle = '#a9824f'
-  ctx.lineWidth = thick + 4
-  ctx.beginPath()
-  ctx.moveTo(top.x, top.y + 3)
-  ctx.lineTo(pivot.x, pivot.y + 3)
-  ctx.stroke()
-  ctx.strokeStyle = '#c9a36b'
-  ctx.lineWidth = thick
-  ctx.beginPath()
-  ctx.moveTo(top.x, top.y)
-  ctx.lineTo(pivot.x, pivot.y)
-  ctx.stroke()
-
-  // 木纹（沿斜面两条细线）
-  ctx.strokeStyle = 'rgba(150,110,60,0.5)'
-  ctx.lineWidth = 1
-  for (const off of [5, -5]) {
+  // 滑道贴纸（沿斜面方向铺满，顶端 → 底端）
+  if (imgRamp.value && imgRamp.value.complete && imgRamp.value.naturalWidth > 0) {
+    ctx.save()
+    ctx.translate(top.x, top.y)
+    ctx.rotate(L.theta)
+    ctx.drawImage(imgRamp.value, 0, -TRACK_H / 2, L.RAMP_LEN, TRACK_H)
+    ctx.restore()
+  } else {
+    // 贴纸未加载完成时的降级：沿用旧木纹斜面（避免空缺）
+    const thick = 16
+    ctx.lineCap = 'round'
+    ctx.strokeStyle = '#a9824f'
+    ctx.lineWidth = thick + 4
     ctx.beginPath()
-    ctx.moveTo(top.x + n.x * off, top.y + n.y * off)
-    ctx.lineTo(pivot.x + n.x * off, pivot.y + n.y * off)
+    ctx.moveTo(top.x, top.y + 3)
+    ctx.lineTo(pivot.x, pivot.y + 3)
+    ctx.stroke()
+    ctx.strokeStyle = '#c9a36b'
+    ctx.lineWidth = thick
+    ctx.beginPath()
+    ctx.moveTo(top.x, top.y)
+    ctx.lineTo(pivot.x, pivot.y)
     ctx.stroke()
   }
-
-  // 斜面保持简洁：仅起点/中点/终点由标记显示数字，不再绘制沿线刻度尺
 }
 
 // 起 / 中 / 末 测量标记（仅显示数字）
@@ -274,105 +276,45 @@ function drawProps(L) {
   }
 }
 
-// 小车（矢量绘制，沿斜面倾斜，车轮转动）
-function drawCart(L, f, wheelAngle) {
+// 小车（贴纸 che.png，沿斜面倾斜，底轮紧贴滑道表面）
+function drawCart(L, f) {
   const p = ptOnPlank(L, f)
-  const u = { x: Math.cos(L.theta), y: Math.sin(L.theta) }
-  const n = { x: Math.sin(L.theta), y: -Math.cos(L.theta) }
-  const L2W = (lx, ly) => ({ x: p.x + u.x * lx + n.x * ly, y: p.y + u.y * lx + n.y * ly })
+  const n = { x: Math.sin(L.theta), y: -Math.cos(L.theta) } // 斜面法线（指向滑道上方）
 
-  const cartW = 48
-  const cartH = 18
-  const wheelR = WHEEL_R
-  const gap = 2
+  // 小车站在滑道顶面上：沿法线方向偏移半个滑道厚度
+  const cx = p.x + n.x * (TRACK_H / 2)
+  const cy = p.y + n.y * (TRACK_H / 2)
 
   // 接触阴影
   ctx.fillStyle = 'rgba(60,50,40,0.18)'
   ctx.beginPath()
-  ctx.ellipse(p.x, p.y + 2, cartW * 0.55, 5, L.theta, 0, Math.PI * 2)
+  ctx.ellipse(cx, cy + 2, CART_W * 0.55, 5, L.theta, 0, Math.PI * 2)
   ctx.fill()
 
-  // 车轮
-  const wheelXs = [-cartW * 0.3, cartW * 0.3]
-  for (const wx of wheelXs) {
-    const c = L2W(wx, wheelR)
-    ctx.fillStyle = '#2b2b2b'
-    ctx.beginPath()
-    ctx.arc(c.x, c.y, wheelR, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.strokeStyle = '#9a9a9a'
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.arc(c.x, c.y, wheelR - 2.5, 0, Math.PI * 2)
-    ctx.stroke()
+  // 小车贴纸（che.png：原图车头朝左 → 水平翻转使车头朝下坡 +x 方向）
+  if (imgCart.value && imgCart.value.complete && imgCart.value.naturalWidth > 0) {
+    const aspect = imgCart.value.naturalHeight / imgCart.value.naturalWidth
+    const cartH = CART_W * aspect
     ctx.save()
-    ctx.translate(c.x, c.y)
-    ctx.rotate(wheelAngle)
-    ctx.strokeStyle = '#cfcfcf'
-    ctx.lineWidth = 1.5
-    ctx.beginPath()
-    ctx.moveTo(-wheelR + 2, 0)
-    ctx.lineTo(wheelR - 2, 0)
-    ctx.moveTo(0, -wheelR + 2)
-    ctx.lineTo(0, wheelR - 2)
-    ctx.stroke()
+    ctx.translate(cx, cy)
+    ctx.rotate(L.theta)
+    ctx.scale(-1, 1) // 翻转：车头朝下坡
+    ctx.drawImage(imgCart.value, -CART_W / 2, -cartH, CART_W, cartH)
     ctx.restore()
+  } else {
+    // 贴纸未加载完成时的降级：旧红车身（避免空缺）
+    const u = { x: Math.cos(L.theta), y: Math.sin(L.theta) }
+    const L2W = (lx, ly) => ({ x: cx + u.x * lx + n.x * ly, y: cy + u.y * lx + n.y * ly })
+    const cartW = 48, cartH = 18, wheelR = WHEEL_R, gap = 2
+    const b0 = L2W(-cartW / 2, wheelR + gap)
+    const b1 = L2W(cartW / 2, wheelR + gap)
+    const b2 = L2W(cartW / 2, wheelR + gap + cartH)
+    const b3 = L2W(-cartW / 2, wheelR + gap + cartH)
+    ctx.fillStyle = '#e0584f'
+    ctx.beginPath()
+    ctx.moveTo(b0.x, b0.y); ctx.lineTo(b1.x, b1.y); ctx.lineTo(b2.x, b2.y); ctx.lineTo(b3.x, b3.y)
+    ctx.closePath(); ctx.fill()
   }
-
-  // 车身
-  const b0 = L2W(-cartW / 2, wheelR + gap)
-  const b1 = L2W(cartW / 2, wheelR + gap)
-  const b2 = L2W(cartW / 2, wheelR + gap + cartH)
-  const b3 = L2W(-cartW / 2, wheelR + gap + cartH)
-  ctx.fillStyle = '#e0584f'
-  ctx.beginPath()
-  ctx.moveTo(b0.x, b0.y)
-  ctx.lineTo(b1.x, b1.y)
-  ctx.lineTo(b2.x, b2.y)
-  ctx.lineTo(b3.x, b3.y)
-  ctx.closePath()
-  ctx.fill()
-  // 车身底部深色条
-  const d0 = L2W(-cartW / 2, wheelR + gap)
-  const d1 = L2W(cartW / 2, wheelR + gap)
-  const d2 = L2W(cartW / 2, wheelR + gap + 5)
-  const d3 = L2W(-cartW / 2, wheelR + gap + 5)
-  ctx.fillStyle = '#c4453d'
-  ctx.beginPath()
-  ctx.moveTo(d0.x, d0.y)
-  ctx.lineTo(d1.x, d1.y)
-  ctx.lineTo(d2.x, d2.y)
-  ctx.lineTo(d3.x, d3.y)
-  ctx.closePath()
-  ctx.fill()
-  // 车窗
-  const w0 = L2W(-cartW / 2 + 8, wheelR + gap + 5)
-  const w1 = L2W(cartW / 2 - 8, wheelR + gap + 5)
-  const w2 = L2W(cartW / 2 - 8, wheelR + gap + cartH - 2)
-  const w3 = L2W(-cartW / 2 + 8, wheelR + gap + cartH - 2)
-  ctx.fillStyle = '#bfe3f0'
-  ctx.beginPath()
-  ctx.moveTo(w0.x, w0.y)
-  ctx.lineTo(w1.x, w1.y)
-  ctx.lineTo(w2.x, w2.y)
-  ctx.lineTo(w3.x, w3.y)
-  ctx.closePath()
-  ctx.fill()
-  // 小旗
-  const ft = L2W(0, wheelR + gap + cartH)
-  ctx.strokeStyle = '#7a7a7a'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(ft.x, ft.y)
-  ctx.lineTo(ft.x, ft.y - 16)
-  ctx.stroke()
-  ctx.fillStyle = '#e0584f'
-  ctx.beginPath()
-  ctx.moveTo(ft.x, ft.y - 16)
-  ctx.lineTo(ft.x + 12, ft.y - 12)
-  ctx.lineTo(ft.x, ft.y - 8)
-  ctx.closePath()
-  ctx.fill()
 }
 
 function drawOverlay() {
@@ -398,8 +340,7 @@ function render() {
   drawMarker(L, 1, '#2faf6b', distanceCm.value)
   drawProps(L)
   const f = currentFrac.value
-  const traveledPx = f * L.RAMP_LEN
-  drawCart(L, f, traveledPx / WHEEL_R)
+  drawCart(L, f)
   drawOverlay()
 }
 
@@ -494,6 +435,17 @@ let resizeObs = null
 onMounted(() => {
   setupCanvas()
   render()
+  // 异步加载贴纸资源（PNG 已放置在 public/assets/lab/）
+  const loadImg = (refName, src) => {
+    const img = new Image()
+    img.onload = () => { render() } // 加载完成后重绘，让贴纸出现
+    img.onerror = () => { console.warn('[SpeedLab] failed to load', src) }
+    img.src = src
+    if (refName === 'cart') imgCart.value = img
+    else imgRamp.value = img
+  }
+  loadImg('cart', '/assets/lab/che.png')
+  loadImg('ramp', '/assets/lab/huadao.png')
   if (window.ResizeObserver) {
     resizeObs = new ResizeObserver(resizeCanvas)
     resizeObs.observe(canvasRef.value.parentElement)
