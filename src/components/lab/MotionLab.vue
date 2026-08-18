@@ -27,11 +27,12 @@ const cloudSpeed = ref(2) // 白云速度 m/s（默认与车相同 → 相对静
 const reference = ref('ground') // ground | car | cloud
 
 // ===== 三元素贴纸尺寸（car/cloud/road.png 均为 400×400 透明画布） =====
-const CAR_W = 132
-const CAR_H = 132
+// car.png 车视觉 bbox y114~298（400 高）→ 车底贴地参考线 298/400
+const CAR_W = 150
+const CAR_H = 150
 const CLOUD_W = 116
 const CLOUD_H = 116
-const ROAD_H = 60 // 路面渲染高度
+const ROAD_H = 96 // 路面渲染高度（road.png 路视觉在 y164~280，slice 裁剪后占满高度）
 const ROAD_TILE_W = 320 // 单段路的渲染宽度（视觉 4:1，原图 1:1 拉伸）
 const ROAD_TILES = 10 // 最多铺 10 段，覆盖 W 最大 2600 + buffer
 
@@ -388,7 +389,7 @@ onBeforeUnmount(() => {
                 v-for="i in ROAD_TILES" :key="i - 1"
                 :x="(i - 1) * ROAD_TILE_W" y="0"
                 :width="ROAD_TILE_W" :height="ROAD_H"
-                preserveAspectRatio="none"
+                preserveAspectRatio="xMidYMid slice"
                 href="/assets/lab/road.png"
               />
             </g>
@@ -434,7 +435,7 @@ onBeforeUnmount(() => {
             <!-- 汽车（car.png 贴纸，车轮贴路面，保留微跳 carBounce） -->
             <image
               href="/assets/lab/car.png"
-              :x="carX - CAR_W / 2" :y="groundY - CAR_H * 0.78 - carBounce"
+              :x="carX - CAR_W / 2" :y="groundY - CAR_H * 0.745 - carBounce"
               :width="CAR_W" :height="CAR_H"
               filter="url(#ml-soft)"
             />
