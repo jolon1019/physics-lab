@@ -16,8 +16,8 @@ let flickerT = 0
 const W = 860
 const H = 460
 
-const v1 = ref(2) // 红球匀速速度 m/s
-const a2 = ref(0.5) // 蓝球加速度 m/s²
+const v1 = ref(6) // 红球匀速速度 m/s（默认满格）
+const a2 = ref(1.2) // 蓝球加速度 m/s²（默认满格）
 const S = 60 // 赛程 m
 
 // 赛道几何
@@ -86,8 +86,8 @@ function resetRun() {
 
 function reset() {
   resetRun()
-  v1.value = 2
-  a2.value = 0.5
+  v1.value = 6
+  a2.value = 1.2
   seen.move = seen.param = false
 }
 
