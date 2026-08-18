@@ -46,6 +46,13 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="user-zone">
+        <button
+          class="nav-fab"
+          v-if="layout.navCollapsed"
+          @click="layout.setNav(false)"
+          aria-label="打开实验目录"
+          title="打开实验目录"
+        >≡</button>
         <button class="board-toggle" type="button" :title="boardTheme.variant === 'light' ? '切回深色黑板背景' : '切换为浅色背景'" @click="toggleBoardVariant">
           {{ boardTheme.variant === 'light' ? '🌑 黑板' : '🟨 浅色' }}
         </button>
@@ -73,14 +80,6 @@ onBeforeUnmount(() => {
       @click="layout.setNav(true)"
       aria-hidden="true"
     ></div>
-
-    <!-- 移动端悬浮按钮：目录收起时一键打开 -->
-    <button
-      class="nav-fab"
-      v-if="layout.navCollapsed"
-      @click="layout.setNav(false)"
-      aria-label="打开实验目录"
-    >≡</button>
 
     <LoginModal v-if="auth.showLogin" />
   </div>

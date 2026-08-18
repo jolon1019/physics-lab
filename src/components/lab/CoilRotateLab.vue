@@ -2,7 +2,7 @@
 // 通电线圈在磁场中转动（教材 20.4 图 20.4-3 甲/乙/丙 + 换向器 20.4-4）—— 深色 2D SVG 互动动画
 // 物理设定（与教材演示一致）：
 //   - 转轴竖直（过线圈中心）；装置已绕竖直轴整体翻转 180°（电池固定原位不动）：
-//     N（右，红）→ S（左，蓝），磁场 B 水平向左；B 与线圈电流 I 同时反向 → 受力 F 方向不变
+//     N（左，红）→ S（右，蓝），磁场 B 水平向右；B 与线圈电流 I 同时反向 → 受力 F 方向不变
 //   - 线圈 abcd：a 左上、b 右上、c 右下、d 左下；电流 a→b→c→d 时左右两竖边受力等大反向
 //     （右边向观者、左边背离），形成力矩使线圈"顺时针"（俯视）转动
 //   - 图甲 θ=0°（线圈平面∥B）：力矩最大 → 顺时针转动，惯性越过平衡位置
@@ -40,6 +40,44 @@ const liveState = ref('图甲：线圈平面与磁感线平行，闭合开关观
 const liveNearFlip = ref(false)
 const readoutTurns = ref('0.0 圈')
 
+/* ============ 动画缩放与拖动 ============ */
+const scale = ref(1)
+const panX = ref(0)
+const panY = ref(0)
+const viewBoxStr = computed(() => {
+  const w = 920 / scale.value, h = 600 / scale.value
+  return `${(460 - w / 2 - panX.value).toFixed(1)} ${(300 - h / 2 - panY.value).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`
+})
+function onWheel(e) {
+  const d = e.deltaY > 0 ? -0.12 : 0.12
+  scale.value = Math.max(0.5, Math.min(2.6, +(scale.value + d).toFixed(2)))
+}
+function zoomIn() { scale.value = Math.min(2.6, +(scale.value + 0.2).toFixed(2)) }
+function zoomOut() { scale.value = Math.max(0.5, +(scale.value - 0.2).toFixed(2)) }
+function zoomReset() { scale.value = 1; panX.value = 0; panY.value = 0 }
+
+/* 拖动平移 */
+const dragging = ref(false)
+let dragStart = { x: 0, y: 0 }
+let panStart = { x: 0, y: 0 }
+function onDown(e) {
+  dragging.value = true
+  dragStart = { x: e.clientX, y: e.clientY }
+  panStart = { x: panX.value, y: panY.value }
+  try { e.target.setPointerCapture(e.pointerId) } catch (_) {}
+}
+function onMove(e) {
+  if (!dragging.value) return
+  const svg = e.currentTarget
+  const rect = svg.getBoundingClientRect()
+  if (!rect.width) return
+  const w = 920 / scale.value
+  const h = 600 / scale.value
+  panX.value = panStart.x + (e.clientX - dragStart.x) * w / rect.width
+  panY.value = panStart.y + (e.clientY - dragStart.y) * h / rect.height
+}
+function onUp() { dragging.value = false }
+
 /* ============ 想想议议（教材页边问题） ============ */
 const quizPick = ref('')
 const quizDone = ref(false)
@@ -70,28 +108,28 @@ const RC_DEMO = 0.26, RC_COMM = 0.30 // 滑环 / 换向器半径
 const RING_Y1 = 2.06, RING_Y2 = 2.30, COMM_Y = 2.18
 
 /* ============ 静态路径（磁极 / 导线，构建一次） ============ */
-function bandPath(side, r) { // 弧形极靴（外方内弧，竖直壁），side=+1 → S（+x），-1 → N（-x）
+function bandPath(side, r) { // 弧形极靴（外方内弧，竖直壁），side=+1 → +x（右），-1 → -x（左）
   const yT = 1.6, yB = -1.6, phi = (38 * Math.PI) / 180
   const pts = []
   for (let i = 0; i <= 16; i++) { const a = -phi + (2 * phi * i) / 16; pts.push(P(side * r * Math.cos(a), yT, r * Math.sin(a))) }
   for (let i = 16; i >= 0; i--) { const a = -phi + (2 * phi * i) / 16; pts.push(P(side * r * Math.cos(a), yB, r * Math.sin(a))) }
   return 'M' + pts.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join('L') + 'Z'
 }
-const poleN_D = bandPath(1, 3.45), poleN_In = bandPath(1, 1.8)   // 装置翻转后 N 位于右侧
-const poleS_D = bandPath(-1, 3.45), poleS_In = bandPath(-1, 1.8) // S 位于左侧
-const nPos = P(2.62, 0.15, 0), sPos = P(-2.62, 0.15, 0)
+const poleN_D = bandPath(-1, 3.45), poleN_In = bandPath(-1, 1.8)   // N 位于左侧（-x）
+const poleS_D = bandPath(1, 3.45), poleS_In = bandPath(1, 1.8)     // S 位于右侧（+x）
+const nPos = P(-2.62, 0.15, 0), sPos = P(2.62, 0.15, 0)
 const bLbl = P(-1.78, 0.33, 0)
 
-// 磁感线（N→S，翻转后自右向左）三条 + B 标签
+// 磁感线（N→S，自左向右）三条 + B 标签
 const bLines = [-0.95, 0, 0.95].map(y => {
-  const a = P(1.62, y, 0), b = P(-1.62, y, 0)
+  const a = P(-1.62, y, 0), b = P(1.62, y, 0)
   return { d: `M${a.x.toFixed(1)},${a.y.toFixed(1)} L${b.x.toFixed(1)},${b.y.toFixed(1)}` }
 })
 
-// 电 路 导 线（电池固定于底部原位，+ 左 − 右；导线取最短路径：左线贴 S 极外侧、右线贴 N 极外侧，无环绕交叉）
-const wireL_D = 'M383,524 L302,524 Q286,524 286,508 L286,198 Q286,182 300,178 L415,164'
-const wireR1_D = 'M485,160 L602,162 Q614,163 614,175 L614,524'
-const wireR2_D = 'M572,524 L537,524'
+// 电 路 导 线（电源模块已移至装置上方区域，缩小为次要元素；导线取最短路径竖直连接，无环绕交叉）
+const wireL_D = 'M416,40 L416,150 Q416,156 422,156'
+const wireR1_D = 'M477,152 L477,24 L540,24'
+const wireR2_D = 'M572,24 L572,40 L504,40'
 
 /* ============ 运行时状态 ============ */
 let theta = 0, angVel = 0
@@ -132,18 +170,9 @@ function render(now) {
   const ca = rot(CORNERS.a, theta), cb = rot(CORNERS.b, theta), cc = rot(CORNERS.c, theta), cd = rot(CORNERS.d, theta)
   const pa = P(ca.x, ca.y, ca.z), pb = P(cb.x, cb.y, cb.z), pc = P(cc.x, cc.y, cc.z), pd = P(cd.x, cd.y, cd.z)
 
-  // 线圈 + 引线
+  // 线圈
   setD('coilPath', `M${ptStr(pa)} L${ptStr(pb)} L${ptStr(pc)} L${ptStr(pd)} Z`)
   setD('coilFlow', `M${ptStr(pa)} L${ptStr(pb)} L${ptStr(pc)} L${ptStr(pd)} Z`)
-  const yA = mode.value === 'comm' ? COMM_Y : RING_Y1
-  const yD = mode.value === 'comm' ? COMM_Y : RING_Y2
-  const rc = mode.value === 'comm' ? RC_COMM : RC_DEMO
-  const azA = mode.value === 'comm' ? theta + 2.967 : 2.967   // ≈170°
-  const azD = mode.value === 'comm' ? theta + 4.782 : 3.316   // ≈190° / ≈274°
-  const rA = P(rc * Math.cos(azA), yA, rc * Math.sin(azA))
-  const rD = P(rc * Math.cos(azD), yD, rc * Math.sin(azD))
-  setD('leadA', `M${ptStr(pa)} Q${((pa.x + rA.x) / 2 - 30).toFixed(1)},${(Math.min(pa.y, rA.y) - 30).toFixed(1)} ${ptStr(rA)}`)
-  setD('leadB', `M${ptStr(pd)} Q${((pd.x + rD.x) / 2 - 30).toFixed(1)},${(Math.min(pd.y, rD.y) - 26).toFixed(1)} ${ptStr(rD)}`)
 
   // 角标 a b c d
   placeLabel('labA', pa); placeLabel('labB', pb); placeLabel('labC', pc); placeLabel('labD', pd)
@@ -316,7 +345,7 @@ function syncBattery() {
   if (bn) bn.textContent = left > 0 ? '−' : '+'
 }
 function syncSwitch() {
-  setT('swBladeG', powered.value ? '' : 'rotate(-42 572 524)')
+  setT('swBladeG', powered.value ? '' : 'rotate(-42 540 24)')
   const b = $('btnPower')
   if (b) b.classList.toggle('on', powered.value)
 }
@@ -381,7 +410,7 @@ onBeforeUnmount(() => {
 
 /* ============ 公式面板 ============ */
 const formulaRows = computed(() => [
-  { label: '磁场 B', value: 'N → S（翻转后向左）' },
+  { label: '磁场 B', value: 'N → S（向右）' },
   { label: '电流 I', value: currentA.value.toFixed(1) + ' A' },
   { label: '有效边受力 F', value: 'F = B·I·L' },
   { label: '力矩 M', value: 'M ∝ cosθ（θ 为偏离图甲的角度）' }
@@ -398,9 +427,9 @@ const verifyList = [
   <div class="lab-stage">
     <!-- 左：动画舞台 -->
     <div class="lab-left">
-      <div class="lab-panel board-dark" style="padding:0;overflow:hidden;position:relative">
+      <div class="lab-panel board-dark board-adaptive" style="padding:0;overflow:hidden;position:relative">
         <div class="lab-container">
-          <div class="lab-title">⚡ 通电线圈在磁场中转动 — 电动机原理</div>
+        
 
           <div class="legend">
             <div><span class="l-f"></span>力 F（左、右竖边）</div>
@@ -408,10 +437,9 @@ const verifyList = [
             <div><span class="l-i"></span>电流 I 及方向</div>
             <div><span class="l-b"></span>磁感线 B（N→S）</div>
             <div><span class="l-r"></span>转动方向（画面视角）</div>
-            <div class="flip-note">↺ 装置已翻转 180°（电池固定）：B 与 I 同时反向 → 受力方向不变</div>
           </div>
 
-          <svg class="stage-svg" viewBox="0 0 920 600" preserveAspectRatio="xMidYMid meet" aria-label="通电线圈在磁场中转动互动演示">
+          <svg class="stage-svg" :viewBox="viewBoxStr" preserveAspectRatio="xMidYMid meet" aria-label="通电线圈在磁场中转动互动演示" :style="{cursor: dragging ? 'grabbing' : 'grab'}" @wheel.prevent="onWheel" @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp" @dblclick.prevent="zoomReset">
             <defs>
               <linearGradient id="gN" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0" stop-color="#a01c12" /><stop offset="0.55" stop-color="#e0352b" /><stop offset="1" stop-color="#7a120b" />
@@ -473,30 +501,28 @@ const verifyList = [
               <path id="flowL" :d="wireL_D" stroke="#ffcf7a" stroke-width="2.2" fill="none" stroke-dasharray="6 12" style="display:none" />
               <path id="flowR1" :d="wireR1_D" stroke="#ffcf7a" stroke-width="2.2" fill="none" stroke-dasharray="6 12" style="display:none" />
               <path id="flowR2" :d="wireR2_D" stroke="#ffcf7a" stroke-width="2.2" fill="none" stroke-dasharray="6 12" style="display:none" />
-              <!-- 电源 -->
-              <rect x="383" y="512" width="12" height="24" rx="2" fill="#9aa3b2" />
-              <rect x="525" y="512" width="12" height="24" rx="2" fill="#9aa3b2" />
-              <rect x="395" y="496" width="130" height="56" rx="8" fill="#242c3a" stroke="#46536a" stroke-width="2" />
-              <rect x="403" y="504" width="34" height="40" rx="3" fill="none" stroke="#5a6b85" stroke-width="2" />
-              <rect x="443" y="504" width="34" height="40" rx="3" fill="none" stroke="#5a6b85" stroke-width="2" />
-              <text x="487" y="530" text-anchor="middle" fill="#9fb0c8" font-size="12.5" font-weight="800">电源</text>
-              <text id="battP" x="389" y="508" text-anchor="middle" fill="#ffd166" font-size="15" font-weight="900">+</text>
-              <text id="battN" x="531" y="508" text-anchor="middle" fill="#7fd0ff" font-size="15" font-weight="900">−</text>
-              <!-- 开关（底部水平串接在电池− 回路上，导线最短路径） -->
-              <circle cx="614" cy="524" r="4.5" fill="#cfd6e2" />
-              <circle cx="572" cy="524" r="4.5" fill="#cfd6e2" />
+              <!-- 电源（缩小为次要元素，移至装置上方区域） -->
+              <rect x="413" y="40" width="6" height="8" rx="1" fill="#9aa3b2" />
+              <rect x="501" y="40" width="6" height="8" rx="1" fill="#9aa3b2" />
+              <rect x="415" y="46" width="90" height="34" rx="6" fill="#1d2433" stroke="#3a4658" stroke-width="1.5" />
+              <rect x="423" y="52" width="22" height="22" rx="2" fill="none" stroke="#4a5668" stroke-width="1.5" />
+              <rect x="475" y="52" width="22" height="22" rx="2" fill="none" stroke="#4a5668" stroke-width="1.5" />
+              <text x="460" y="68" text-anchor="middle" fill="#7d8a9c" font-size="10" font-weight="700">电源</text>
+              <text id="battP" x="416" y="37" text-anchor="middle" fill="#ffd166" font-size="11" font-weight="800">+</text>
+              <text id="battN" x="504" y="37" text-anchor="middle" fill="#7fd0ff" font-size="11" font-weight="800">−</text>
+              <!-- 开关（缩小，串接在上方右侧水平回路） -->
+              <circle cx="540" cy="24" r="3.5" fill="#cfd6e2" />
+              <circle cx="572" cy="24" r="3.5" fill="#cfd6e2" />
               <g id="swBladeG">
-                <line x1="572" y1="524" x2="614" y2="524" stroke="#e6ebf2" stroke-width="4.5" stroke-linecap="round" />
+                <line x1="540" y1="24" x2="572" y2="24" stroke="#e6ebf2" stroke-width="3.5" stroke-linecap="round" />
               </g>
-              <text x="593" y="507" text-anchor="middle" fill="#9fb0c8" font-size="12" font-weight="700">开关</text>
-              <rect x="552" y="496" width="92" height="54" fill="transparent" style="cursor:pointer" @click="togglePower">
+              <text x="556" y="16" text-anchor="middle" fill="#7d8a9c" font-size="10" font-weight="700">开关</text>
+              <rect x="520" y="8" width="72" height="28" fill="transparent" style="cursor:pointer" @click="togglePower">
                 <title>{{ powered ? '断开开关' : '闭合开关' }}</title>
               </rect>
             </g>
 
-            <!-- 线圈引线 + 线圈 abcd -->
-            <path id="leadA" fill="none" stroke="#caa05a" stroke-width="3" />
-            <path id="leadB" fill="none" stroke="#caa05a" stroke-width="3" />
+            <!-- 线圈 abcd -->
             <path id="coilPath" fill="rgba(255,190,120,0.05)" stroke="#f0a852" stroke-width="5.5" stroke-linejoin="round" style="filter:drop-shadow(0 0 6px rgba(255,170,80,0.35))" />
             <path id="coilFlow" fill="none" stroke="#ffcf7a" stroke-width="2.6" stroke-dasharray="7 11" style="display:none" />
             <g id="curA" style="display:none"><path d="M0,-4.5 L9,0 L0,4.5 Z" fill="#ffb74d" /></g>
@@ -517,40 +543,17 @@ const verifyList = [
             <text id="rotLbl" fill="#4dd8ff" font-size="12" font-weight="800" text-anchor="middle"></text>
           </svg>
 
-          <!-- 底部控制栏 -->
-          <div class="panel">
-            <div class="col" style="min-width:196px">
-              <div class="lbl">教材场景（图 20.4-3）</div>
-              <div class="chips">
-                <span class="chip" :class="{ on: scenario === 'A' }" @click="setScenario('A')">甲·受力转动</span>
-                <span class="chip" :class="{ on: scenario === 'B' }" @click="setScenario('B')">乙·平衡位置</span>
-                <span class="chip" :class="{ on: scenario === 'C' }" @click="setScenario('C')">丙·受力阻碍</span>
-              </div>
-            </div>
+          <!-- 缩放控制 -->
+          <div class="zoom-ctrl">
+            <button class="zoom-btn" @click="zoomOut" title="缩小">−</button>
+            <span class="zoom-val" @click="zoomReset" title="点击恢复 100%（或双击动画）">{{ (scale * 100).toFixed(0) }}%</span>
+            <button class="zoom-btn" @click="zoomIn" title="放大">+</button>
+            <span class="zoom-hint" title="滚轮缩放 · 拖动平移">↔</span>
+          </div>
 
-            <div class="col" style="min-width:170px">
-              <div class="lbl">操作</div>
-              <div class="btns">
-                <button id="btnPower" class="btn" @click="togglePower">{{ powered ? '⏻ 断电' : '⚡ 通电' }}</button>
-                <button class="btn btn-flip" :class="{ 'btn-glow': liveNearFlip, disabled: mode === 'comm' }" @click="flipCurrent" title="在线圈每次越过平衡位置时点击，改变电流方向可让线圈继续转动">⇄ 手动换向<span v-if="liveNearFlip" class="flip-now">·现在点！</span></button>
-              </div>
-              <div class="btns">
-                <button class="btn" :class="{ on: mode === 'comm' }" @click="toggleMode" title="E、F 铜半环 + 电刷 A、B，越过平衡位置自动改变电流方向">换向器模式</button>
-              </div>
-            </div>
-
-            <div class="info">
-              <div class="info-title">📖 观察与解释</div>
-              <div class="info-body" id="infoB">选择场景并闭合开关（点击图中开关也可以），观察线圈的受力与转动</div>
-            </div>
-
-            <div class="col" style="min-width:76px">
-              <div class="lbl">显示</div>
-              <div class="btns">
-                <button class="btn" :class="{ on: showForce }" @click="toggleForceV">受力</button>
-                <button class="btn" :class="{ on: showCur }" @click="toggleCurV">电流</button>
-              </div>
-            </div>
+          <!-- 观察与解释（动画下方讲解条，一两行） -->
+          <div class="info info-bar">
+            <div class="info-body" id="infoB">选择场景并闭合开关（点击图中开关也可以），观察线圈的受力与转动</div>
           </div>
         </div>
       </div>
@@ -563,7 +566,7 @@ const verifyList = [
       </div>
     </div>
 
-    <!-- 右：变量 + 数据 + 公式 + 想想议议 + 教材对照 -->
+    <!-- 右：变量 + 操作控制 + 数据 + 公式 + 想想议议 + 教材对照 -->
     <aside class="lab-right">
       <div class="lab-panel">
         <div class="lab-panel-head">
@@ -573,6 +576,41 @@ const verifyList = [
         <div class="lab-params">
           <ParamSlider v-model="currentA" :min="0.5" :max="2" :step="0.1" :precision="1" label="电流大小 I" unit=" A" hint="电流越大，受力 F=BIL 越大，摆动越快" />
           <ParamSlider v-model="speedScale" :min="0.3" :max="2" :step="0.1" :precision="1" label="演示速度" unit=" ×" hint="数值越大演示越快" />
+        </div>
+      </div>
+
+      <!-- 操作控制（原动画底部栏，移至此处） -->
+      <div class="lab-panel control-panel">
+        <div class="lab-panel-head">
+          <strong>操作控制</strong>
+          <span>场景 · 开关 · 显示</span>
+        </div>
+        <div class="ctrl-body">
+          <div class="ctrl-row">
+            <div class="lbl">教材场景（图 20.4-3）</div>
+            <div class="chips">
+              <span class="chip" :class="{ on: scenario === 'A' }" @click="setScenario('A')">甲·受力转动</span>
+              <span class="chip" :class="{ on: scenario === 'B' }" @click="setScenario('B')">乙·平衡位置</span>
+              <span class="chip" :class="{ on: scenario === 'C' }" @click="setScenario('C')">丙·受力阻碍</span>
+            </div>
+          </div>
+
+          <div class="ctrl-row">
+            <div class="lbl">操作</div>
+            <div class="btns">
+              <button id="btnPower" class="btn" @click="togglePower">{{ powered ? '断电' : '通电' }}</button>
+              <button class="btn btn-flip" :class="{ 'btn-glow': liveNearFlip, disabled: mode === 'comm' }" @click="flipCurrent" title="在线圈每次越过平衡位置时点击，改变电流方向可让线圈继续转动">手动换向<span v-if="liveNearFlip" class="flip-now">·现在点！</span></button>
+              <button class="btn" :class="{ on: mode === 'comm' }" @click="toggleMode" title="E、F 铜半环 + 电刷 A、B，越过平衡位置自动改变电流方向">换向器模式</button>
+            </div>
+          </div>
+
+          <div class="ctrl-row">
+            <div class="lbl">显示</div>
+            <div class="btns">
+              <button class="btn" :class="{ on: showForce }" @click="toggleForceV">受力</button>
+              <button class="btn" :class="{ on: showCur }" @click="toggleCurV">电流</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -646,7 +684,7 @@ const verifyList = [
           <li><strong>图甲·受力转动</strong>：闭合开关，线圈沿顺时针方向转动，并由于惯性越过平衡位置。</li>
           <li><strong>图丙·受力阻碍</strong>：冲过平衡位置后闭合开关，线圈逆时针转动 —— 受力阻碍它沿顺时针方向转动，最后返回平衡位置。</li>
           <li><strong>结论</strong>：线圈不能连续转动。若在越过平衡位置后改变电流方向，线圈将继续转动 —— 实际电动机由<strong>换向器</strong>（E、F 铜半环 + 电刷 A、B）自动完成。</li>
-          <li><strong>装置翻转 180°</strong>：电池固定原位不动，磁体与线圈整体翻转、导线按最短路径重新连接 —— 磁场 B 与线圈电流 I <strong>同时反向</strong>，受力 F 方向不变，线圈仍照常转动（印证"想想议议"结论）。</li>
+          <li><strong>装置翻转 180°</strong>：磁体与线圈整体翻转、电池移至装置上方区域并缩小为次要元素、导线按最短路径重新连接 —— 磁场 B 与线圈电流 I <strong>同时反向</strong>，受力 F 方向不变，线圈仍照常转动（印证"想想议议"结论）。</li>
         </ol>
       </div>
     </aside>
@@ -667,9 +705,10 @@ const verifyList = [
 }
 .lab-container svg {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
   width: 100%;
-  height: calc(100% - 80px);
+  height: calc(100% - 52px);
 }
 .lab-title {
   position: absolute;
@@ -684,6 +723,54 @@ const verifyList = [
   z-index: 30;
   white-space: nowrap;
 }
+/* 缩放控制 */
+.zoom-ctrl {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(5,8,16,0.6);
+  border: 1px solid rgba(56,189,248,0.3);
+  border-radius: 8px;
+  padding: 3px 4px;
+}
+.zoom-btn {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(56,189,248,0.4);
+  border-radius: 5px;
+  background: rgba(56,189,248,0.12);
+  color: #7dd3fc;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.zoom-btn:hover { background: rgba(56,189,248,0.3); color: #fff; }
+.zoom-val {
+  min-width: 42px;
+  text-align: center;
+  color: #cfe9ff;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--mono, monospace);
+  cursor: pointer;
+  user-select: none;
+}
+.zoom-val:hover { color: #7dd3fc; }
+.zoom-hint {
+  color: rgba(125,211,252,0.6);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: help;
+  padding: 0 2px;
+}
 .legend {
   position: absolute;
   top: 40px;
@@ -694,15 +781,6 @@ const verifyList = [
   z-index: 20;
 }
 .legend span { display: inline-block; width: 22px; height: 3px; margin-right: 6px; vertical-align: middle; border-radius: 2px; }
-.flip-note {
-  margin-top: 5px;
-  padding-top: 5px;
-  border-top: 1px dashed rgba(56, 189, 248, 0.25);
-  color: rgba(125, 211, 252, 0.85);
-  font-size: 9.5px;
-  line-height: 1.5;
-  max-width: 168px;
-}
 .l-f { background: #ff5b6e; }
 .l-f2 { background: #c586ff; }
 .l-i { background: repeating-linear-gradient(90deg, #ffb74d, #ffb74d 4px, transparent 4px, transparent 8px); }
@@ -714,20 +792,28 @@ const verifyList = [
 /* 线圈角标 */
 .corner-lbl circle { fill: rgba(20, 26, 38, 0.75); stroke: #f0a852; stroke-width: 1.5; }
 .corner-lbl text { fill: #ffd9a0; font-size: 12px; font-weight: 800; }
-/* 底部控制栏（与凸透镜实验室一致） */
-.panel {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 80px;
-  background: linear-gradient(180deg, rgba(5,8,16,0.98), rgba(3,5,12,0.99));
-  border-top: 1px solid rgba(30,50,80,0.6);
+/* 右侧操作控制面板（原动画底部栏移至此处） */
+.control-panel .ctrl-body {
   display: flex;
-  padding: 10px 14px;
+  flex-direction: column;
   gap: 12px;
-  z-index: 40;
-  align-items: center;
+  padding: 12px 14px;
+}
+.ctrl-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed rgba(30, 50, 80, 0.25);
+}
+.ctrl-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.control-panel .info {
+  border: none;
+  padding: 0;
+  min-width: 0;
 }
 .col { display: flex; flex-direction: column; gap: 8px; }
 .lbl {
@@ -740,17 +826,17 @@ const verifyList = [
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip {
   padding: 4px 9px;
-  background: rgba(56,189,248,0.12);
-  border: 1px solid rgba(56,189,248,0.3);
-  color: #38bdf8;
+  background: #fff;
+  border: 1px solid rgba(20,95,210,0.35);
+  color: #050505;
   font-size: 10px;
   font-weight: 700;
   border-radius: 5px;
   cursor: pointer;
   transition: all 0.2s;
 }
-.chip:hover { background: rgba(56,189,248,0.25); border-color: rgba(56,189,248,0.6); transform: translateY(-1px); }
-.chip.on { background: rgba(74,222,128,0.18); border-color: rgba(74,222,128,0.5); color: #4ade80; }
+.chip:hover { background: #f0eee7; border-color: rgba(20,95,210,0.6); transform: translateY(-1px); }
+.chip.on { background: rgba(13,155,97,0.12); border-color: rgba(13,155,97,0.5); color: #0d9b61; }
 .info {
   flex: 1;
   display: flex;
@@ -760,6 +846,29 @@ const verifyList = [
   border-left: 1px solid rgba(30,50,80,0.5);
   border-right: 1px solid rgba(30,50,80,0.5);
   min-width: 0;
+}
+/* 动画下方观察与解释讲解条 */
+.info-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 16px;
+  background: linear-gradient(180deg, rgba(5,8,16,0.96), rgba(3,5,12,0.98));
+  border-top: 1px solid rgba(30,50,80,0.6);
+  display: flex;
+  align-items: center;
+  z-index: 20;
+}
+.info-bar .info-body {
+  color: #e2e8f0;
+  font-size: 13px;
+  line-height: 1.5;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .info-title {
   color: #64748b;
@@ -777,26 +886,26 @@ const verifyList = [
 .btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .btn {
   padding: 4px 10px;
-  background: rgba(100,116,139,0.12);
-  border: 1px solid rgba(100,116,139,0.25);
-  color: #94a3b8;
+  background: #fff;
+  border: 1px solid rgba(100,116,139,0.3);
+  color: #050505;
   font-size: 11px;
   font-weight: 700;
   border-radius: 5px;
   cursor: pointer;
   transition: all 0.2s;
 }
-.btn.on { background: rgba(74,222,128,0.15); border-color: rgba(74,222,128,0.4); color: #4ade80; }
-.btn:hover { background: rgba(100,116,139,0.22); }
+.btn.on { background: rgba(13,155,97,0.12); border-color: rgba(13,155,97,0.45); color: #0d9b61; }
+.btn:hover { background: #f0eee7; }
 .btn.disabled { opacity: 0.4; pointer-events: none; }
-/* 手动换向按钮：接近平衡位置时发光提示 */
-.btn-flip { border-color: #c0742a; color: #f0c98a; }
+/* 手动换向按钮 */
+.btn-flip { border-color: rgba(184,121,21,0.45); color: #050505; }
 .btn-glow { animation: flipPulse 0.85s ease-in-out infinite; }
 @keyframes flipPulse {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.5), 0 0 10px 1px rgba(255, 209, 102, 0.55); }
-  50% { box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.85), 0 0 18px 4px rgba(255, 209, 102, 0.9); }
+  0%, 100% { box-shadow: 0 0 0 2px rgba(184, 121, 21, 0.45), 0 0 10px 1px rgba(184, 121, 21, 0.5); }
+  50% { box-shadow: 0 0 0 3px rgba(184, 121, 21, 0.8), 0 0 18px 4px rgba(184, 121, 21, 0.85); }
 }
-.flip-now { margin-left: 4px; font-weight: 800; color: #ffd166; }
+.flip-now { margin-left: 4px; font-weight: 800; color: #b87915; }
 /* 想想议议 */
 .quiz-box { padding: 10px 12px; display: grid; gap: 8px; }
 .quiz-q { margin: 0; font-size: 12.5px; color: var(--text); line-height: 1.6; }
@@ -808,4 +917,10 @@ const verifyList = [
 .ref-list { margin: 0; padding: 8px 18px 12px 24px; font-size: 12px; color: var(--text); line-height: 1.7; }
 .ref-list li { margin-bottom: 4px; }
 .ref-list strong { color: var(--accent-strong); }
+@media (max-width: 1180px) {
+  .lab-stage { grid-template-columns: 1fr; }
+  .lab-left { height: auto; }
+  .lab-container { min-height: 420px; }
+  .control-panel .info { padding: 0; }
+}
 </style>
