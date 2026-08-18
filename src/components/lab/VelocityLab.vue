@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
+import { boardTheme } from '../../lib/boardTheme'
 
 const emit = defineEmits(['complete'])
 
@@ -36,6 +37,7 @@ const trace2 = [] // { t, s } 蓝球
 
 const seen = { move: false, param: false }
 let completed = false
+let firstFinished = false
 
 const hint = ref('点击「开始」，观察红球匀速、蓝球加速的运动')
 
@@ -76,6 +78,7 @@ function resetRun() {
   s1 = 0
   s2 = 0
   v2 = 0
+  firstFinished = false
   trace1.length = 0
   trace2.length = 0
   hint.value = '点击「开始」，观察红球匀速、蓝球加速的运动'
@@ -118,17 +121,56 @@ function resizeCanvas() {
   ctx.setTransform(scale, 0, 0, scale, (cw * dpr - W * scale) / 2, (ch * dpr - H * scale) / 2)
 }
 
+// 调色板：跟随 boardTheme（chalk 深板 / light 浅色纸面），浅色模式下保证对比度
 const C = {
-  bg0: '#0a0d14',
-  bg1: '#0e1320',
-  grid: 'rgba(140,165,210,0.09)',
   red: '#ff3b4d',
   blue: '#6ea8ff',
   amber: '#ffc94d',
   text: '#c9d1d9',
   muted: '#7d8794',
-  finish: '#4ade80'
+  finish: '#4ade80',
+  grid: 'rgba(140,165,210,0.09)',
+  track: 'rgba(225,238,228,0.5)',
+  chartBg: 'rgba(14,19,32,0.92)',
+  chartBorder: 'rgba(150,170,210,0.4)',
+  axis: 'rgba(150,170,210,0.55)'
 }
+function applyTheme() {
+  const light = boardTheme.variant === 'light'
+  if (light) {
+    C.red = '#e21f33'
+    C.blue = '#1d4fd7'
+    C.amber = '#b7791f'
+    C.text = '#20262e'
+    C.muted = '#5b6470'
+    C.finish = '#15803d'
+    C.grid = 'rgba(60,50,40,0.10)'
+    C.track = 'rgba(60,50,40,0.5)'
+    C.chartBg = 'rgba(255,255,255,0.82)'
+    C.chartBorder = 'rgba(60,50,40,0.28)'
+    C.axis = 'rgba(60,50,40,0.5)'
+  } else {
+    C.red = '#ff3b4d'
+    C.blue = '#6ea8ff'
+    C.amber = '#ffc94d'
+    C.text = '#c9d1d9'
+    C.muted = '#7d8794'
+    C.finish = '#4ade80'
+    C.grid = 'rgba(140,165,210,0.09)'
+    C.track = 'rgba(225,238,228,0.5)'
+    C.chartBg = 'rgba(14,19,32,0.92)'
+    C.chartBorder = 'rgba(150,170,210,0.4)'
+    C.axis = 'rgba(150,170,210,0.55)'
+  }
+}
+applyTheme()
+watch(
+  () => boardTheme.variant,
+  () => {
+    applyTheme()
+    render()
+  }
+)
 
 function trackX(s) {
   return trackX0 + (Math.min(s, S) / S) * (trackX1 - trackX0)
@@ -153,7 +195,7 @@ function drawTracks() {
   paintBoard(ctx, W, H, 'chalk')
 
   for (const ty of [trackY1, trackY2]) {
-    ctx.strokeStyle = 'rgba(225,238,228,0.5)'
+    ctx.strokeStyle = C.track
     ctx.lineWidth = 2
     ctx.setLineDash([12, 8])
     ctx.beginPath()
@@ -184,8 +226,8 @@ function drawChart(x0, y0, w, h, title, drawFn, opts = {}) {
   const pw = w - padL - padR
   const ph = h - padT - padB
 
-  ctx.fillStyle = 'rgba(14,19,32,0.92)'
-  ctx.strokeStyle = 'rgba(150,170,210,0.4)'
+  ctx.fillStyle = C.chartBg
+  ctx.strokeStyle = C.chartBorder
   ctx.lineWidth = 1.5
   ctx.beginPath()
   ctx.rect(x0, y0, w, h)
@@ -202,7 +244,7 @@ function drawChart(x0, y0, w, h, title, drawFn, opts = {}) {
   ctx.rect(px, py, pw, ph)
   ctx.clip()
   // 坐标轴（左 + 下）
-  ctx.strokeStyle = 'rgba(150,170,210,0.55)'
+  ctx.strokeStyle = C.axis
   ctx.lineWidth = 1.5
   ctx.beginPath()
   ctx.moveTo(px, py)
@@ -236,16 +278,19 @@ function drawST() {
   const y0 = 260
   const w = 382
   const h = 120
-  const tMax = Math.max(t1f.value, t2f.value) * 1.05
+  const tMax = Math.max(t1f.value, t2f.value) // 不加余量，曲线恰好走到时间轴末端
   drawChart(x0, y0, w, h, 's–t 图像（路程—时间）', ({ px, py, pw, ph }) => {
     const X = (t) => px + (t / tMax) * pw
     const Y = (s) => py + ph - (Math.min(s, S) / S) * ph
 
     ctx.strokeStyle = C.red
     ctx.lineWidth = 2.5
+    const tR = t1f.value
+    const tDiagEnd = Math.min(t, tR) // 对角段到当前时刻（最多到 tR）
     ctx.beginPath()
     ctx.moveTo(X(0), Y(0))
-    ctx.lineTo(X(Math.min(t, t1f.value)), Y(Math.min(v1.value * Math.min(t, t1f.value), S)))
+    ctx.lineTo(X(tDiagEnd), Y(v1.value * tDiagEnd)) // 对角线跟随时长增长
+    if (t > tR) ctx.lineTo(X(Math.min(t, tMax)), Y(S)) // 达终点后水平延伸
     ctx.stroke()
 
     ctx.strokeStyle = C.blue
@@ -266,7 +311,7 @@ function drawVT() {
   const y0 = 260
   const w = 382
   const h = 120
-  const tMax = Math.max(t1f.value, t2f.value) * 1.05
+  const tMax = Math.max(t1f.value, t2f.value)
   const vMax = Math.max(v1.value, a2.value * tMax, 0.1) * 1.1
   drawChart(x0, y0, w, h, 'v–t 图像（速度—时间）', ({ px, py, pw, ph }) => {
     const X = (t) => px + (t / tMax) * pw
@@ -325,10 +370,19 @@ function loop() {
     const s2Done = s2 >= S
     if (s1Done) s1 = S
     if (s2Done) s2 = S
-    if (s1Done || s2Done) {
+    // 第一个到达终点：给出领先提示，但继续跑到两者都到终点，让 s-t / v-t 曲线画满整张图
+    if (!firstFinished && (s1Done || s2Done)) {
+      firstFinished = true
+      hint.value = t1f.value < t2f.value ? '红球先到终点 —— 相同路程比时间' : t2f.value < t1f.value ? '蓝球先到终点 —— 匀加速运动更快' : '同时到达！'
+    }
+    if (s1Done && s2Done) {
       running.value = false
       done.value = true
-      hint.value = t1f.value < t2f.value ? '红球先到终点 —— 相同路程比时间' : t2f.value < t1f.value ? '蓝球先到终点 —— 匀加速运动更快' : '同时到达！'
+      hint.value = t1f.value < t2f.value
+        ? '红球先到（' + t1f.value.toFixed(1) + 's）· 蓝球后到（' + t2f.value.toFixed(1) + 's）'
+        : t2f.value < t1f.value
+        ? '蓝球先到（' + t2f.value.toFixed(1) + 's）· 红球后到（' + t1f.value.toFixed(1) + 's）'
+        : '同时到达终点！'
     }
   }
   render()
