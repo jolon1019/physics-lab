@@ -100,16 +100,18 @@ function dims() {
 // 计算场景布局：底座三角形下面直角边 = 画布宽的 2/3（默认状态）
 function layout() {
   const { W, H } = dims()
-  const groundY = H - 78
   const theta = (slope.value * Math.PI) / 180
   // 目标底边：画布宽的 2/3；坡度太陡时压缩以保证顶端不溢出
   const desiredBase = W * (2 / 3)
   const maxBase = Math.max(80, (H - 96) / Math.max(Math.tan(theta), 0.05))
   const BASE = Math.min(desiredBase, maxBase)
-  // 底座定位：左 8% 边距起向右铺 BASE
-  const topX = W * 0.08
+  // 水平居中：楔块底边中点对齐画布水平中心
+  const topX = (W - BASE) / 2
   const pivotX = topX + BASE
-  const pivotY = groundY - 4
+  // 垂直居中：装置整体（含小车 + 起/末标记 + 平台厚）的视觉包围盒中心对齐画布中心
+  // 斜面顶端到平台底几何中心 = (H - 24 + BASE·sinθ)/2；再下移 12px 补偿小车/标记向上凸起
+  const pivotY = (H - 24 + BASE * Math.sin(theta)) / 2 + 12
+  const groundY = pivotY + 4
   const topY = pivotY - BASE * Math.sin(theta)
   return { W, H, groundY, pivotX, pivotY, theta, topX, topY, BASE }
 }
