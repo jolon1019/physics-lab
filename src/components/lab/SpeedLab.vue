@@ -70,19 +70,13 @@ let lastT = null
 let tScreen = 0
 const currentFrac = ref(0) // 当前已走路程占所选全程的比例（真实匀加速：∝ t²）
 
-// ===== 贴纸资源（小车 / 滑道，PNG 已放置在 public/assets/lab/）=====
+// ===== 贴纸资源（小车，PNG 已放置在 public/assets/lab/）=====
 const imgCart = ref(null) // 小车贴纸（che.png）
-const imgRamp = ref(null) // 滑道贴纸（huadao.png）
-const TRACK_H = 36 // 滑道贴纸在画布上的厚度（px，源图 800×148，约 170px 长时保真）
 const CART_W = 84 // 小车贴纸在画布上的宽度（px），源 che.png 裁后 225×133（已去白底、透明），高度按原图比例自动
 
-// 贴纸内"接触参考行"占源图高度的比例（像素实测，用于精确对齐，消除悬浮 / 断裂感）
-// huadao.png：车轮滚行的上表面行 ≈ y27（占 148）
+// 小车贴纸内"车轮最底不透明行"占源图高度的比例（像素实测）；车轮精确压在楔块顶边（斜面表面）
 // che.png：车轮最底不透明行 ≈ y124（占 133）
-// 两者都对齐同一条 plank 线（斜面表面），车轮即精确压在滑道上表面
-const RAMP_SURF_FRAC = 27 / 148
 const CART_WHEEL_FRAC = 124 / 133
-const RAMP_EXT = TRACK_H * 0.5 // 滑道两端各外伸，确保起点 / 终点与整体衔接、无端点缺口
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
@@ -112,14 +106,12 @@ function layout() {
   const desiredBase = W * (2 / 3)
   const maxBase = Math.max(80, (H - 96) / Math.max(Math.tan(theta), 0.05))
   const BASE = Math.min(desiredBase, maxBase)
-  // 斜面长 = 底边 / cosθ，使水平投影（底边）= BASE；RAMP_LEN 仅随坡度变，与固定路程无关
-  const RAMP_LEN = BASE / Math.cos(theta)
   // 底座定位：左 8% 边距起向右铺 BASE
   const topX = W * 0.08
   const pivotX = topX + BASE
   const pivotY = groundY - 4
-  const topY = pivotY - RAMP_LEN * Math.sin(theta)
-  return { W, H, groundY, pivotX, pivotY, RAMP_LEN, theta, topX, topY, BASE }
+  const topY = pivotY - BASE * Math.sin(theta)
+  return { W, H, groundY, pivotX, pivotY, theta, topX, topY, BASE }
 }
 
 // 斜面表面上的点（f: 0=顶端起点, 1=底端）
@@ -159,24 +151,62 @@ function drawBackground(L) {
   ctx.stroke()
 }
 
-// 木质斜面（保留支撑楔块；斜面表面改用贴纸 huadao.png，沿斜面方向铺满）
+// 木质斜面支撑楔块（直角三角形：顶端、底端、底端正下方），渲染为木纹材质
+// 跑道贴纸已移除：小车直接滑行于楔块顶边（斜边）
 function drawRamp(L) {
   const top = { x: L.topX, y: L.topY }
   const pivot = { x: L.pivotX, y: L.pivotY }
+  const topDown = { x: L.topX, y: L.pivotY }
 
-  // 支撑楔块（直角三角形：顶端、底端、底端正下方）
-  ctx.fillStyle = '#e3d2b0'
+  // 裁剪到三角形内部后绘制木纹
+  ctx.save()
   ctx.beginPath()
   ctx.moveTo(top.x, top.y)
   ctx.lineTo(pivot.x, pivot.y)
-  ctx.lineTo(top.x, pivot.y)
+  ctx.lineTo(topDown.x, topDown.y)
   ctx.closePath()
-  ctx.fill()
-  ctx.strokeStyle = 'rgba(120,90,50,0.25)'
+  ctx.clip()
+
+  // 木纹底色渐变（沿楔块斜高方向：亮木 → 中木 → 暗木）
+  const g = ctx.createLinearGradient(topDown.x - 24, topDown.y, pivot.x + 8, top.y)
+  g.addColorStop(0, '#ecd7ac')
+  g.addColorStop(0.5, '#d6b67e')
+  g.addColorStop(1, '#bf974f')
+  ctx.fillStyle = g
+  ctx.fillRect(topDown.x - 40, top.y - 6, (pivot.x - topDown.x) + 80, (pivot.y - top.y) + 12)
+
+  // 木纹纹理：沿斜边方向的多条平行纹理线
+  const dx = pivot.x - top.x, dy = pivot.y - top.y
+  const len = Math.hypot(dx, dy) || 1
+  const ux = dx / len, uy = dy / len
+  let nx = -uy, ny = ux // 斜边法线
+  const mx = (top.x + pivot.x) / 2, my = (top.y + pivot.y) / 2
+  if (nx * (topDown.x - mx) + ny * (topDown.y - my) < 0) { nx = -nx; ny = -ny } // 指向楔块内部
+  const bands = 6
+  for (let i = 1; i < bands; i++) {
+    const off = (i / bands) * 13
+    const ox = nx * off, oy = ny * off
+    ctx.strokeStyle = i % 2 === 0 ? 'rgba(110,80,45,0.18)' : 'rgba(255,250,240,0.12)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(top.x + ox + ux * 5, top.y + oy + uy * 5)
+    ctx.lineTo(pivot.x + ox - ux * 5, pivot.y + oy - uy * 5)
+    ctx.stroke()
+  }
+  ctx.restore()
+
+  // 楔块描边
+  ctx.strokeStyle = 'rgba(120,90,50,0.3)'
   ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(top.x, top.y)
+  ctx.lineTo(pivot.x, pivot.y)
+  ctx.lineTo(topDown.x, topDown.y)
+  ctx.closePath()
   ctx.stroke()
-  // 楔块左侧竖直面阴影
-  ctx.fillStyle = 'rgba(0,0,0,0.05)'
+
+  // 楔块左侧竖直面阴影（增强立体感）
+  ctx.fillStyle = 'rgba(0,0,0,0.06)'
   ctx.beginPath()
   ctx.moveTo(top.x, top.y)
   ctx.lineTo(top.x, pivot.y)
@@ -184,32 +214,6 @@ function drawRamp(L) {
   ctx.lineTo(top.x - 8, top.y + 8 * Math.tan(L.theta))
   ctx.closePath()
   ctx.fill()
-
-  // 滑道贴纸（沿斜面方向铺满，顶端 → 底端）
-  if (imgRamp.value && imgRamp.value.complete && imgRamp.value.naturalWidth > 0) {
-    ctx.save()
-    ctx.translate(top.x, top.y)
-    ctx.rotate(L.theta)
-    // 贴纸上表面行(源 y27)对齐 plank 线(局部 y=0)；两端各外伸 RAMP_EXT 封住端点缺口
-    ctx.drawImage(imgRamp.value, -RAMP_EXT, -RAMP_SURF_FRAC * TRACK_H, L.RAMP_LEN + RAMP_EXT * 2, TRACK_H)
-    ctx.restore()
-  } else {
-    // 贴纸未加载完成时的降级：沿用旧木纹斜面（避免空缺）
-    const thick = 16
-    ctx.lineCap = 'round'
-    ctx.strokeStyle = '#a9824f'
-    ctx.lineWidth = thick + 4
-    ctx.beginPath()
-    ctx.moveTo(top.x, top.y + 3)
-    ctx.lineTo(pivot.x, pivot.y + 3)
-    ctx.stroke()
-    ctx.strokeStyle = '#c9a36b'
-    ctx.lineWidth = thick
-    ctx.beginPath()
-    ctx.moveTo(top.x, top.y)
-    ctx.lineTo(pivot.x, pivot.y)
-    ctx.stroke()
-  }
 }
 
 // 金属材质底座平台（位于斜面支撑楔块下方，作为整个装置的金属台面）
@@ -218,14 +222,6 @@ function drawMetalPlatform(L) {
   const pw = (L.pivotX - L.topX) + 28
   const py = L.pivotY
   const ph = 24
-
-  // 台面接触投影（柔和渐隐，非贴纸椭圆，仅作落地阴影）
-  const sg = ctx.createLinearGradient(0, py + ph, 0, py + ph + 12)
-  sg.addColorStop(0, 'rgba(0,0,0,0.24)')
-  sg.addColorStop(1, 'rgba(0,0,0,0)')
-  ctx.fillStyle = sg
-  rr(px + 4, py + ph, pw - 8, 12, 4)
-  ctx.fill()
 
   // 金属主体（竖直钢铁反光渐变：亮 → 中 → 暗）
   const g = ctx.createLinearGradient(0, py, 0, py + ph)
@@ -475,17 +471,15 @@ let resizeObs = null
 onMounted(() => {
   setupCanvas()
   render()
-  // 异步加载贴纸资源（PNG 已放置在 public/assets/lab/）
-  const loadImg = (refName, src) => {
+  // 异步加载小车贴纸（PNG 已放置在 public/assets/lab/）
+  const loadImg = (src) => {
     const img = new Image()
     img.onload = () => { render() } // 加载完成后重绘，让贴纸出现
     img.onerror = () => { console.warn('[SpeedLab] failed to load', src) }
     img.src = src
-    if (refName === 'cart') imgCart.value = img
-    else imgRamp.value = img
+    imgCart.value = img
   }
-  loadImg('cart', '/assets/lab/che.png')
-  loadImg('ramp', '/assets/lab/huadao.png')
+  loadImg('/assets/lab/che.png')
   if (window.ResizeObserver) {
     resizeObs = new ResizeObserver(resizeCanvas)
     resizeObs.observe(canvasRef.value.parentElement)
