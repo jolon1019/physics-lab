@@ -75,6 +75,14 @@ const imgRamp = ref(null) // 滑道贴纸（huadao.png）
 const TRACK_H = 36 // 滑道贴纸在画布上的厚度（px，源图 800×148，约 170px 长时保真）
 const CART_W = 84 // 小车贴纸在画布上的宽度（px），源 che.png 裁后 225×133（已去白底、透明），高度按原图比例自动
 
+// 贴纸内"接触参考行"占源图高度的比例（像素实测，用于精确对齐，消除悬浮 / 断裂感）
+// huadao.png：车轮滚行的上表面行 ≈ y27（占 148）
+// che.png：车轮最底不透明行 ≈ y124（占 133）
+// 两者都对齐同一条 plank 线（斜面表面），车轮即精确压在滑道上表面
+const RAMP_SURF_FRAC = 27 / 148
+const CART_WHEEL_FRAC = 124 / 133
+const RAMP_EXT = TRACK_H * 0.5 // 滑道两端各外伸，确保起点 / 终点与整体衔接、无端点缺口
+
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
 function setupCanvas() {
@@ -181,7 +189,8 @@ function drawRamp(L) {
     ctx.save()
     ctx.translate(top.x, top.y)
     ctx.rotate(L.theta)
-    ctx.drawImage(imgRamp.value, 0, -TRACK_H / 2, L.RAMP_LEN, TRACK_H)
+    // 贴纸上表面行(源 y27)对齐 plank 线(局部 y=0)；两端各外伸 RAMP_EXT 封住端点缺口
+    ctx.drawImage(imgRamp.value, -RAMP_EXT, -RAMP_SURF_FRAC * TRACK_H, L.RAMP_LEN + RAMP_EXT * 2, TRACK_H)
     ctx.restore()
   } else {
     // 贴纸未加载完成时的降级：沿用旧木纹斜面（避免空缺）
@@ -281,20 +290,17 @@ function drawProps(L) {
   }
 }
 
-// 小车（贴纸 che.png，沿斜面倾斜，底轮紧贴滑道平面）
+// 小车（贴纸 che.png，沿斜面倾斜，车轮最底行精确压在滑道上表面）
 function drawCart(L, f) {
   const p = ptOnPlank(L, f)
-  const n = { x: Math.sin(L.theta), y: -Math.cos(L.theta) } // 斜面法线（指向滑道上方）
+  // 锚点 = plank 表面点（= 滑道贴纸上表面行对齐的那条线）。不再额外偏移，否则会悬浮
+  const cx = p.x
+  const cy = p.y
 
-  // 小车站在滑道平面上：沿法线方向下移到平面区（贴纸顶部 0..0.2*TRACK_H 是细铁轨，
-  // 真正的平面在其下，故偏移取 TRACK_H*0.3 让轮子落在平面，避开铁轨造成的"悬浮"错觉）
-  const cx = p.x + n.x * (TRACK_H * 0.3)
-  const cy = p.y + n.y * (TRACK_H * 0.3)
-
-  // 接触阴影
+  // 接触阴影（落在滑道面上，沿斜面）
   ctx.fillStyle = 'rgba(60,50,40,0.18)'
   ctx.beginPath()
-  ctx.ellipse(cx, cy + 2, CART_W * 0.55, 5, L.theta, 0, Math.PI * 2)
+  ctx.ellipse(cx, cy + 2, CART_W * 0.5, 4, L.theta, 0, Math.PI * 2)
   ctx.fill()
 
   // 小车贴纸（che.png：原图车头朝左 → 水平翻转使车头朝下坡 +x 方向）
@@ -305,12 +311,14 @@ function drawCart(L, f) {
     ctx.translate(cx, cy)
     ctx.rotate(L.theta)
     ctx.scale(-1, 1) // 翻转：车头朝下坡
-    ctx.drawImage(imgCart.value, -CART_W / 2, -cartH, CART_W, cartH)
+    // 车轮最底行(源 124/133)对齐 plank 线(局部 y=0)，即精确压在滑道上表面
+    ctx.drawImage(imgCart.value, -CART_W / 2, -CART_WHEEL_FRAC * cartH, CART_W, cartH)
     ctx.restore()
   } else {
-    // 贴纸未加载完成时的降级：旧红车身（避免空缺）
+    // 贴纸未加载完成时的降级：旧红车身（避免空缺，车轮底贴 plank）
     const u = { x: Math.cos(L.theta), y: Math.sin(L.theta) }
-    const L2W = (lx, ly) => ({ x: cx + u.x * lx + n.x * ly, y: cy + u.y * lx + n.y * ly })
+    const ny = { x: Math.sin(L.theta), y: -Math.cos(L.theta) }
+    const L2W = (lx, ly) => ({ x: cx + u.x * lx + ny.x * ly, y: cy + u.y * lx + ny.y * ly })
     const cartW = 48, cartH = 18, wheelR = WHEEL_R, gap = 2
     const b0 = L2W(-cartW / 2, wheelR + gap)
     const b1 = L2W(cartW / 2, wheelR + gap)
