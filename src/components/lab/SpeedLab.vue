@@ -72,8 +72,8 @@ const currentFrac = ref(0) // 当前已走路程占所选全程的比例（真�
 // ===== 贴纸资源（小车 / 滑道，PNG 已放置在 public/assets/lab/）=====
 const imgCart = ref(null) // 小车贴纸（che.png）
 const imgRamp = ref(null) // 滑道贴纸（huadao.png）
-const TRACK_H = 24 // 滑道贴纸在画布上的厚度（px）
-const CART_W = 54 // 小车贴纸在画布上的宽度（px），高度按原图比例自动
+const TRACK_H = 36 // 滑道贴纸在画布上的厚度（px，源图 800×148，约 170px 长时保真）
+const CART_W = 84 // 小车贴纸在画布上的宽度（px），源 che.png 裁后 225×133（已去白底、透明），高度按原图比例自动
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
