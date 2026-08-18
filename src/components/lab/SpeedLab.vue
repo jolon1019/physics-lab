@@ -140,15 +140,6 @@ function rr(x, y, w, h, r) {
 // 背景 + 桌面线
 function drawBackground(L) {
   paintBoard(ctx, L.W, L.H, 'chalk')
-  // 桌面线（粉笔色描边，露出统一黑板底）
-  const px = L.W * 0.08
-  const pw = L.W * 0.86
-  const py = L.groundY
-  const ph = 36
-  ctx.strokeStyle = 'rgba(225,238,228,0.5)'
-  ctx.lineWidth = 2
-  rr(px, py, pw, ph, 16)
-  ctx.stroke()
 }
 
 // 木质斜面支撑楔块（直角三角形：顶端、底端、底端正下方），渲染为木纹材质
