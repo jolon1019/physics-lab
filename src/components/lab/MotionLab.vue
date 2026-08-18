@@ -30,10 +30,14 @@ const reference = ref('ground') // ground | car | cloud
 // car.png 车视觉 bbox y114~298（400 高）→ 车底贴地参考线 298/400
 const CAR_W = 150
 const CAR_H = 150
+// 车贴纸顶部相对 groundY 的偏移系数（用户已调好的车的位置）
+const CAR_TOP_FRAC = 0.345
+// 车视觉中心在贴纸内的竖向比例（像素校准：视觉 bbox 中心 ≈ 468/1000）
+const CAR_VISUAL_CY_FRAC = 0.468
 const CLOUD_W = 116
 const CLOUD_H = 116
-const ROAD_H = 96 // 路面渲染高度（road.png 路视觉在 y164~280，slice 裁剪后占满高度）
-const ROAD_TILE_W = 320 // 单段路的渲染宽度（视觉 4:1，原图 1:1 拉伸）
+const ROAD_H = 76 // 路面渲染高度（road.png 路视觉在 y164~280，slice 裁剪后占满高度）
+const ROAD_TILE_W = 220 // 单段路的渲染宽度（视觉 4:1，原图 1:1 拉伸）
 const ROAD_TILES = 10 // 最多铺 10 段，覆盖 W 最大 2600 + buffer
 
 // 连续位置（始终单向增大、循环，绝不反向）
@@ -414,10 +418,12 @@ onBeforeUnmount(() => {
             >
               <animate attributeName="stroke-dashoffset" from="0" to="-38" dur="1.1s" repeatCount="indefinite" />
             </circle>
-            <!-- 参照物高亮：选车厢时圈出汽车 -->
+            <!-- 参照物高亮：选车厢时圈出汽车（圆心跟随车视觉中心：
+                 cy = 车顶部 + 视觉中心偏移 = groundY - CAR_H*CAR_TOP_FRAC + CAR_H*CAR_VISUAL_CY_FRAC，
+                 并随 carBounce 一起跳动始终包裹车） -->
             <circle
               v-if="reference === 'car'"
-              :cx="carX" :cy="groundY - 56" r="84"
+              :cx="carX" :cy="groundY - CAR_H * CAR_TOP_FRAC + CAR_H * CAR_VISUAL_CY_FRAC - carBounce" r="80"
               fill="none" stroke="#ff4d7d" stroke-width="3" stroke-dasharray="10 9"
               opacity="0.9"
             >
@@ -435,7 +441,7 @@ onBeforeUnmount(() => {
             <!-- 汽车（car.png 贴纸，车轮贴路面，保留微跳 carBounce） -->
             <image
               href="/assets/lab/car.png"
-              :x="carX - CAR_W / 2" :y="groundY - CAR_H * 0.745 - carBounce"
+              :x="carX - CAR_W / 2" :y="groundY - CAR_H * CAR_TOP_FRAC - carBounce"
               :width="CAR_W" :height="CAR_H"
               filter="url(#ml-soft)"
             />
