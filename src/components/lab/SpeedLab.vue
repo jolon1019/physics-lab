@@ -212,6 +212,59 @@ function drawRamp(L) {
   }
 }
 
+// 金属材质底座平台（位于斜面支撑楔块下方，作为整个装置的金属台面）
+function drawMetalPlatform(L) {
+  const px = L.topX - 14
+  const pw = (L.pivotX - L.topX) + 28
+  const py = L.pivotY
+  const ph = 24
+
+  // 台面接触投影（柔和渐隐，非贴纸椭圆，仅作落地阴影）
+  const sg = ctx.createLinearGradient(0, py + ph, 0, py + ph + 12)
+  sg.addColorStop(0, 'rgba(0,0,0,0.24)')
+  sg.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = sg
+  rr(px + 4, py + ph, pw - 8, 12, 4)
+  ctx.fill()
+
+  // 金属主体（竖直钢铁反光渐变：亮 → 中 → 暗）
+  const g = ctx.createLinearGradient(0, py, 0, py + ph)
+  g.addColorStop(0, '#eef2f6')
+  g.addColorStop(0.16, '#c6cfda')
+  g.addColorStop(0.5, '#9aa6b4')
+  g.addColorStop(0.84, '#79838f')
+  g.addColorStop(1, '#5b6571')
+  ctx.fillStyle = g
+  rr(px, py, pw, ph, 6)
+  ctx.fill()
+
+  // 顶部高光条（金属反光）
+  ctx.fillStyle = 'rgba(255,255,255,0.6)'
+  rr(px + 3, py + 2, pw - 6, 3, 2)
+  ctx.fill()
+
+  // 底部暗边
+  ctx.fillStyle = 'rgba(0,0,0,0.2)'
+  rr(px + 2, py + ph - 3, pw - 4, 3, 2)
+  ctx.fill()
+
+  // 铆钉（金属螺栓细节）
+  ctx.fillStyle = '#454e59'
+  const rivetCount = Math.max(3, Math.floor(pw / 64))
+  for (let i = 0; i < rivetCount; i++) {
+    const rx = px + (pw * (i + 1)) / (rivetCount + 1)
+    const ry = py + ph / 2
+    ctx.beginPath()
+    ctx.arc(rx, ry, 2.6, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'
+    ctx.beginPath()
+    ctx.arc(rx - 0.8, ry - 0.8, 1, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = '#454e59'
+  }
+}
+
 // 起 / 中 / 末 测量标记（仅显示数字）
 function drawMarker(L, f, color, num) {
   const p = ptOnPlank(L, f)
@@ -321,6 +374,7 @@ function render() {
   if (!ctx) return
   const L = layout()
   drawBackground(L)
+  drawMetalPlatform(L)
   drawRamp(L)
   drawMarker(L, 0, '#8a8a8a', 0)
   drawMarker(L, 0.5, '#3b6fd4', Math.round(DISTANCE_CM * 0.5))
