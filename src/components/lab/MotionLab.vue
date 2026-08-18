@@ -52,6 +52,9 @@ let cloudDrift2 = 640
 const seen = { ground: false, car: false, cloud: false }
 let completed = false
 
+// 全屏模式（手机端：动画 + 右侧参数并排）
+const isFullscreen = ref(false)
+
 const hint = ref('切换参照物，观察同一物体是运动还是静止')
 
 // 响应式渲染状态
@@ -157,6 +160,25 @@ function reset() {
   hint.value = '切换参照物，观察同一物体是运动还是静止'
 }
 
+// ===== 全屏（手机端：动画 + 右侧参数并排） =====
+function toggleFullscreen() {
+  const stage = stageEl.value?.closest('.lab-stage')
+  if (!stage) return
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    // 兼容 Safari 前缀；requestFullscreen 返回 Promise，被拒（如无权限）时静默
+    const p = stage.requestFullscreen ? stage.requestFullscreen() : stage.webkitRequestFullscreen?.()
+    if (p && p.catch) p.catch(() => {})
+  } else if (document.exitFullscreen) {
+    const p = document.exitFullscreen()
+    if (p && p.catch) p.catch(() => {})
+  } else if (document.webkitExitFullscreen) {
+    document.webkitExitFullscreen()
+  }
+}
+function onFsChange() {
+  isFullscreen.value = !!(document.fullscreenElement || document.webkitFullscreenElement)
+}
+
 // 由参照物决定“世界”滚动：让所选参照物居中、世界连续滚动、另一物体环绕
 function computeOffsets() {
   let wo, cx, clx
@@ -241,17 +263,21 @@ onMounted(() => {
   resize()
   ro = new ResizeObserver(resize)
   if (stageEl.value) ro.observe(stageEl.value)
+  document.addEventListener('fullscreenchange', onFsChange)
+  document.addEventListener('webkitfullscreenchange', onFsChange)
   raf = requestAnimationFrame(loop)
 })
 
 onBeforeUnmount(() => {
   if (raf) cancelAnimationFrame(raf)
   if (ro) ro.disconnect()
+  document.removeEventListener('fullscreenchange', onFsChange)
+  document.removeEventListener('webkitfullscreenchange', onFsChange)
 })
 </script>
 
 <template>
-  <div class="lab-stage">
+  <div class="lab-stage" :class="{ 'is-fullscreen': isFullscreen }">
     <div class="lab-left">
       <div class="lab-panel motion-panel" style="padding: 0">
         <div ref="stageEl" class="motion-stage">
@@ -488,6 +514,7 @@ onBeforeUnmount(() => {
         <button class="btn" :class="{ 'btn-primary': reference === 'car' }" @click="pickReference('car')">以车厢为参照物</button>
         <button class="btn" :class="{ 'btn-primary': reference === 'cloud' }" @click="pickReference('cloud')">以白云为参照物</button>
         <button class="btn" @click="reset">重置</button>
+        <button class="btn fs-btn" @click="toggleFullscreen">{{ isFullscreen ? '✕ 退出全屏' : '⛶ 全屏' }}</button>
         <span class="feedback" :class="completed ? 'ok' : 'no'">{{ hint }}</span>
       </div>
     </div>
@@ -598,6 +625,45 @@ onBeforeUnmount(() => {
 @keyframes ml-twinkle {
   0%, 100% { opacity: 0.2; }
   50% { opacity: 0.95; }
+}
+
+/* ===== 全屏模式（手机端：动画 + 右侧参数并排） ===== */
+.lab-stage.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 310px);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  margin: 0;
+  padding: 10px;
+  background: var(--surface, #16202c);
+  overflow: hidden;
+}
+.lab-stage.is-fullscreen .lab-left {
+  position: static;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+.lab-stage.is-fullscreen .motion-stage {
+  aspect-ratio: auto;
+  max-height: none;
+  height: 100%;
+  width: 100%;
+}
+.lab-stage.is-fullscreen .lab-right {
+  max-height: 100%;
+  overflow-y: auto;
+  min-width: 0;
+}
+.lab-stage.is-fullscreen .motion-panel {
+  min-height: 0;
 }
 
 /* ===== 移动端优化 ===== */
