@@ -26,6 +26,15 @@ const speed = ref(2) // 车速 m/s
 const cloudSpeed = ref(2) // 白云速度 m/s（默认与车相同 → 相对静止）
 const reference = ref('ground') // ground | car | cloud
 
+// ===== 三元素贴纸尺寸（car/cloud/road.png 均为 400×400 透明画布） =====
+const CAR_W = 132
+const CAR_H = 132
+const CLOUD_W = 116
+const CLOUD_H = 116
+const ROAD_H = 60 // 路面渲染高度
+const ROAD_TILE_W = 320 // 单段路的渲染宽度（视觉 4:1，原图 1:1 拉伸）
+const ROAD_TILES = 10 // 最多铺 10 段，覆盖 W 最大 2600 + buffer
+
 // 连续位置（始终单向增大、循环，绝不反向）
 let carPos = carCenter()
 let cloudPos = cloudCenter()
@@ -176,7 +185,7 @@ function loop() {
 
   const { wo, cx, clx } = computeOffsets()
   worldOffset.value = wo
-  laneOffset.value = mod(wo, 150)
+  laneOffset.value = mod(wo, ROAD_TILE_W)
   lampOffset.value = mod(wo, 460)
   hillOffset.value = mod(wo * 0.22, 460)
   cityOffset.value = mod(wo * 0.4, 520)
@@ -373,13 +382,16 @@ onBeforeUnmount(() => {
             </g>
 
             <!-- 地面已移除：统一露出黑板底（地平线处的路面/车道线保留） -->
-            <!-- 柏油路面 -->
-            <rect x="0" :y="groundY" :width="W" height="48" fill="url(#ml-road)" />
-            <!-- 路缘霓虹线 -->
-            <rect x="0" :y="groundY + 2" :width="W" height="3" fill="#46e8d2" opacity="0.8" />
-            <rect x="0" :y="groundY + 44" :width="W" height="3" fill="#ff8fb0" opacity="0.8" />
-            <!-- 车道虚线（滚动） -->
-            <rect x="0" :y="groundY + 20" :width="W" height="14" fill="url(#ml-lane)" :transform="`translate(${-laneOffset} 0)`" />
+            <!-- 柏油路面（road.png 平铺，沿车速反向滚动 → laneOffset） -->
+            <g :transform="`translate(${-laneOffset} ${groundY})`">
+              <image
+                v-for="i in ROAD_TILES" :key="i - 1"
+                :x="(i - 1) * ROAD_TILE_W" y="0"
+                :width="ROAD_TILE_W" :height="ROAD_H"
+                preserveAspectRatio="none"
+                href="/assets/lab/road.png"
+              />
+            </g>
             <!-- 霓虹街灯已移除：统一露出黑板底 -->
 
             <!-- 速度线 -->
@@ -411,51 +423,21 @@ onBeforeUnmount(() => {
               <animate attributeName="stroke-dashoffset" from="0" to="-38" dur="1.1s" repeatCount="indefinite" />
             </circle>
 
-            <!-- 白云（参照物本体） -->
-            <g :transform="`translate(${cloudX} ${cloudY})`" filter="url(#ml-soft)">
-              <ellipse cx="6" cy="24" rx="60" ry="17" fill="rgba(10,12,28,0.45)" />
-              <g fill="rgba(255,255,255,0.96)">
-                <circle cx="-36" cy="6" r="21" />
-                <circle cx="-8" cy="-13" r="29" />
-                <circle cx="26" cy="-6" r="24" />
-                <circle cx="48" cy="9" r="18" />
-                <circle cx="4" cy="15" r="26" />
-              </g>
-              <ellipse cx="2" cy="20" rx="48" ry="9" fill="rgba(180,200,230,0.7)" />
-            </g>
+            <!-- 白云（cloud.png 贴纸，参照物本体） -->
+            <image
+              href="/assets/lab/cloud.png"
+              :x="cloudX - CLOUD_W / 2" :y="cloudY - CLOUD_H / 2"
+              :width="CLOUD_W" :height="CLOUD_H"
+              filter="url(#ml-soft)"
+            />
 
-            <!-- 汽车（霓虹流光扁平风） -->
-            <g :transform="`translate(${carX} ${groundY}) scale(0.66) translate(0 ${-carBounce})`" filter="url(#ml-soft)">
-              <!-- 车底霓虹倒影 -->
-              <ellipse cx="0" cy="6" rx="96" ry="13" fill="rgba(70,232,210,0.28)" />
-              <ellipse cx="0" cy="2" rx="92" ry="11" fill="rgba(0,0,0,0.35)" />
-              <!-- 车身下半 -->
-              <path d="M-96 -24 L96 -24 L96 -52 Q96 -58 90 -58 L-90 -58 Q-96 -58 -96 -52 Z" fill="url(#ml-car)" />
-              <!-- 车厢 -->
-              <path d="M-64 -58 L-46 -92 Q-44 -98 -36 -98 L32 -98 Q42 -98 44 -90 L64 -58 Z" fill="url(#ml-car2)" />
-              <!-- 车窗 -->
-              <path d="M-36 -60 L-28 -92 L-6 -92 L-14 -60 Z" fill="url(#ml-win)" />
-              <path d="M6 -60 L2 -92 L26 -92 L34 -60 Z" fill="url(#ml-win)" />
-              <!-- 乘客（后排） -->
-              <ellipse cx="-6" cy="-68" rx="10" ry="7" fill="#1b2740" />
-              <circle cx="-6" cy="-75" r="6" fill="#ffd9b0" />
-              <!-- 前大灯霓虹 + 灯 -->
-              <ellipse cx="88" cy="-40" rx="13" ry="9" fill="#bff6ff" filter="url(#ml-glow)" />
-              <ellipse cx="86" cy="-40" rx="7" ry="5" fill="#ffffff" />
-              <!-- 尾灯 -->
-              <rect x="-95" y="-50" width="7" height="12" rx="2" fill="#ff4d7d" filter="url(#ml-glow)" />
-              <!-- 车轮 -->
-              <g v-for="wx in [-54, 54]" :key="wx" :transform="`rotate(${wheelAngleVal} ${wx} -24)`">
-                <circle :cx="wx" cy="-24" r="24" fill="#0c0e16" />
-                <circle :cx="wx" cy="-24" r="12" fill="#e9edf3" />
-                <circle :cx="wx" cy="-24" r="12" fill="none" stroke="#19b6c9" stroke-width="2" />
-                <g stroke="#3a4252" stroke-width="2.6">
-                  <line v-for="a in 6" :key="a" :x1="wx" :y1="-24" :x2="wx + Math.cos(a * (Math.PI * 2 / 6)) * 11" :y2="-24 + Math.sin(a * (Math.PI * 2 / 6)) * 11" />
-                </g>
-                <circle :cx="wx" cy="-24" r="3.6" fill="#19b6c9" />
-                <circle :cx="wx" cy="-24" r="24" fill="none" stroke="#05060c" stroke-width="1.8" />
-              </g>
-            </g>
+            <!-- 汽车（car.png 贴纸，车轮贴路面，保留微跳 carBounce） -->
+            <image
+              href="/assets/lab/car.png"
+              :x="carX - CAR_W / 2" :y="groundY - CAR_H * 0.78 - carBounce"
+              :width="CAR_W" :height="CAR_H"
+              filter="url(#ml-soft)"
+            />
 
             <!-- 尾气粒子 -->
             <g>
