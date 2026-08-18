@@ -658,9 +658,18 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 .lab-stage.is-fullscreen .lab-right {
+  display: block; /* 关键：不用 grid（grid 会把面板均分压缩+截断内容），改 block 让面板按内容高排布 */
   max-height: 100%;
   overflow-y: auto;
   min-width: 0;
+  scrollbar-width: thin;
+  padding-right: 4px;
+}
+.lab-stage.is-fullscreen .lab-right > .lab-panel {
+  margin-bottom: 12px;
+}
+.lab-stage.is-fullscreen .lab-right > .lab-panel:last-child {
+  margin-bottom: 0;
 }
 .lab-stage.is-fullscreen .motion-panel {
   min-height: 0;
