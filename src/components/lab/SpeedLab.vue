@@ -94,18 +94,23 @@ function dims() {
   return { W: canvas.width / dpr, H: canvas.height / dpr }
 }
 
-// 计算场景布局：斜面坡度真实改变斜面几何
+// 计算场景布局：底座三角形下面直角边 = 画布宽的 2/3（默认状态）
 function layout() {
   const { W, H } = dims()
   const groundY = H - 78
-  const pivotX = W * 0.70 // 斜面底端支点
-  const pivotY = groundY - 4
-  // 斜面长度随总路程变化（60cm→170px，200cm→340px），让“总路程”真正改变动画
-  const RAMP_LEN = clamp(170 + ((distanceCm.value - 60) / 140) * 170, 170, 340)
   const theta = (slope.value * Math.PI) / 180
-  const topX = pivotX - RAMP_LEN * Math.cos(theta)
+  // 目标底边：画布宽的 2/3；坡度太陡时压缩以保证顶端不溢出
+  const desiredBase = W * (2 / 3)
+  const maxBase = Math.max(80, (H - 96) / Math.max(Math.tan(theta), 0.05))
+  const BASE = Math.min(desiredBase, maxBase)
+  // 斜面长 = 底边 / cosθ，使水平投影（底边）= BASE；RAMP_LEN 仅随坡度变、不再随 distanceCm 变
+  const RAMP_LEN = BASE / Math.cos(theta)
+  // 底座定位：左 8% 边距起向右铺 BASE
+  const topX = W * 0.08
+  const pivotX = topX + BASE
+  const pivotY = groundY - 4
   const topY = pivotY - RAMP_LEN * Math.sin(theta)
-  return { W, H, groundY, pivotX, pivotY, RAMP_LEN, theta, topX, topY }
+  return { W, H, groundY, pivotX, pivotY, RAMP_LEN, theta, topX, topY, BASE }
 }
 
 // 斜面表面上的点（f: 0=顶端起点, 1=底端）
@@ -276,14 +281,15 @@ function drawProps(L) {
   }
 }
 
-// 小车（贴纸 che.png，沿斜面倾斜，底轮紧贴滑道表面）
+// 小车（贴纸 che.png，沿斜面倾斜，底轮紧贴滑道平面）
 function drawCart(L, f) {
   const p = ptOnPlank(L, f)
   const n = { x: Math.sin(L.theta), y: -Math.cos(L.theta) } // 斜面法线（指向滑道上方）
 
-  // 小车站在滑道顶面上：沿法线方向偏移半个滑道厚度
-  const cx = p.x + n.x * (TRACK_H / 2)
-  const cy = p.y + n.y * (TRACK_H / 2)
+  // 小车站在滑道平面上：沿法线方向下移到平面区（贴纸顶部 0..0.2*TRACK_H 是细铁轨，
+  // 真正的平面在其下，故偏移取 TRACK_H*0.3 让轮子落在平面，避开铁轨造成的"悬浮"错觉）
+  const cx = p.x + n.x * (TRACK_H * 0.3)
+  const cy = p.y + n.y * (TRACK_H * 0.3)
 
   // 接触阴影
   ctx.fillStyle = 'rgba(60,50,40,0.18)'
