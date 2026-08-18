@@ -7,11 +7,12 @@ import { paintBoard } from '../../lib/boardBg'
 const emit = defineEmits(['complete'])
 
 // ===== 可调变量 =====
-const slope = ref(35) // 斜面坡度（度，20~55）
-const distanceCm = ref(120) // 总路程（cm，60~200）
+const slope = ref(25) // 斜面坡度（度，20~30）
+// 路程已固定为常量，不再作为可调变量
 
 // ===== 物理常量 =====
 const L_M = 2.0 // 斜面全长代表的真实长度（米）
+const DISTANCE_CM = 120 // 全程路程固定值（cm），已移除可调变量
 const G = 9.8 // 重力加速度（m/s²）
 const SLOWMO = 2.4 // 动画放慢倍数（计时仍显示真实物理秒）
 const WHEEL_R = 7 // 车轮半径（画布像素），用于车轮转角计算
@@ -26,7 +27,7 @@ const hint = ref('点击「开始计时」释放小车')
 const startBtn = ref('开始计时')
 
 // ===== 公式面板 =====
-const S_TOTAL = computed(() => distanceCm.value / 100)
+const S_TOTAL = computed(() => DISTANCE_CM / 100)
 const formulaRows = computed(() => [
   { label: '全程路程 s', value: `${S_TOTAL.value.toFixed(2)} m` },
   { label: '中点路程 s₁ = s/2', value: `${(S_TOTAL.value / 2).toFixed(2)} m` },
@@ -56,7 +57,7 @@ const verifySteps = computed(() => [
 function physics() {
   const theta = (slope.value * Math.PI) / 180
   const a = G * Math.sin(theta) // m/s²
-  const dM = distanceCm.value / 100 // 全程路程（米）
+  const dM = DISTANCE_CM / 100 // 全程路程（米）
   const tEnd = Math.sqrt((2 * dM) / Math.max(a, 1e-6)) // 从静止滑到终点所需时间
   return { a, dM, tEnd }
 }
@@ -111,7 +112,7 @@ function layout() {
   const desiredBase = W * (2 / 3)
   const maxBase = Math.max(80, (H - 96) / Math.max(Math.tan(theta), 0.05))
   const BASE = Math.min(desiredBase, maxBase)
-  // 斜面长 = 底边 / cosθ，使水平投影（底边）= BASE；RAMP_LEN 仅随坡度变、不再随 distanceCm 变
+  // 斜面长 = 底边 / cosθ，使水平投影（底边）= BASE；RAMP_LEN 仅随坡度变，与固定路程无关
   const RAMP_LEN = BASE / Math.cos(theta)
   // 底座定位：左 8% 边距起向右铺 BASE
   const topX = W * 0.08
@@ -266,28 +267,6 @@ function drawProps(L) {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
   ctx.fillText(elapsed.value.toFixed(2) + ' s', sx, sy + r + 4)
-
-  // 直尺（右下）
-  const rx = L.W - 156
-  const ry = L.H - 28
-  const rw = 130
-  const rh = 10
-  ctx.fillStyle = '#f6d7a0'
-  rr(rx, ry, rw, rh, 3)
-  ctx.fill()
-  ctx.strokeStyle = '#9a7b4f'
-  ctx.lineWidth = 1
-  rr(rx, ry, rw, rh, 3)
-  ctx.stroke()
-  ctx.strokeStyle = '#9a7b4f'
-  for (let i = 0; i <= 13; i++) {
-    const tx = rx + (i / 13) * rw
-    const h = i % 5 === 0 ? 6 : 3
-    ctx.beginPath()
-    ctx.moveTo(tx, ry)
-    ctx.lineTo(tx, ry + h)
-    ctx.stroke()
-  }
 }
 
 // 小车（贴纸 che.png，沿斜面倾斜，车轮最底行精确压在滑道上表面）
@@ -296,12 +275,6 @@ function drawCart(L, f) {
   // 锚点 = plank 表面点（= 滑道贴纸上表面行对齐的那条线）。不再额外偏移，否则会悬浮
   const cx = p.x
   const cy = p.y
-
-  // 接触阴影（落在滑道面上，沿斜面）
-  ctx.fillStyle = 'rgba(60,50,40,0.18)'
-  ctx.beginPath()
-  ctx.ellipse(cx, cy + 2, CART_W * 0.5, 4, L.theta, 0, Math.PI * 2)
-  ctx.fill()
 
   // 小车贴纸（che.png：原图车头朝左 → 水平翻转使车头朝下坡 +x 方向）
   if (imgCart.value && imgCart.value.complete && imgCart.value.naturalWidth > 0) {
@@ -350,8 +323,8 @@ function render() {
   drawBackground(L)
   drawRamp(L)
   drawMarker(L, 0, '#8a8a8a', 0)
-  drawMarker(L, 0.5, '#3b6fd4', Math.round(distanceCm.value * 0.5))
-  drawMarker(L, 1, '#2faf6b', distanceCm.value)
+  drawMarker(L, 0.5, '#3b6fd4', Math.round(DISTANCE_CM * 0.5))
+  drawMarker(L, 1, '#2faf6b', DISTANCE_CM)
   drawProps(L)
   const f = currentFrac.value
   drawCart(L, f)
@@ -443,7 +416,6 @@ function resizeCanvas() {
 }
 
 watch(slope, render)
-watch(distanceCm, render)
 
 let resizeObs = null
 onMounted(() => {
@@ -497,8 +469,7 @@ onBeforeUnmount(() => {
           <span>实时联动</span>
         </div>
         <div class="lab-params">
-          <ParamSlider v-model="slope" :min="20" :max="55" :step="1" label="斜面坡度 θ" unit="°" hint="坡度越大，小车下滑越快，斜面会实时倾斜" />
-          <ParamSlider v-model="distanceCm" :min="60" :max="200" :step="10" label="总路程 s" unit=" cm" hint="改变斜面长度，测不同路程的平均速度" />
+          <ParamSlider v-model="slope" :min="20" :max="30" :step="1" label="斜面坡度 θ" unit="°" hint="坡度越大，小车下滑越快，斜面会实时倾斜（最大 30°）" />
         </div>
       </div>
 
