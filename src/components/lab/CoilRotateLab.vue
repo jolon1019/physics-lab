@@ -13,6 +13,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
+import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 let completed = false
@@ -563,6 +564,7 @@ const verifyList = [
         <div class="btn-group">
           <button class="btn btn-sm" @click="reset">重置</button>
         </div>
+        <FullscreenBtn />
       </div>
     </div>
 
@@ -918,8 +920,8 @@ const verifyList = [
 .ref-list li { margin-bottom: 4px; }
 .ref-list strong { color: var(--accent-strong); }
 @media (max-width: 1180px) {
-  .lab-stage { grid-template-columns: 1fr; }
-  .lab-left { height: auto; }
+  .lab-stage:not(.is-fullscreen) { grid-template-columns: 1fr; }
+  .lab-left:not(.is-fullscreen) { height: auto; }
   .lab-container { min-height: 420px; }
   .control-panel .info { padding: 0; }
 }

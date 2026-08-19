@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
+import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 
@@ -328,6 +329,7 @@ onBeforeUnmount(() => {
         <button v-if="state !== 'running'" class="btn btn-primary" @click="startRun">{{ startBtn }}</button>
         <button class="btn" @click="resetAll">重置</button>
         <span class="feedback" :class="completed && isBath ? 'ok' : 'no'">{{ hint }}</span>
+        <FullscreenBtn />
       </div>
     </div>
 

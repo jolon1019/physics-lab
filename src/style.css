@@ -1266,3 +1266,63 @@ p { margin: 0; }
     margin-top: 4px;
   }
 }
+
+/* ===== 全屏模式（手机端：动画 + 右侧参数并排）=====
+   通用所有 .lab-stage 实验：由 FullscreenBtn.vue 切换 is-fullscreen class，
+   布局规则统一在此维护（原 MotionLab 私有规则提升为全局，各实验共用一份）。 */
+.lab-stage.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(250px, 310px);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  margin: 0;
+  padding: 10px;
+  background: var(--surface, #16202c);
+  overflow: hidden;
+}
+.lab-stage.is-fullscreen .lab-left {
+  position: static; /* 抵消移动端 sticky 吸顶 */
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+/* 动画容器撑满左侧列：canvas 内联 height（520px 等）用 !important 覆盖 */
+.lab-stage.is-fullscreen .lab-left > .lab-panel canvas,
+.lab-stage.is-fullscreen .lab-left > .lab-panel > svg {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+}
+/* .lab-container（通电线圈 / 透镜等）：取消 min-height 500px 限制，撑满全屏列 */
+.lab-stage.is-fullscreen .lab-left .lab-container {
+  min-height: 0;
+  height: 100%;
+}
+.lab-stage.is-fullscreen .lab-left .lab-container .stage-svg {
+  position: relative;
+  inset: auto;
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
+}
+.lab-stage.is-fullscreen .lab-right {
+  display: block; /* 关键：不用 grid（grid 会把面板均分压缩+截断内容），改 block 让面板按内容高排布 */
+  max-height: 100%;
+  overflow-y: auto;
+  min-width: 0;
+  scrollbar-width: thin;
+  padding-right: 4px;
+}
+.lab-stage.is-fullscreen .lab-right > .lab-panel {
+  margin-bottom: 12px;
+}
+.lab-stage.is-fullscreen .lab-right > .lab-panel:last-child {
+  margin-bottom: 0;
+}

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
+import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 
@@ -189,6 +190,7 @@ onBeforeUnmount(() => {
       </div>
       <div class="lab-actions">
         <span class="feedback ok">调节拉力，观察弹簧伸长：弹性限度内伸长与拉力成正比（F = k·x）</span>
+        <FullscreenBtn />
       </div>
     </div>
 

@@ -4,6 +4,7 @@ import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
 import { drawCircuitIcon } from '../../lib/drawCircuitIcon'
+import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 
@@ -318,6 +319,7 @@ onBeforeUnmount(() => {
           <span class="r-readout-item">大头针 <strong>{{ nails }} 枚</strong></span>
         </span>
         <button class="btn" @click="addSnapshot">＋ 记录对比</button>
+        <FullscreenBtn />
       </div>
     </div>
 
@@ -508,7 +510,7 @@ onBeforeUnmount(() => {
   color: var(--text-h);
 }
 @media (max-width: 1180px) {
-  .lab-stage { grid-template-columns: 1fr; }
-  .lab-left { height: auto; }
+  .lab-stage:not(.is-fullscreen) { grid-template-columns: 1fr; }
+  .lab-left:not(.is-fullscreen) { height: auto; }
 }
 </style>

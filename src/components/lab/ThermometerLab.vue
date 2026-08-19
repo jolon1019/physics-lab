@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { paintBoard } from '../../lib/boardBg'
+import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 
@@ -311,6 +312,7 @@ onBeforeUnmount(() => {
         <button class="btn btn-primary" @click="submit" :disabled="!allFilled">记录并校验读数</button>
         <button class="btn" @click="resetAll">重置</button>
         <span class="feedback" :class="completed ? 'ok' : 'no'">{{ hint }}</span>
+        <FullscreenBtn />
       </div>
     </div>
 

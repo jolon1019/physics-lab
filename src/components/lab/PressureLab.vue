@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
+import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 
@@ -184,6 +185,7 @@ onBeforeUnmount(() => {
         <button class="btn" :class="{ 'btn-primary': dir === 'up' }" @click="dir = 'up'">探头向上</button>
         <button class="btn" :class="{ 'btn-primary': dir === 'side' }" @click="dir = 'side'">探头向侧</button>
         <button class="btn" :class="{ 'btn-primary': dir === 'down' }" @click="dir = 'down'">探头向下</button>
+        <FullscreenBtn />
       </div>
     </div>
 

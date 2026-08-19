@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
+import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 
@@ -247,6 +248,7 @@ onBeforeUnmount(() => {
         <button class="btn" :class="{ 'btn-primary': mode === 'liquid' }" @click="setMode('liquid')">测液体密度</button>
         <button class="btn" @click="resetAll">重置</button>
         <span class="feedback" :class="completed ? 'ok' : 'no'">{{ note }}</span>
+        <FullscreenBtn />
       </div>
     </div>
 

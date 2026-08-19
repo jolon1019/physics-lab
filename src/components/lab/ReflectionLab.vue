@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
+import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 
@@ -221,6 +222,7 @@ onBeforeUnmount(() => {
         </button>
         <button class="btn" @click="resetAll">重置</button>
         <span class="feedback" :class="completed ? 'ok' : 'no'">{{ note }}</span>
+        <FullscreenBtn />
       </div>
     </div>
 

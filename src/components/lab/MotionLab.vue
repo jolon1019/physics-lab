@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
+import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 
@@ -51,9 +52,6 @@ let cloudDrift2 = 640
 
 const seen = { ground: false, car: false, cloud: false }
 let completed = false
-
-// 全屏模式（手机端：动画 + 右侧参数并排）
-const isFullscreen = ref(false)
 
 const hint = ref('切换参照物，观察同一物体是运动还是静止')
 
@@ -160,24 +158,7 @@ function reset() {
   hint.value = '切换参照物，观察同一物体是运动还是静止'
 }
 
-// ===== 全屏（手机端：动画 + 右侧参数并排） =====
-function toggleFullscreen() {
-  const stage = stageEl.value?.closest('.lab-stage')
-  if (!stage) return
-  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-    // 兼容 Safari 前缀；requestFullscreen 返回 Promise，被拒（如无权限）时静默
-    const p = stage.requestFullscreen ? stage.requestFullscreen() : stage.webkitRequestFullscreen?.()
-    if (p && p.catch) p.catch(() => {})
-  } else if (document.exitFullscreen) {
-    const p = document.exitFullscreen()
-    if (p && p.catch) p.catch(() => {})
-  } else if (document.webkitExitFullscreen) {
-    document.webkitExitFullscreen()
-  }
-}
-function onFsChange() {
-  isFullscreen.value = !!(document.fullscreenElement || document.webkitFullscreenElement)
-}
+// ===== 全屏由 FullscreenBtn.vue 统一处理（toggleFullscreen / isFullscreen / 事件监听都在组件内） =====
 
 // 由参照物决定“世界”滚动：让所选参照物居中、世界连续滚动、另一物体环绕
 function computeOffsets() {
@@ -263,21 +244,17 @@ onMounted(() => {
   resize()
   ro = new ResizeObserver(resize)
   if (stageEl.value) ro.observe(stageEl.value)
-  document.addEventListener('fullscreenchange', onFsChange)
-  document.addEventListener('webkitfullscreenchange', onFsChange)
   raf = requestAnimationFrame(loop)
 })
 
 onBeforeUnmount(() => {
   if (raf) cancelAnimationFrame(raf)
   if (ro) ro.disconnect()
-  document.removeEventListener('fullscreenchange', onFsChange)
-  document.removeEventListener('webkitfullscreenchange', onFsChange)
 })
 </script>
 
 <template>
-  <div class="lab-stage" :class="{ 'is-fullscreen': isFullscreen }">
+  <div class="lab-stage">
     <div class="lab-left">
       <div class="lab-panel motion-panel" style="padding: 0">
         <div ref="stageEl" class="motion-stage">
@@ -514,7 +491,7 @@ onBeforeUnmount(() => {
         <button class="btn" :class="{ 'btn-primary': reference === 'car' }" @click="pickReference('car')">以车厢为参照物</button>
         <button class="btn" :class="{ 'btn-primary': reference === 'cloud' }" @click="pickReference('cloud')">以白云为参照物</button>
         <button class="btn" @click="reset">重置</button>
-        <button class="btn fs-btn" @click="toggleFullscreen">{{ isFullscreen ? '✕ 退出全屏' : '⛶ 全屏' }}</button>
+        <FullscreenBtn />
         <span class="feedback" :class="completed ? 'ok' : 'no'">{{ hint }}</span>
       </div>
     </div>
@@ -627,49 +604,14 @@ onBeforeUnmount(() => {
   50% { opacity: 0.95; }
 }
 
-/* ===== 全屏模式（手机端：动画 + 右侧参数并排） ===== */
-.lab-stage.is-fullscreen {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(250px, 310px);
-  grid-template-rows: minmax(0, 1fr);
-  gap: 12px;
-  align-items: stretch;
-  width: 100vw;
-  height: 100vh;
-  max-width: none;
-  margin: 0;
-  padding: 10px;
-  background: var(--surface, #16202c);
-  overflow: hidden;
-}
-.lab-stage.is-fullscreen .lab-left {
-  position: static;
-  height: 100%;
-  min-height: 0;
-  grid-template-rows: minmax(0, 1fr) auto;
-}
+/* ===== 全屏模式 =====
+   通用布局规则（.lab-stage.is-fullscreen 双列 + 右侧栏滚动）已提升到全局 src/style.css，
+   此处仅保留 MotionLab 特有的覆盖：motion-stage 取消 aspect-ratio 撑满 */
 .lab-stage.is-fullscreen .motion-stage {
   aspect-ratio: auto;
   max-height: none;
   height: 100%;
   width: 100%;
-}
-.lab-stage.is-fullscreen .lab-right {
-  display: block; /* 关键：不用 grid（grid 会把面板均分压缩+截断内容），改 block 让面板按内容高排布 */
-  max-height: 100%;
-  overflow-y: auto;
-  min-width: 0;
-  scrollbar-width: thin;
-  padding-right: 4px;
-}
-.lab-stage.is-fullscreen .lab-right > .lab-panel {
-  margin-bottom: 12px;
-}
-.lab-stage.is-fullscreen .lab-right > .lab-panel:last-child {
-  margin-bottom: 0;
 }
 .lab-stage.is-fullscreen .motion-panel {
   min-height: 0;

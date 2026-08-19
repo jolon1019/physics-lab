@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
+import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 const labRef = ref(null)
@@ -536,6 +537,7 @@ function checkSeen() {
         <div class="btn-group">
           <button class="btn btn-sm" @click="reset">重置</button>
         </div>
+        <FullscreenBtn />
       </div>
     </div>
 

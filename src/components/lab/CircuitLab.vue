@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
+import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 
@@ -214,6 +215,7 @@ onBeforeUnmount(() => {
       <div class="lab-actions">
         <button class="btn" :class="{ 'btn-primary': topology === 'series' }" @click="topology = 'series'">串联电路</button>
         <button class="btn" :class="{ 'btn-primary': topology === 'parallel' }" @click="topology = 'parallel'">并联电路</button>
+        <FullscreenBtn />
       </div>
     </div>
 

@@ -6,6 +6,7 @@ import { paintBoard } from '../../lib/boardBg'
 // 通用电路元件图标（PNG 路径统一在 src/circuit/pngAssets.js / src/lib/drawCircuitIcon.js
 // 集中，本文件不再 import 任何 PNG 文件；同图不同页直接调用 drawCircuitIcon 即可）。
 import { drawCircuitIcon } from '../../lib/drawCircuitIcon'
+import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 
@@ -514,6 +515,7 @@ onBeforeUnmount(() => {
           {{ switchOn ? '⏸ 断开开关' : '▶ 闭合开关' }}
         </button>
         <button class="btn" @click="addSnapshot">＋ 记录对比</button>
+        <FullscreenBtn />
       </div>
     </div>
 
@@ -746,10 +748,10 @@ onBeforeUnmount(() => {
   color: var(--text-h);
 }
 @media (max-width: 1180px) {
-  .lab-stage {
+  .lab-stage:not(.is-fullscreen) {
     grid-template-columns: 1fr;
   }
-  .lab-left {
+  .lab-left:not(.is-fullscreen) {
     height: auto;
   }
 }

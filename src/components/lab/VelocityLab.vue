@@ -4,6 +4,7 @@ import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
 import { boardTheme } from '../../lib/boardTheme'
+import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 
@@ -415,6 +416,7 @@ onBeforeUnmount(() => {
         <button class="btn btn-primary" @click="startPause">{{ done ? '重跑' : running ? '暂停' : '开始' }}</button>
         <button class="btn" @click="reset">重置</button>
         <span class="feedback" :class="completed ? 'ok' : 'no'">{{ hint }}</span>
+        <FullscreenBtn />
       </div>
     </div>
 

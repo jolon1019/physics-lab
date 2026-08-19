@@ -4,6 +4,7 @@ import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
 import { drawCircuitIcon } from '../../lib/drawCircuitIcon'
+import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 
@@ -267,6 +268,7 @@ onBeforeUnmount(() => {
           {{ switchOn ? '⏸ 断开开关' : '▶ 闭合开关' }}
         </button>
         <button class="btn" @click="addSnapshot">＋ 记录对比</button>
+        <FullscreenBtn />
       </div>
     </div>
 
@@ -423,7 +425,7 @@ onBeforeUnmount(() => {
   box-shadow: 3px 3px 0 #050505;
 }
 @media (max-width: 1180px) {
-  .lab-stage { grid-template-columns: 1fr; }
-  .lab-left { height: auto; }
+  .lab-stage:not(.is-fullscreen) { grid-template-columns: 1fr; }
+  .lab-left:not(.is-fullscreen) { height: auto; }
 }
 </style>
