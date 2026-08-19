@@ -40,7 +40,7 @@ const STAND_Y = deskY - STAND_W * 0.90  // 站脚贴桌面
 
 // 球（挂在铁架台横臂夹子上，pivot 必须 = 夹子位置）
 const BALL_PIVOT_X = STAND_X + STAND_W * 0.62   // 摆动支点 x（=夹子横坐标）
-const BALL_PIVOT_Y = STAND_Y + STAND_W * 0.26   // 摆动支点 y（=夹子纵坐标）
+const BALL_PIVOT_Y = STAND_Y + STAND_W * 0.27   // 摆动支点 y（=夹子纵坐标）
 const BALL_W = 310                // 图渲染宽（球的视觉大小）
 const BALL_H = BALL_W
 const BALL_LEN = 324 / 800 * BALL_W  // content 长度（球到支点距离）
@@ -49,6 +49,24 @@ const BALL_LEN = 324 / 800 * BALL_W  // content 长度（球到支点距离）
 const forkImg = new Image(); forkImg.src = '/assets/lab/fork.png'
 const standImg = new Image(); standImg.src = '/assets/lab/stand.png'
 const ballImg = new Image(); ballImg.src = '/assets/lab/ball.png'
+const clockImg = new Image(); clockImg.src = '/assets/lab/clock.png'
+const jarImg = new Image(); jarImg.src = '/assets/lab/jar.png'
+
+// ===== 真空罩模式两件器材（用户可调位置）=====
+// 图片原画布：jar.png 400x400（内容底 y=0.98，站脚贴桌面）；clock.png 400x400
+//   jar 内容 0.04~0.98 竖向（黑色底座在底）；clock 内容中心 (50%, 57%)，内容底 75.2%
+
+// 玻璃罩（中央）
+const JAR_W = 260
+const JAR_H = JAR_W
+const JAR_X = 300 - JAR_W / 2           // 图左上 x
+const JAR_Y = deskY - JAR_W * 0.98       // 图左上 y（黑色底座贴桌面）
+
+// 闹钟（玻璃罩中央偏下、底座上方）
+const CLOCK_W = 80
+const CLOCK_H = CLOCK_W
+const CLOCK_X = 300 - CLOCK_W * 0.50     // 图左上 x（水平居中于玻璃罩）
+const CLOCK_Y = 300 - CLOCK_W * 0.57     // 图左上 y（垂直中下区）
 
 // 模式：音叉(转换法) / 真空罩(推理法) / 声波传播(介质)
 const mode = ref('fork')
@@ -294,54 +312,36 @@ function drawForkMode() {
 function drawVacuumMode() {
   const textH = cssVar('--text-h', '#111')
   const textCol = cssVar('--text', '#555')
-  const accent = cssVar('--accent', '#3a6ea5')
-  const cx = 300
   const pumpX = 640
 
   const ringing = volume.value > 30
-  const shake = ringing ? Math.sin(flickerT * 0.35) * 0.06 : 0
-  ctx.save(); ctx.translate(cx, 312); ctx.rotate(shake)
-  ctx.fillStyle = '#f5f2e9'; ctx.strokeStyle = '#555'; ctx.lineWidth = 2
-  ctx.beginPath(); ctx.arc(0, 0, 38, 0, Math.PI * 2); ctx.fill(); ctx.stroke()
-  ctx.fillStyle = '#e74c3c'
-  ctx.beginPath(); ctx.arc(0, -34, 7, 0, Math.PI * 2); ctx.arc(0, -34, 4, 0, Math.PI * 2); ctx.fill()
-  ctx.strokeStyle = '#333'; ctx.lineWidth = 3
-  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -24); ctx.moveTo(0, 0); ctx.lineTo(16, 8); ctx.stroke()
-  ctx.restore()
 
-  // 罩内空气粒子（随抽气变稀）
+  // 1. 罩内空气粒子（画在玻璃罩 PNG 下面、闹钟上面，被它们自然遮罩）
   const n = Math.round(56 * (1 - vacuum.value / 100))
   ctx.fillStyle = 'rgba(90,130,200,0.5)'
   for (let i = 0; i < n; i++) {
     const p = waveRest[(i * 7) % waveRest.length]
-    const px = cx - 90 + ((p - 70) / 740) * 180
-    const py = 205 + ((i * 37) % 140) + Math.sin(flickerT * 0.05 + i) * 2
+    const px = JAR_X + JAR_W * 0.18 + ((p - 70) / 740) * JAR_W * 0.64
+    const py = JAR_Y + JAR_W * 0.20 + ((i * 37) % (JAR_W * 0.50)) + Math.sin(flickerT * 0.05 + i) * 2
     ctx.beginPath(); ctx.arc(px, py, 2.2, 0, Math.PI * 2); ctx.fill()
   }
 
-  // 玻璃罩
-  ctx.fillStyle = 'rgba(210,228,255,0.14)'
-  ctx.strokeStyle = 'rgba(140,170,220,0.85)'; ctx.lineWidth = 3
-  ctx.beginPath()
-  ctx.moveTo(170, deskY - 8); ctx.lineTo(170, 235)
-  ctx.quadraticCurveTo(170, 150, cx, 150)
-  ctx.quadraticCurveTo(430, 150, 430, 235)
-  ctx.lineTo(430, deskY - 8); ctx.closePath()
-  ctx.fill(); ctx.stroke()
-  ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 5
-  ctx.beginPath(); ctx.moveTo(185, 230); ctx.quadraticCurveTo(185, 175, 240, 165); ctx.stroke()
+  // 2. 闹钟（带 shake 旋转动画，绕 content 中心）
+  if (clockImg.complete && clockImg.naturalWidth) {
+    ctx.save()
+    const shake = ringing ? Math.sin(flickerT * 0.35) * 0.06 : 0
+    ctx.translate(CLOCK_X + CLOCK_W * 0.5, CLOCK_Y + CLOCK_H * 0.57)
+    ctx.rotate(shake)
+    ctx.drawImage(clockImg, -CLOCK_W * 0.5, -CLOCK_H * 0.57, CLOCK_W, CLOCK_H)
+    ctx.restore()
+  }
 
-  // 底座与抽气管道
-  ctx.fillStyle = '#8b7355'; ctx.fillRect(130, deskY - 8, 340, 16)
-  ctx.strokeStyle = '#777'; ctx.lineWidth = 5
-  ctx.beginPath(); ctx.moveTo(430, deskY - 4); ctx.quadraticCurveTo(520, deskY - 4, 560, deskY - 30); ctx.lineTo(560, deskY - 66); ctx.stroke()
+  // 3. 玻璃罩（盖在最上层，把粒子和闹钟围在罩内）
+  if (jarImg.complete && jarImg.naturalWidth) {
+    ctx.drawImage(jarImg, JAR_X, JAR_Y, JAR_W, JAR_H)
+  }
 
-  // 抽气泵
-  ctx.fillStyle = '#7d8794'; ctx.fillRect(pumpX - 34, deskY - 96, 68, 92)
-  ctx.fillStyle = '#5b6570'; ctx.fillRect(pumpX - 44, deskY - 108, 88, 16)
-  ctx.fillStyle = '#c9a76b'; ctx.fillRect(pumpX - 6, deskY - 96, 12, 30)
-
-  // 气压表
+  // 4. 气压表（保留：可视化罩内气压变化）
   const barW = 150
   const pct = 1 - vacuum.value / 100
   ctx.fillStyle = '#f0eee7'; ctx.strokeStyle = '#0b0b0b'; ctx.lineWidth = 2
@@ -351,7 +351,7 @@ function drawVacuumMode() {
   ctx.fillStyle = textH; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'
   ctx.fillText(`罩内气压 ${(pct * 100).toFixed(0)} kPa`, pumpX + 45, 170)
 
-  if (ringing) pushArcs(cx, 240, (volume.value - 30) / 70)
+  if (ringing) pushArcs(300, 270, (volume.value - 30) / 70)
 
   ctx.fillStyle = textH; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'left'
   ctx.fillText('🔔 真空罩 · 闹钟在玻璃罩内（推理法）', 40, 40)
