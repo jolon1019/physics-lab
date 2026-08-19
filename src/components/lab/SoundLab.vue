@@ -245,7 +245,6 @@ function roundRectPath(x, y, w, h, r) {
 }
 
 function drawForkMode() {
-  const accent = cssVar('--accent', '#3a6ea5')
   const textH = cssVar('--text-h', '#111')
   const textCol = cssVar('--text', '#555')
   const amp = vibr.value > 0.02 ? vibr.value : 0
@@ -261,19 +260,8 @@ function drawForkMode() {
     ctx.drawImage(forkImg, FORK_X + sw, FORK_Y, FORK_W, FORK_H)
   }
 
-  // 振动光晕：在音叉图顶部画两个小竖线
+  // 3. 声波波纹：从音叉主体中心发出（渲染顺序在 drawForkMode 之前 → 自然叠在音叉后方）
   if (amp > 0.02) {
-    const fkTopX = FORK_X + FORK_W * 0.5 + sw
-    const fkTopY = FORK_Y + FORK_H * 0.05
-    ctx.save()
-    ctx.shadowColor = accent; ctx.shadowBlur = 12
-    ctx.strokeStyle = accent; ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(fkTopX - 28, fkTopY); ctx.lineTo(fkTopX - 28, fkTopY - 18)
-    ctx.moveTo(fkTopX + 28, fkTopY); ctx.lineTo(fkTopX + 28, fkTopY - 18)
-    ctx.stroke()
-    ctx.restore()
-    // 声波波纹：从音叉主体中心发出（渲染顺序在 drawForkMode 之前 → 自然叠在音叉后方）
     pushArcs(FORK_X + FORK_W * 0.5, FORK_Y + FORK_H * 0.45, vibr.value)
   }
 
