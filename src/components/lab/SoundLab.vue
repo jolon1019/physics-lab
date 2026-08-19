@@ -327,7 +327,7 @@ function drawVacuumMode() {
   ctx.fillStyle = 'rgba(90,130,200,0.7)'
   for (let i = 0; i < n; i++) {
     const p = waveRest[(i * 7) % waveRest.length]
-    const px = JAR_X + JAR_W * 0.18 + ((p - 70) / 740) * JAR_W * 0.64
+    const px = JAR_X + JAR_W * 0.30 + ((p - 70) / 740) * JAR_W * 0.40
     const py = JAR_Y + JAR_W * 0.20 + ((i * 37) % (JAR_W * 0.50)) + Math.sin(flickerT * 0.05 + i) * 2
     ctx.beginPath(); ctx.arc(px, py, 2.2, 0, Math.PI * 2); ctx.fill()
   }
