@@ -63,10 +63,10 @@ const JAR_X = 300 - JAR_W / 2           // 图左上 x
 const JAR_Y = deskY - JAR_W * 0.98       // 图左上 y（黑色底座贴桌面）
 
 // 闹钟（玻璃罩中央偏下、底座上方；CLOCK_W 即闹钟主体宽度）
-const CLOCK_W = 110
+const CLOCK_W = 70
 const CLOCK_H = Math.round((CLOCK_W * 150) / 103)  // 保持裁剪图比例 ≈160
 const CLOCK_X = 300 - CLOCK_W * 0.49     // 图左上 x（水平居中于玻璃罩）
-const CLOCK_Y = 200                       // 图左上 y（垂直中下区）
+const CLOCK_Y = 217                       // 图左上 y（垂直中下区）
 
 // 模式：音叉(转换法) / 真空罩(推理法) / 声波传播(介质)
 const mode = ref('fork')
@@ -316,19 +316,20 @@ function drawVacuumMode() {
 
   const ringing = volume.value > 30
 
-  // 1. 罩内空气粒子（画在玻璃罩 PNG 下面、闹钟上面，被它们自然遮罩）
+  // 1. 玻璃罩（半透明罩体）
+  if (jarImg.complete && jarImg.naturalWidth) {
+    ctx.drawImage(jarImg, JAR_X, JAR_Y, JAR_W, JAR_H)
+  }
+
+  // 2. 罩内空气粒子（画在玻璃罩上层 → 不被罩色叠加，清晰可见；
+  //    位置在罩体内部区域，视觉上仍在罩内）
   const n = Math.round(56 * (1 - vacuum.value / 100))
-  ctx.fillStyle = 'rgba(90,130,200,0.5)'
+  ctx.fillStyle = 'rgba(90,130,200,0.7)'
   for (let i = 0; i < n; i++) {
     const p = waveRest[(i * 7) % waveRest.length]
     const px = JAR_X + JAR_W * 0.18 + ((p - 70) / 740) * JAR_W * 0.64
     const py = JAR_Y + JAR_W * 0.20 + ((i * 37) % (JAR_W * 0.50)) + Math.sin(flickerT * 0.05 + i) * 2
     ctx.beginPath(); ctx.arc(px, py, 2.2, 0, Math.PI * 2); ctx.fill()
-  }
-
-  // 2. 玻璃罩（半透明罩体，粒子透过可见）
-  if (jarImg.complete && jarImg.naturalWidth) {
-    ctx.drawImage(jarImg, JAR_X, JAR_Y, JAR_W, JAR_H)
   }
 
   // 3. 闹钟（画在罩子上层 → 不被玻璃色叠加，清晰可见；
@@ -355,7 +356,7 @@ function drawVacuumMode() {
   if (ringing) pushArcs(300, 270, (volume.value - 30) / 70)
 
   ctx.fillStyle = textH; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'left'
-  ctx.fillText('🔔 真空罩 · 闹钟在玻璃罩内（推理法）', 40, 40)
+  ctx.fillText('真空罩 · 闹钟在玻璃罩内', 40, 40)
   ctx.fillStyle = textCol; ctx.font = '13px sans-serif'
   ctx.fillText(
     vacuum.value < 40 ? '铃声清晰：空气（介质）在传播声波' : vacuum.value < 80 ? '抽去空气，铃声逐渐减弱' : '空气几乎抽尽，铃声听不到 → 真空不能传声',
