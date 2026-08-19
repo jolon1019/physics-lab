@@ -49,12 +49,12 @@ const BALL_LEN = 324 / 800 * BALL_W  // content 长度（球到支点距离）
 const forkImg = new Image(); forkImg.src = '/assets/lab/fork.png'
 const standImg = new Image(); standImg.src = '/assets/lab/stand.png'
 const ballImg = new Image(); ballImg.src = '/assets/lab/ball.png'
-const clockImg = new Image(); clockImg.src = '/assets/lab/clock.png'
+const clockImg = new Image(); clockImg.src = '/assets/lab/clock_crop.png'
 const jarImg = new Image(); jarImg.src = '/assets/lab/jar.png'
 
 // ===== 真空罩模式两件器材（用户可调位置）=====
-// 图片原画布：jar.png 400x400（内容底 y=0.98，站脚贴桌面）；clock.png 400x400
-//   jar 内容 0.04~0.98 竖向（黑色底座在底）；clock 内容中心 (50%, 57%)，内容底 75.2%
+// 图片原画布：jar.png 400x400（内容底 y=0.98，站脚贴桌面）；
+//   clock_crop.png 103x150（已裁剪掉透明边，视觉中心 (49%, 50%)）
 
 // 玻璃罩（中央）
 const JAR_W = 260
@@ -62,11 +62,11 @@ const JAR_H = JAR_W
 const JAR_X = 300 - JAR_W / 2           // 图左上 x
 const JAR_Y = deskY - JAR_W * 0.98       // 图左上 y（黑色底座贴桌面）
 
-// 闹钟（玻璃罩中央偏下、底座上方）
-const CLOCK_W = 80
-const CLOCK_H = CLOCK_W
-const CLOCK_X = 300 - CLOCK_W * 0.50     // 图左上 x（水平居中于玻璃罩）
-const CLOCK_Y = 300 - CLOCK_W * 0.57     // 图左上 y（垂直中下区）
+// 闹钟（玻璃罩中央偏下、底座上方；CLOCK_W 即闹钟主体宽度）
+const CLOCK_W = 110
+const CLOCK_H = Math.round((CLOCK_W * 150) / 103)  // 保持裁剪图比例 ≈160
+const CLOCK_X = 300 - CLOCK_W * 0.49     // 图左上 x（水平居中于玻璃罩）
+const CLOCK_Y = 200                       // 图左上 y（垂直中下区）
 
 // 模式：音叉(转换法) / 真空罩(推理法) / 声波传播(介质)
 const mode = ref('fork')
@@ -326,19 +326,20 @@ function drawVacuumMode() {
     ctx.beginPath(); ctx.arc(px, py, 2.2, 0, Math.PI * 2); ctx.fill()
   }
 
-  // 2. 闹钟（带 shake 旋转动画，绕 content 中心）
+  // 2. 玻璃罩（半透明罩体，粒子透过可见）
+  if (jarImg.complete && jarImg.naturalWidth) {
+    ctx.drawImage(jarImg, JAR_X, JAR_Y, JAR_W, JAR_H)
+  }
+
+  // 3. 闹钟（画在罩子上层 → 不被玻璃色叠加，清晰可见；
+  //    位置在罩体内部区域，视觉上仍在罩内）
   if (clockImg.complete && clockImg.naturalWidth) {
     ctx.save()
     const shake = ringing ? Math.sin(flickerT * 0.35) * 0.06 : 0
-    ctx.translate(CLOCK_X + CLOCK_W * 0.5, CLOCK_Y + CLOCK_H * 0.57)
+    ctx.translate(CLOCK_X + CLOCK_W * 0.49, CLOCK_Y + CLOCK_H * 0.5)
     ctx.rotate(shake)
-    ctx.drawImage(clockImg, -CLOCK_W * 0.5, -CLOCK_H * 0.57, CLOCK_W, CLOCK_H)
+    ctx.drawImage(clockImg, -CLOCK_W * 0.49, -CLOCK_H * 0.5, CLOCK_W, CLOCK_H)
     ctx.restore()
-  }
-
-  // 3. 玻璃罩（盖在最上层，把粒子和闹钟围在罩内）
-  if (jarImg.complete && jarImg.naturalWidth) {
-    ctx.drawImage(jarImg, JAR_X, JAR_Y, JAR_W, JAR_H)
   }
 
   // 4. 气压表（保留：可视化罩内气压变化）
