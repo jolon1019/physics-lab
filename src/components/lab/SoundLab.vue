@@ -28,20 +28,20 @@ const deskY = 380
 // 音叉+共鸣箱（中央偏左）
 const FORK_W = 200              // 图渲染宽
 const FORK_H = FORK_W           // 图渲染高（原图方）
-const FORK_X = 200              // 图左上 x（左右挪改这）
+const FORK_X = 430              // 图左上 x（左右挪改这）
 const FORK_Y = deskY - FORK_W * 0.92  // 图左上 y（贴桌面，桌面改 deskY 即可）
 
 // 铁架台（右侧，支点位置 = 横臂末端夹子）
 // stand.png 内容 7%-90% 竖向，0.07 处开始；横臂夹子大约在 x≈0.68、y≈0.22
-const STAND_W = 240
+const STAND_W = 340
 const STAND_H = STAND_W
-const STAND_X = 420             // 图左上 x（左右挪改这）
+const STAND_X = 120             // 图左上 x（左右挪改这）
 const STAND_Y = deskY - STAND_W * 0.90  // 站脚贴桌面
 
 // 球（挂在铁架台横臂夹子上，pivot 必须 = 夹子位置）
-const BALL_PIVOT_X = STAND_X + STAND_W * 0.68   // 摆动支点 x（=夹子横坐标）
-const BALL_PIVOT_Y = STAND_Y + STAND_W * 0.22   // 摆动支点 y（=夹子纵坐标）
-const BALL_W = 110                // 图渲染宽（球的视觉大小）
+const BALL_PIVOT_X = STAND_X + STAND_W * 0.62   // 摆动支点 x（=夹子横坐标）
+const BALL_PIVOT_Y = STAND_Y + STAND_W * 0.26   // 摆动支点 y（=夹子纵坐标）
+const BALL_W = 310                // 图渲染宽（球的视觉大小）
 const BALL_H = BALL_W
 const BALL_LEN = 324 / 800 * BALL_W  // content 长度（球到支点距离）
 
@@ -55,8 +55,6 @@ const mode = ref('fork')
 const strike = ref(70)
 const vibr = ref(0)
 const ballSwing = ref(0)
-const waterMode = ref(false)
-const splashes = []
 const vacuum = ref(0)
 const wavePlay = ref(false)
 const medium = ref('gas') // solid | liquid | gas
@@ -73,7 +71,7 @@ const MEDIA = {
 const waveRest = []
 for (let x = 70; x <= 810; x += 13) waveRest.push(x)
 
-const seen = { hit: false, hold: false, weak: false, restore: false, wave: false }
+const seen = { hit: false, weak: false, restore: false, wave: false }
 const mediaTried = new Set()
 let completed = false
 let wavePhase = 0
@@ -83,7 +81,7 @@ const forkState = computed(() => (vibr.value > 0.02 ? '发声（音叉振动）'
 const forkAmp = computed(() => Math.round(vibr.value * 100))
 const toneState = computed(() => {
   if (vacuum.value < 40) return '铃声清晰'
-  if (vacuum.value < 80) return '🔉 铃声减弱'
+  if (vacuum.value < 80) return '铃声减弱'
   return '几乎听不到'
 })
 const hint = ref('先「敲击音叉」，用乒乓球（转换法）显示看不见的振动')
@@ -114,6 +112,7 @@ watch(mode, (m) => {
 })
 
 /* ============ 交互 ============ */
+const struck = ref(false)
 function swingFork() {
   vibr.value = strike.value / 100
   ballSwing.value = (strike.value / 100) * 0.6
@@ -122,25 +121,8 @@ function swingFork() {
   forkTone = muted.value
     ? null
     : createTone({ freq: 440, volume: 0.06 + (strike.value / 100) * 0.35, harmonics: [1, 0.12] })
-  if (waterMode.value) {
-    const fx = 360
-    for (let i = 0; i < 14; i++) {
-      splashes.push({ x: fx + (Math.random() - 0.5) * 40, y: deskY - 6, vx: (Math.random() - 0.5) * 120, vy: -120 - Math.random() * 160 })
-    }
-  }
   if (vibr.value > 0.6) seen.hit = true
   hint.value = '音叉振动 → 乒乓球被弹开：用看得见的摆动“放大”显示看不见的振动（转换法）'
-  tryComplete()
-}
-const struck = ref(false)
-function holdFork() {
-  vibr.value = 0
-  ballSwing.value = 0
-  struck.value = false
-  forkTone?.stop()
-  forkTone = null
-  seen.hold = true
-  hint.value = '振动停止，发声停止（但已发出的声音仍在空气中传播一段距离）'
   tryComplete()
 }
 function toggleMute() {
@@ -187,7 +169,7 @@ function setMedium(m) {
   tryComplete()
 }
 function tryComplete() {
-  const forkDone = seen.hit && seen.hold
+  const forkDone = seen.hit
   const vacuumDone = seen.weak && seen.restore
   const waveDone = seen.wave && mediaTried.size >= 2
   if ((forkDone || vacuumDone || waveDone) && !completed) {
@@ -202,9 +184,7 @@ function reset() {
   struck.value = false
   vacuum.value = 0
   wavePlay.value = false
-  waterMode.value = false
-  splashes.length = 0
-  seen.hit = seen.hold = seen.weak = seen.restore = seen.wave = false
+  seen.hit = seen.weak = seen.restore = seen.wave = false
   mediaTried.clear()
   forkTone?.stop()
   forkTone = null
@@ -276,16 +256,7 @@ function drawForkMode() {
     ctx.drawImage(standImg, STAND_X, STAND_Y, STAND_W, STAND_H)
   }
 
-  // 2. 水盘（转换法：音叉触水溅水花），画在共鸣箱底下
-  if (waterMode.value) {
-    ctx.fillStyle = 'rgba(70,150,210,0.35)'
-    const trayX = FORK_X + FORK_W * 0.30
-    const trayW = FORK_W * 0.40
-    roundRectPath(trayX, deskY - 14, trayW, 14, 5); ctx.fill()
-    ctx.strokeStyle = 'rgba(40,110,170,0.7)'; ctx.lineWidth = 2; ctx.stroke()
-  }
-
-  // 3. 音叉+共鸣箱（带振动偏移 sw）
+  // 2. 音叉+共鸣箱（带振动偏移 sw）
   if (forkImg.complete && forkImg.naturalWidth) {
     ctx.drawImage(forkImg, FORK_X + sw, FORK_Y, FORK_W, FORK_H)
   }
@@ -302,8 +273,8 @@ function drawForkMode() {
     ctx.moveTo(fkTopX + 28, fkTopY); ctx.lineTo(fkTopX + 28, fkTopY - 18)
     ctx.stroke()
     ctx.restore()
-    // 推波纹（音叉图右上方）
-    pushArcs(FORK_X + FORK_W * 0.85, FORK_Y + FORK_H * 0.18, vibr.value)
+    // 声波波纹：从音叉主体中心发出（渲染顺序在 drawForkMode 之前 → 自然叠在音叉后方）
+    pushArcs(FORK_X + FORK_W * 0.5, FORK_Y + FORK_H * 0.45, vibr.value)
   }
 
   // 4. 球（围绕支点 BALL_PIVOT 摆动）
@@ -323,26 +294,8 @@ function drawForkMode() {
     ctx.restore()
   }
 
-  // 连接小箭头：音叉→球（球当前位置 = 支点 + (BALL_LEN·sin, BALL_LEN·cos)）
-  if (amp > 0.02) {
-    const fkArrowX = FORK_X + FORK_W * 0.85
-    const fkArrowY = FORK_Y + FORK_H * 0.35
-    const bx = BALL_PIVOT_X + BALL_LEN * Math.sin(ang)
-    const by = BALL_PIVOT_Y + BALL_LEN * Math.cos(ang)
-    ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.setLineDash([4, 4])
-    ctx.beginPath(); ctx.moveTo(fkArrowX, fkArrowY); ctx.lineTo(bx, by); ctx.stroke()
-    ctx.setLineDash([])
-  }
-
-  // 5. 水花
-  for (let i = splashes.length - 1; i >= 0; i--) {
-    const s = splashes[i]
-    ctx.fillStyle = 'rgba(70,150,210,0.8)'
-    ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, Math.PI * 2); ctx.fill()
-  }
-
   ctx.fillStyle = textH; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'left'
-  ctx.fillText('🎵 音叉发声 · 乒乓球显示振动（转换法）', 40, 40)
+  ctx.fillText('音叉发声 · 乒乓球显示振动', 40, 40)
   ctx.fillStyle = textCol; ctx.font = '13px sans-serif'
   ctx.fillText(
     amp > 0.02 ? '听不到振动？看乒乓球被弹开——把不明显的振动"放大"显示' : '力度越大，振动越强，乒乓球摆得越高',
@@ -504,14 +457,6 @@ function loop(ts) {
     const vNorm = MEDIA[medium.value].v / 5200
     wavePhase += 170 * vNorm * dt
   }
-  // 水花物理
-  for (let i = splashes.length - 1; i >= 0; i--) {
-    const s = splashes[i]
-    s.vy += 520 * dt
-    s.x += s.vx * dt
-    s.y += s.vy * dt
-    if (s.y > deskY - 6) splashes.splice(i, 1)
-  }
   render()
   raf = requestAnimationFrame(loop)
 }
@@ -543,8 +488,6 @@ onBeforeUnmount(() => {
         <button class="btn" :class="{ 'btn-primary': mode === 'vacuum' }" @click="mode = 'vacuum'">真空罩</button>
         <button class="btn" :class="{ 'btn-primary': mode === 'wave' }" @click="mode = 'wave'">声波传播</button>
         <button v-if="mode === 'fork'" class="btn btn-primary" @click="swingFork">{{ vibr > 0.02 ? '再敲一下' : '敲击音叉' }}</button>
-        <button v-if="mode === 'fork'" class="btn" @click="holdFork">按住音叉</button>
-        <button v-if="mode === 'fork'" class="btn" :class="{ 'btn-primary': waterMode }" @click="waterMode = !waterMode">水花演示</button>
         <button v-if="mode === 'wave'" class="btn btn-primary" @click="toggleWave">{{ wavePlay ? '⏸ 暂停' : '▶ 播放' }}</button>
         <button v-if="mode === 'vacuum'" class="btn btn-primary" @click="restore">放气</button>
         <button class="btn" @click="reset">重置</button>
