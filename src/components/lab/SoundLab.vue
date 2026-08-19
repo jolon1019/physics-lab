@@ -19,6 +19,37 @@ const W = 880
 const H = 470
 const deskY = 380
 
+// ===== 音叉模式三件器材（用户可调位置）=====
+// 图片原画布：fork.png 400x400（内容 bbox 底 y=92%）；stand.png/ball.png 800x800
+//   fork 内容底 0.92 → 站脚贴桌面（deskY=380）
+//   stand 内容底 0.90 → 站脚贴桌面
+//   ball 内容顶 0.268（214/800），内容底 0.671；摆动支点 = 铁架台横臂末端的夹子
+
+// 音叉+共鸣箱（中央偏左）
+const FORK_W = 200              // 图渲染宽
+const FORK_H = FORK_W           // 图渲染高（原图方）
+const FORK_X = 200              // 图左上 x（左右挪改这）
+const FORK_Y = deskY - FORK_W * 0.92  // 图左上 y（贴桌面，桌面改 deskY 即可）
+
+// 铁架台（右侧，支点位置 = 横臂末端夹子）
+// stand.png 内容 7%-90% 竖向，0.07 处开始；横臂夹子大约在 x≈0.68、y≈0.22
+const STAND_W = 240
+const STAND_H = STAND_W
+const STAND_X = 420             // 图左上 x（左右挪改这）
+const STAND_Y = deskY - STAND_W * 0.90  // 站脚贴桌面
+
+// 球（挂在铁架台横臂夹子上，pivot 必须 = 夹子位置）
+const BALL_PIVOT_X = STAND_X + STAND_W * 0.68   // 摆动支点 x（=夹子横坐标）
+const BALL_PIVOT_Y = STAND_Y + STAND_W * 0.22   // 摆动支点 y（=夹子纵坐标）
+const BALL_W = 110                // 图渲染宽（球的视觉大小）
+const BALL_H = BALL_W
+const BALL_LEN = 324 / 800 * BALL_W  // content 长度（球到支点距离）
+
+// 预加载 3 张图（首次 drawImage 时若未加载完会静默跳过，下一帧自动显示）
+const forkImg = new Image(); forkImg.src = '/assets/lab/fork.png'
+const standImg = new Image(); standImg.src = '/assets/lab/stand.png'
+const ballImg = new Image(); ballImg.src = '/assets/lab/ball.png'
+
 // 模式：音叉(转换法) / 真空罩(推理法) / 声波传播(介质)
 const mode = ref('fork')
 const strike = ref(70)
@@ -237,86 +268,73 @@ function drawForkMode() {
   const accent = cssVar('--accent', '#3a6ea5')
   const textH = cssVar('--text-h', '#111')
   const textCol = cssVar('--text', '#555')
-  const x = 340
-  const boxY = deskY - 92
   const amp = vibr.value > 0.02 ? vibr.value : 0
-  const sw = Math.sin(flickerT * 0.5) * amp * 7
+  const sw = Math.sin(flickerT * 0.5) * amp * 7  // 音叉振动水平偏移
 
-  // 木共鸣箱
-  const wg = ctx.createLinearGradient(0, boxY, 0, deskY)
-  wg.addColorStop(0, '#d9b98a'); wg.addColorStop(1, '#a97f4f')
-  ctx.fillStyle = wg
-  ctx.beginPath()
-  ctx.moveTo(x - 108, boxY); ctx.lineTo(x + 108, boxY); ctx.lineTo(x + 74, deskY); ctx.lineTo(x - 74, deskY)
-  ctx.closePath(); ctx.fill()
-  ctx.strokeStyle = 'rgba(90,60,25,0.5)'; ctx.lineWidth = 2; ctx.stroke()
-  ctx.fillStyle = 'rgba(60,40,20,0.55)'
-  ctx.beginPath(); ctx.arc(x - 40, boxY + 44, 9, 0, Math.PI * 2); ctx.arc(x + 40, boxY + 44, 9, 0, Math.PI * 2); ctx.fill()
+  // 1. 铁架台（在最下层）
+  if (standImg.complete && standImg.naturalWidth) {
+    ctx.drawImage(standImg, STAND_X, STAND_Y, STAND_W, STAND_H)
+  }
 
-  // 水盘（转换法：音叉触水溅水花）
+  // 2. 水盘（转换法：音叉触水溅水花），画在共鸣箱底下
   if (waterMode.value) {
     ctx.fillStyle = 'rgba(70,150,210,0.35)'
-    roundRectPath(x - 60, deskY - 14, 120, 14, 5); ctx.fill()
+    const trayX = FORK_X + FORK_W * 0.30
+    const trayW = FORK_W * 0.40
+    roundRectPath(trayX, deskY - 14, trayW, 14, 5); ctx.fill()
     ctx.strokeStyle = 'rgba(40,110,170,0.7)'; ctx.lineWidth = 2; ctx.stroke()
   }
 
-  // 黄铜音叉
-  const mg = ctx.createLinearGradient(x - 34, 0, x + 34, 0)
-  mg.addColorStop(0, '#c8a05c'); mg.addColorStop(0.3, '#f2d492'); mg.addColorStop(0.5, '#fff0b8')
-  mg.addColorStop(0.7, '#e7c379'); mg.addColorStop(1, '#b0853f')
-  ctx.fillStyle = mg
-  const prongW = 13
-  const prongTop = boxY - 120
-  const prongBottom = boxY + 12
-  const gap = 26
-  const leftX = x - gap - prongW / 2 + sw
-  const rightX = x + gap - prongW / 2 - sw
-  for (const px of [leftX, rightX]) {
-    roundRectPath(px, prongTop, prongW, prongBottom - prongTop, 6); ctx.fill()
-    ctx.fillStyle = 'rgba(255,255,255,0.35)'
-    ctx.fillRect(px + 2, prongTop + 5, 3, prongBottom - prongTop - 10)
-    ctx.fillStyle = mg
+  // 3. 音叉+共鸣箱（带振动偏移 sw）
+  if (forkImg.complete && forkImg.naturalWidth) {
+    ctx.drawImage(forkImg, FORK_X + sw, FORK_Y, FORK_W, FORK_H)
   }
-  roundRectPath(x - 40, prongBottom - 18, 80, 18, 8); ctx.fill()
-  roundRectPath(x - 7, prongBottom - 4, 14, 34, 4); ctx.fill()
-  ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(x - 3, prongBottom + 2, 3, 28); ctx.fillStyle = mg
 
-  // 振动光晕
+  // 振动光晕：在音叉图顶部画两个小竖线
   if (amp > 0.02) {
+    const fkTopX = FORK_X + FORK_W * 0.5 + sw
+    const fkTopY = FORK_Y + FORK_H * 0.05
     ctx.save()
-    ctx.shadowColor = accent; ctx.shadowBlur = 12; ctx.strokeStyle = accent; ctx.lineWidth = 2
-    for (const px of [leftX, rightX]) {
-      ctx.beginPath(); ctx.moveTo(px - 2, prongTop - 8); ctx.lineTo(px - 2, prongTop - 20)
-      ctx.moveTo(px + prongW + 2, prongTop - 8); ctx.lineTo(px + prongW + 2, prongTop - 20); ctx.stroke()
-    }
+    ctx.shadowColor = accent; ctx.shadowBlur = 12
+    ctx.strokeStyle = accent; ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(fkTopX - 28, fkTopY); ctx.lineTo(fkTopX - 28, fkTopY - 18)
+    ctx.moveTo(fkTopX + 28, fkTopY); ctx.lineTo(fkTopX + 28, fkTopY - 18)
+    ctx.stroke()
     ctx.restore()
-    pushArcs(x, boxY - 62, vibr.value)
+    // 推波纹（音叉图右上方）
+    pushArcs(FORK_X + FORK_W * 0.85, FORK_Y + FORK_H * 0.18, vibr.value)
   }
 
-  // 乒乓球（转换法：挂在支架上，被振动弹开而摆动）
-  const pivotX = 600
-  const pivotY = 120
-  const L = 180
+  // 4. 球（围绕支点 BALL_PIVOT 摆动）
   const ang = ballSwing.value * Math.sin(flickerT * 0.42)
-  const bx = pivotX + L * Math.sin(ang)
-  const by = pivotY + L * Math.cos(ang)
-  ctx.fillStyle = '#8b7355'
-  ctx.fillRect(pivotX - 6, pivotY - 70, 12, 70)
-  ctx.fillRect(pivotX - 50, pivotY - 64, 100, 8)
-  ctx.strokeStyle = '#666'; ctx.lineWidth = 1.5
-  ctx.beginPath(); ctx.moveTo(pivotX, pivotY); ctx.lineTo(bx, by); ctx.stroke()
-  ctx.fillStyle = '#e74c3c'
-  ctx.beginPath(); ctx.arc(bx, by, 15, 0, Math.PI * 2); ctx.fill()
-  ctx.fillStyle = 'rgba(255,255,255,0.55)'
-  ctx.beginPath(); ctx.arc(bx - 4, by - 5, 4.5, 0, Math.PI * 2); ctx.fill()
-  // 连接小箭头：音叉→球
+  if (ballImg.complete && ballImg.naturalWidth) {
+    ctx.save()
+    ctx.translate(BALL_PIVOT_X, BALL_PIVOT_Y)
+    ctx.rotate(ang)
+    // 将球图绘制为：图内容顶 y=214/800 落在支点（旋转中心）处
+    // content 水平中心 x=407/800，让图水平居中于支点
+    ctx.drawImage(
+      ballImg,
+      -BALL_W * 407 / 800,        // dx：图左上 x（让内容水平中心对齐支点）
+      -214 / 800 * BALL_W,        // dy：图左上 y（让内容顶落在支点）
+      BALL_W, BALL_H
+    )
+    ctx.restore()
+  }
+
+  // 连接小箭头：音叉→球（球当前位置 = 支点 + (BALL_LEN·sin, BALL_LEN·cos)）
   if (amp > 0.02) {
+    const fkArrowX = FORK_X + FORK_W * 0.85
+    const fkArrowY = FORK_Y + FORK_H * 0.35
+    const bx = BALL_PIVOT_X + BALL_LEN * Math.sin(ang)
+    const by = BALL_PIVOT_Y + BALL_LEN * Math.cos(ang)
     ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.setLineDash([4, 4])
-    ctx.beginPath(); ctx.moveTo(x + 30, boxY - 40); ctx.lineTo(pivotX - 30, pivotY + 60); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(fkArrowX, fkArrowY); ctx.lineTo(bx, by); ctx.stroke()
     ctx.setLineDash([])
   }
 
-  // 水花
+  // 5. 水花
   for (let i = splashes.length - 1; i >= 0; i--) {
     const s = splashes[i]
     ctx.fillStyle = 'rgba(70,150,210,0.8)'
@@ -327,7 +345,7 @@ function drawForkMode() {
   ctx.fillText('🎵 音叉发声 · 乒乓球显示振动（转换法）', 40, 40)
   ctx.fillStyle = textCol; ctx.font = '13px sans-serif'
   ctx.fillText(
-    amp > 0.02 ? '听不到振动？看乒乓球被弹开——把不明显的振动“放大”显示' : '力度越大，振动越强，乒乓球摆得越高',
+    amp > 0.02 ? '听不到振动？看乒乓球被弹开——把不明显的振动"放大"显示' : '力度越大，振动越强，乒乓球摆得越高',
     40, 64
   )
 }
