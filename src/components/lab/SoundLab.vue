@@ -4,6 +4,7 @@ import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { createTone, playTone } from '../../lib/audio'
 import { paintBoard } from '../../lib/boardBg'
+import { boardTheme } from '../../lib/boardTheme'
 import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
@@ -59,13 +60,13 @@ const jarImg = new Image(); jarImg.src = '/assets/lab/jar.png'
 // 玻璃罩（中央）
 const JAR_W = 260
 const JAR_H = JAR_W
-const JAR_X = 300 - JAR_W / 2           // 图左上 x
+const JAR_X = 440 - JAR_W / 2           // 图左上 x（玻璃罩居中，画布中心 x=440）
 const JAR_Y = deskY - JAR_W * 0.98       // 图左上 y（黑色底座贴桌面）
 
 // 闹钟（玻璃罩中央偏下、底座上方；CLOCK_W 即闹钟主体宽度）
 const CLOCK_W = 70
 const CLOCK_H = Math.round((CLOCK_W * 150) / 103)  // 保持裁剪图比例 ≈160
-const CLOCK_X = 300 - CLOCK_W * 0.49     // 图左上 x（水平居中于玻璃罩）
+const CLOCK_X = 440 - CLOCK_W * 0.49     // 图左上 x（水平居中于玻璃罩）
 const CLOCK_Y = 217                       // 图左上 y（垂直中下区）
 
 // 模式：音叉(转换法) / 真空罩(推理法) / 声波传播(介质)
@@ -241,6 +242,14 @@ function pushArcs(cx, cy, intensity) {
 }
 
 function drawDesk() {
+  // 0. 物理画布铺底：容器比例与逻辑画布（880x470）不一致时，contain 缩放
+  //    会留出 letterbox 区域（左右或上下），先把整个物理画布铺上黑板底色，
+  //    避免露出面板底色造成「背景没铺满」
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.fillStyle = boardTheme.variant === 'light' ? '#f4f1ea' : '#163025'
+  ctx.fillRect(0, 0, canvasRef.value.width, canvasRef.value.height)
+  ctx.restore()
   paintBoard(ctx, W, H, 'chalk')
   // 桌面线（粉笔色描边，露出统一黑板底）
   ctx.strokeStyle = 'rgba(225,238,228,0.5)'
@@ -323,12 +332,12 @@ function drawVacuumMode() {
 
   // 2. 罩内空气粒子（画在玻璃罩上层 → 不被罩色叠加，清晰可见；
   //    位置在罩体内部区域，视觉上仍在罩内）
-  const n = Math.round(56 * (1 - vacuum.value / 100))
+  const n = Math.round(50 * (1 - vacuum.value / 100))
   ctx.fillStyle = 'rgba(90,130,200,0.7)'
   for (let i = 0; i < n; i++) {
     const p = waveRest[(i * 7) % waveRest.length]
     const px = JAR_X + JAR_W * 0.30 + ((p - 70) / 740) * JAR_W * 0.40
-    const py = JAR_Y + JAR_W * 0.20 + ((i * 37) % (JAR_W * 0.50)) + Math.sin(flickerT * 0.05 + i) * 2
+    const py = JAR_Y + JAR_W * 0.30 + ((i * 37) % (JAR_W * 0.50)) + Math.sin(flickerT * 0.05 + i) * 2
     ctx.beginPath(); ctx.arc(px, py, 2.2, 0, Math.PI * 2); ctx.fill()
   }
 
@@ -353,7 +362,7 @@ function drawVacuumMode() {
   ctx.fillStyle = textH; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'
   ctx.fillText(`罩内气压 ${(pct * 100).toFixed(0)} kPa`, pumpX + 45, 170)
 
-  if (ringing) pushArcs(300, 270, (volume.value - 30) / 70)
+  if (ringing) pushArcs(440, 270, (volume.value - 30) / 70)
 
   ctx.fillStyle = textH; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'left'
   ctx.fillText('真空罩 · 闹钟在玻璃罩内', 40, 40)
