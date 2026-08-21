@@ -12,10 +12,14 @@ const emit = defineEmits(['complete'])
 // ===== 装置素材（cartoon 风格 PNG；用 /assets/lab/* 静态直链）=====
 const standImg    = new Image(); standImg.src   = '/assets/lab/sancengzhijia.png'
 const beakerImg   = new Image(); beakerImg.src  = '/assets/lab/shaobei.png'
-const tubeImg     = new Image(); tubeImg.src    = '/assets/lab/shiguan.png'
-const thermoImg   = new Image(); thermoImg.src  = '/assets/lab/wenduji.png'
-const lampOffImg  = new Image(); lampOffImg.src = '/assets/lab/jiujingdeng-off.png'
-const lampOnImg   = new Image(); lampOnImg.src  = '/assets/lab/jiujingdeng-on.png'
+// 试管按状态切换：空 / 固（晶粒）/ 融化 / 沸腾
+const tubeImgKong    = new Image(); tubeImgKong.src    = '/assets/lab/shiguan-kong.png'
+const tubeImgGu      = new Image(); tubeImgGu.src      = '/assets/lab/shiguan-gu.png'
+const tubeImgRong    = new Image(); tubeImgRong.src    = '/assets/lab/shiguan-rong.png'
+const tubeImgFeiteng = new Image(); tubeImgFeiteng.src = '/assets/lab/shiguan-feiteng.png'
+const thermoImg      = new Image(); thermoImg.src  = '/assets/lab/wenduji.png'
+const lampOffImg     = new Image(); lampOffImg.src = '/assets/lab/jiujingdeng-off.png'
+const lampOnImg      = new Image(); lampOnImg.src  = '/assets/lab/jiujingdeng-on.png'
 
 // 各素材不透明 bbox（用 PIL alpha.bbox() 测得），用于按需缩放时保持内容宽高比 & 底边对齐。
 // 格式：[opaqueBotY, opaqueW, opaqueH]
@@ -25,10 +29,37 @@ const lampOnImg   = new Image(); lampOnImg.src  = '/assets/lab/jiujingdeng-on.pn
 const IMG_META = {
   stand:    [389, 226, 389],   // 三脚铁架台
   beaker:   [388, 291, 370],   // 烧杯
-  tube:     [389, 125, 375],   // 试管
+  tubeKong:    [394, 126, 385],   // 试管（空）
+  tubeGu:      [394, 130, 385],   // 试管（底部晶体颗粒）
+  tubeRong:    [394, 131, 385],   // 试管（液态+少量气泡）
+  tubeFeiteng: [394, 147, 394],   // 试管（沸腾：蒸汽+液面+气泡）
   thermo:   [388, 144, 384],   // 温度计
   lampOff:  [390, 253, 247],   // 酒精灯（关）
   lampOn:   [390, 253, 368],   // 酒精灯（开，含火焰）
+}
+// 试管图与 meta 的快速映射表（用 'tube' + 当前阶段 key 取 img/meta）
+const TUBE_MAP = {
+  kong:    { img: tubeImgKong,    meta: IMG_META.tubeKong },
+  gu:      { img: tubeImgGu,      meta: IMG_META.tubeGu },
+  rong:    { img: tubeImgRong,    meta: IMG_META.tubeRong },
+  feiteng: { img: tubeImgFeiteng, meta: IMG_META.tubeFeiteng },
+}
+
+// 按 (state, 物质, 当前温度) 选 试管阶段
+function pickTubePhase() {
+  // 开始加热前：晶体展示晶粒在管底；非晶（石蜡）显示空管（无定形晶粒视觉）
+  if (state.value === 'ready') return isCrystal.value ? 'gu' : 'kong'
+  const T = temp.value
+  if (isCrystal.value) {
+    // 海波（晶体）：未到熔点 → 晶粒；熔点±几℃ → 融化；超过 65℃ → 沸腾示意
+    if (T < MELT - 1) return 'gu'
+    if (T < 65) return 'rong'
+    return 'feiteng'
+  }
+  // 石蜡（非晶）：< 软化区 → 空管；融化 → 液态；> 65 → 沸腾示意
+  if (T < T_START.wax) return 'kong'
+  if (T < 65) return 'rong'
+  return 'feiteng'
 }
 
 // 放置素材图：把不透明底边对齐到 baseline，居中于 xCenter；按目标内容宽 targetContentW 缩放。
@@ -232,8 +263,10 @@ function drawSetup(L) {
   // 2) 烧杯
   const beakerRect = placeAsset(beakerImg, IMG_META.beaker, layout.beaker.x, layout.beaker.baseline, layout.beaker.w, 'beaker')
 
-  // 3) 试管：底部浸入烧杯
-  const tubeRect = placeAsset(tubeImg, IMG_META.tube, layout.tube.x, layout.tube.baseline, layout.tube.w, 'tube')
+  // 3) 试管：按 (state, 物质, 温度) 选 空/固/融/沸 之一，底部仍对齐 layout.tube.baseline
+  const phase = pickTubePhase()
+  const tubeSel = TUBE_MAP[phase] || TUBE_MAP.kong
+  const tubeRect = placeAsset(tubeSel.img, tubeSel.meta, layout.tube.x, layout.tube.baseline, layout.tube.w, 'tube')
 
   // 4) 温度计：紧贴试管右侧
   const thermoRect = placeAsset(thermoImg, IMG_META.thermo, layout.thermo.x, layout.thermo.baseline, layout.thermo.w, 'thermo')
