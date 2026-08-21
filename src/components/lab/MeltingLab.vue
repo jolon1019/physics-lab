@@ -54,6 +54,8 @@ const editMode = ref(false)
 const selected = ref('stand')          // 当前选中的元件
 const layout = reactive({})            // 各元件坐标（drawSetup 直接使用）
 const lastRects = {}                   // 每帧绘制后记录实际矩形，用于命中测试 & 高亮
+const LS_KEY = 'emelt-layout-v1'       // 已保存摆放的 localStorage 键
+const savedLayout = ref(null)          // 用户保存过的固定布局（优先于自适应）
 // 编辑器内实时显示 / 复制用：随 layout 与画布尺寸自动更新
 const layoutJson = computed(() => {
   const L = canvasRef.value ? dims() : { W: 0, H: 0 }
@@ -88,7 +90,33 @@ function computeDefaults(L) {
 }
 function applyDefaults() {
   const L = dims()
-  Object.assign(layout, computeDefaults(L))
+  // 已保存过则优先用保存值（固定摆放），否则按画布尺寸自适应
+  Object.assign(layout, savedLayout.value || computeDefaults(L))
+}
+// 从 localStorage 读取已保存布局（仅在结构合法时启用）
+function loadSaved() {
+  try {
+    const s = localStorage.getItem(LS_KEY)
+    if (!s) return
+    const o = JSON.parse(s)
+    if (o && o.stand && o.beaker && o.tube && o.thermo && o.lamp) savedLayout.value = o
+  } catch (_) {}
+}
+// 保存当前摆放：写入 localStorage 并设为优先布局
+function saveLayout() {
+  try {
+    const o = JSON.parse(JSON.stringify(layout))
+    localStorage.setItem(LS_KEY, JSON.stringify(o))
+    savedLayout.value = o
+    hint.value = '已保存当前摆放，刷新或缩放后将保持'
+  } catch (_) {}
+}
+// 重置：清除保存，恢复为按画布尺寸自适应
+function resetLayout() {
+  try { localStorage.removeItem(LS_KEY) } catch (_) {}
+  savedLayout.value = null
+  applyDefaults()
+  hint.value = '已恢复为自适应默认布局'
 }
 
 // ===== 可调变量 =====
@@ -505,7 +533,8 @@ watch(material, () => {
 let resizeObs = null
 onMounted(() => {
   setupCanvas()
-  applyDefaults()          // 首次渲染前先算好默认布局
+  loadSaved()              // 先读已保存的摆放
+  applyDefaults()          // 首次渲染前算好布局（有保存则用保存值）
   render()
   window.addEventListener('keydown', onKey)
   if (window.ResizeObserver) {
@@ -567,8 +596,9 @@ onBeforeUnmount(() => {
             w={{ Math.round(layout[selected]?.w || 0) }}
           </div>
           <div class="pe-row">
-            <button class="pe-btn pe-copy" @click="exportLayout">复制布局参数</button>
-            <button class="pe-btn" @click="applyDefaults()">重置</button>
+            <button class="pe-btn pe-save" @click="saveLayout">保存</button>
+            <button class="pe-btn pe-copy" @click="exportLayout">复制参数</button>
+            <button class="pe-btn" @click="resetLayout">重置</button>
           </div>
           <pre class="pe-json">{{ layoutJson }}</pre>
         </div>
@@ -700,6 +730,9 @@ onBeforeUnmount(() => {
 }
 .pe-copy {
   background: #6fe0a8;
+}
+.pe-save {
+  background: #ffd24d;
 }
 .pe-vals {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
