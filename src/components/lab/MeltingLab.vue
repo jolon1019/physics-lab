@@ -1,7 +1,7 @@
 <script setup>
 import { boardFg, boardText } from '../../lib/boardText'
 
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
@@ -32,8 +32,9 @@ const IMG_META = {
 }
 
 // 放置素材图：把不透明底边对齐到 baseline，居中于 xCenter；按目标内容宽 targetContentW 缩放。
-// 返回 {x, y, w, h}（逻辑坐标），未加载返回 null。
-function placeAsset(img, meta, xCenter, baseline, targetContentW) {
+// 返回 {x, y, w, h}（逻辑坐标），未加载 / 参数缺失返回 null。name 用于编辑器命中测试。
+function placeAsset(img, meta, xCenter, baseline, targetContentW, name) {
+  if (xCenter == null || baseline == null || !targetContentW) return null
   if (!img.complete || !img.naturalWidth) return null
   const [opaqueBotY, opaqueW, opaqueH] = meta
   const scale = targetContentW / opaqueW
@@ -42,7 +43,52 @@ function placeAsset(img, meta, xCenter, baseline, targetContentW) {
   const drawX = xCenter - drawW / 2
   const drawY = baseline - opaqueBotY * scale
   ctx.drawImage(img, drawX, drawY, drawW, drawH)
-  return { x: drawX, y: drawY, w: drawW, h: drawH }
+  const rect = { x: drawX, y: drawY, w: drawW, h: drawH, cx: xCenter, baseline }
+  if (name) lastRects[name] = rect
+  return rect
+}
+
+// ===== 摆放编辑器（editMode 下可拖动 / 滚轮缩放每个元件）=====
+// 每个元件用绝对逻辑坐标 {x:中心x, baseline:底部y, w:内容宽} 描述，便于手动微调。
+const editMode = ref(false)
+const selected = ref('stand')          // 当前选中的元件
+const layout = reactive({})            // 各元件坐标（drawSetup 直接使用）
+const lastRects = {}                   // 每帧绘制后记录实际矩形，用于命中测试 & 高亮
+// 编辑器内实时显示 / 复制用：随 layout 与画布尺寸自动更新
+const layoutJson = computed(() => {
+  const L = canvasRef.value ? dims() : { W: 0, H: 0 }
+  return JSON.stringify(
+    { _canvas: { W: Math.round(L.W), H: Math.round(L.H) }, layout: { ...layout } },
+    null, 1
+  )
+})
+
+// 按当前画布尺寸算默认布局（即原内联公式的显式坐标版）
+function computeDefaults(L) {
+  const cx = L.W * 0.27
+  const baseY = L.H - 70
+  const standW = Math.min(86, L.W * 0.13)
+  const beakerW = Math.min(110, L.W * 0.16)
+  const tubeW = Math.min(38, beakerW * 0.32)
+  const thermoW = Math.min(26, beakerW * 0.22)
+  const lampW = Math.min(46, L.W * 0.07)
+  const beakerBottomY = baseY - 130
+  const tubeCx = cx - 12
+  const tubeBottomY = beakerBottomY + 4
+  const thermoCx = cx + (tubeW / 2) + (thermoW / 2) + 2
+  const thermoBottomY = tubeBottomY - 60
+  const lampCx = Math.max(60, cx - standW * 0.85)
+  return {
+    stand:  { x: cx, baseline: baseY, w: standW },
+    beaker: { x: cx, baseline: beakerBottomY, w: beakerW },
+    tube:   { x: tubeCx, baseline: tubeBottomY, w: tubeW },
+    thermo: { x: thermoCx, baseline: thermoBottomY, w: thermoW },
+    lamp:   { x: lampCx, baseline: baseY, w: lampW },
+  }
+}
+function applyDefaults() {
+  const L = dims()
+  Object.assign(layout, computeDefaults(L))
 }
 
 // ===== 可调变量 =====
@@ -150,38 +196,25 @@ function rr(x, y, w, h, r) {
 }
 
 // 左侧实验装置（cartoon PNG 拼接）：铁架台 + 酒精灯 + 烧杯 + 试管 + 温度计
+// 所有元件位置来自 layout（编辑模式下可手动拖动 / 缩放）
 function drawSetup(L) {
-  const cx = L.W * 0.27
-  const baseY = L.H - 70
+  // 1) 三脚铁架台：底部贴 baseline（先画，最深）
+  placeAsset(standImg, IMG_META.stand, layout.stand.x, layout.stand.baseline, layout.stand.w, 'stand')
 
-  // 1) 三脚铁架台：底部贴 baseY（先画，最深）
-  const standW = Math.min(86, L.W * 0.13)
-  placeAsset(standImg, IMG_META.stand, cx, baseY, standW)
+  // 2) 烧杯
+  const beakerRect = placeAsset(beakerImg, IMG_META.beaker, layout.beaker.x, layout.beaker.baseline, layout.beaker.w, 'beaker')
 
-  // 2) 烧杯：坐在铁架台中环上（baseY − 130）
-  const beakerBottomY = baseY - 130
-  const beakerW = Math.min(110, L.W * 0.16)
-  const beakerRect = placeAsset(beakerImg, IMG_META.beaker, cx, beakerBottomY, beakerW)
+  // 3) 试管：底部浸入烧杯
+  const tubeRect = placeAsset(tubeImg, IMG_META.tube, layout.tube.x, layout.tube.baseline, layout.tube.w, 'tube')
 
-  // 3) 试管：底部浸入烧杯水面下 ≈ 烧杯底部（让液面看到试管沉底）
-  const tubeCx = cx - 12      // 试管略偏左
-  const tubeBottomY = beakerBottomY + 4   // 试管底在烧杯底外侧 ~4，使试管沉到底
-  const tubeW = Math.min(38, beakerW * 0.32)
-  const tubeRect = placeAsset(tubeImg, IMG_META.tube, tubeCx, tubeBottomY, tubeW)
+  // 4) 温度计：紧贴试管右侧
+  const thermoRect = placeAsset(thermoImg, IMG_META.thermo, layout.thermo.x, layout.thermo.baseline, layout.thermo.w, 'thermo')
 
-  // 4) 温度计：紧贴试管右侧，汞泡在试管下方内
-  const thermoW = Math.min(26, beakerW * 0.22)
-  const thermoCx = cx + (tubeW / 2) + (thermoW / 2) + 2
-  const thermoBottomY = tubeRect ? tubeRect.y + tubeRect.h * 0.7 : tubeBottomY - 60
-  const thermoRect = placeAsset(thermoImg, IMG_META.thermo, thermoCx, thermoBottomY, thermoW)
-
-  // 5) 酒精灯（左下），离立柱有一定间距：底部贴 baseY
-  const lampCx = Math.max(60, cx - standW * 0.85)
+  // 5) 酒精灯（离立柱有一定间距）：底部贴 baseline
   const isOn = state.value === 'running' || state.value === 'done'
   const lampImg = isOn ? lampOnImg : lampOffImg
   const lampMeta = isOn ? IMG_META.lampOn : IMG_META.lampOff
-  const lampW = Math.min(46, L.W * 0.07)
-  placeAsset(lampImg, lampMeta, lampCx, baseY, lampW)
+  placeAsset(lampImg, lampMeta, layout.lamp.x, layout.lamp.baseline, layout.lamp.w, 'lamp')
 
   // 6) 汞柱动态显示：图片加载完成前不画（避免 null.y）
   if (thermoRect) {
@@ -201,7 +234,18 @@ function drawSetup(L) {
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
-  ctx.fillText(isCrystal.value ? '海波' : '石蜡', cx, baseY + 14)
+  ctx.fillText(isCrystal.value ? '海波' : '石蜡', layout.stand.x, layout.stand.baseline + 14)
+
+  // 8) 编辑器高亮：选中元件画虚线框
+  if (editMode.value && selected.value && lastRects[selected.value]) {
+    const r = lastRects[selected.value]
+    ctx.save()
+    ctx.strokeStyle = '#ffcf33'
+    ctx.lineWidth = 2
+    ctx.setLineDash([6, 4])
+    ctx.strokeRect(r.x - 4, r.y - 4, r.w + 8, r.h + 8)
+    ctx.restore()
+  }
 }
 
 // 右侧 T-t 图
@@ -314,6 +358,81 @@ function render() {
   drawGraph(L)
 }
 
+// ===== 摆放编辑器：交互（拖动 / 滚轮缩放 / 方向键微调）=====
+let dragging = false
+let dragStart = null
+
+function toLogical(e) {
+  const rect = canvasRef.value.getBoundingClientRect()
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+}
+function hitTest(lx, ly) {
+  // 逆向绘制顺序：后画的在上层
+  const order = ['lamp', 'thermo', 'tube', 'beaker', 'stand']
+  for (const name of order) {
+    const r = lastRects[name]
+    if (!r) continue
+    if (lx >= r.x && lx <= r.x + r.w && ly >= r.y && ly <= r.y + r.h) return name
+  }
+  return null
+}
+function onPointerDown(e) {
+  if (!editMode.value) return
+  const { x, y } = toLogical(e)
+  const name = hitTest(x, y)
+  if (name) {
+    selected.value = name
+    dragging = true
+    dragStart = { name, lx: x, ly: y, x: layout[name].x, baseline: layout[name].baseline }
+    try { canvasRef.value.setPointerCapture?.(e.pointerId) } catch (_) {}
+  }
+}
+function onPointerMove(e) {
+  if (!editMode.value || !dragging || !dragStart) return
+  const { x, y } = toLogical(e)
+  layout[dragStart.name].x = dragStart.x + (x - dragStart.lx)
+  layout[dragStart.name].baseline = dragStart.baseline + (y - dragStart.ly)
+}
+function onPointerUp() {
+  dragging = false
+  dragStart = null
+}
+function onWheel(e) {
+  if (!editMode.value || !selected.value) return
+  e.preventDefault()
+  const factor = e.deltaY < 0 ? 1.06 : 0.94
+  layout[selected.value].w = Math.max(8, Math.min(400, layout[selected.value].w * factor))
+}
+function nudge(dx, dy) {
+  if (!selected.value) return
+  layout[selected.value].x += dx
+  layout[selected.value].baseline += dy
+}
+function scaleSel(factor) {
+  if (!selected.value) return
+  layout[selected.value].w = Math.max(8, Math.min(400, layout[selected.value].w * factor))
+}
+function exportLayout() {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(layoutJson.value).then(
+      () => { hint.value = '已复制布局参数到剪贴板，可粘贴给我以固化默认值' },
+      () => {}
+    )
+  }
+}
+function onKey(e) {
+  if (!editMode.value || !selected.value) return
+  const step = e.shiftKey ? 10 : 2
+  switch (e.key) {
+    case 'ArrowLeft':  layout[selected.value].x -= step; e.preventDefault(); break
+    case 'ArrowRight': layout[selected.value].x += step; e.preventDefault(); break
+    case 'ArrowUp':    layout[selected.value].baseline -= step; e.preventDefault(); break
+    case 'ArrowDown':  layout[selected.value].baseline += step; e.preventDefault(); break
+    case '+': case '=': scaleSel(1.05); break
+    case '-': case '_': scaleSel(0.95); break
+  }
+}
+
 // ===== 控制 =====
 function startRun() {
   if (state.value === 'running') return
@@ -374,6 +493,7 @@ function loop(now) {
 function resizeCanvas() {
   if (!canvasRef.value) return
   setupCanvas()
+  if (!editMode.value) applyDefaults()   // 非编辑态随画布自适应；编辑态保留手动微调
   render()
 }
 
@@ -385,7 +505,9 @@ watch(material, () => {
 let resizeObs = null
 onMounted(() => {
   setupCanvas()
+  applyDefaults()          // 首次渲染前先算好默认布局
   render()
+  window.addEventListener('keydown', onKey)
   if (window.ResizeObserver) {
     resizeObs = new ResizeObserver(resizeCanvas)
     resizeObs.observe(canvasRef.value.parentElement)
@@ -395,17 +517,61 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (raf) cancelAnimationFrame(raf)
   if (resizeObs) resizeObs.disconnect()
+  window.removeEventListener('keydown', onKey)
 })
 </script>
 
 <template>
   <div class="lab-stage">
     <div class="lab-left">
-      <div class="lab-panel" style="padding:0">
+      <div class="lab-panel" style="padding:0;position:relative">
         <canvas
           ref="canvasRef"
           style="display:block;width:100%;height:520px;touch-action:none;border-radius:8px"
+          @pointerdown="onPointerDown"
+          @pointermove="onPointerMove"
+          @pointerup="onPointerUp"
+          @pointerleave="onPointerUp"
+          @wheel="onWheel"
         ></canvas>
+
+        <!-- 摆放编辑器浮层 -->
+        <div v-if="editMode" class="pos-editor">
+          <div class="pe-head">
+            <strong>摆放编辑器</strong>
+            <span class="pe-tip">拖动元件移动 · 滚轮缩放</span>
+          </div>
+          <div class="pe-row">
+            <label>元件</label>
+            <select v-model="selected" class="pe-select">
+              <option value="stand">铁架台</option>
+              <option value="beaker">烧杯</option>
+              <option value="tube">试管</option>
+              <option value="thermo">温度计</option>
+              <option value="lamp">酒精灯</option>
+            </select>
+          </div>
+          <div class="pe-row pe-arrows">
+            <button class="pe-btn" title="左移" @click="nudge(-2,0)">←</button>
+            <button class="pe-btn" title="上移" @click="nudge(0,-2)">↑</button>
+            <button class="pe-btn" title="下移" @click="nudge(0,2)">↓</button>
+            <button class="pe-btn" title="右移" @click="nudge(2,0)">→</button>
+          </div>
+          <div class="pe-row">
+            <button class="pe-btn" @click="scaleSel(0.95)">缩小 −</button>
+            <button class="pe-btn" @click="scaleSel(1.05)">放大 +</button>
+          </div>
+          <div class="pe-row pe-vals">
+            x={{ Math.round(layout[selected]?.x || 0) }} ·
+            y={{ Math.round(layout[selected]?.baseline || 0) }} ·
+            w={{ Math.round(layout[selected]?.w || 0) }}
+          </div>
+          <div class="pe-row">
+            <button class="pe-btn pe-copy" @click="exportLayout">复制布局参数</button>
+            <button class="pe-btn" @click="applyDefaults()">重置</button>
+          </div>
+          <pre class="pe-json">{{ layoutJson }}</pre>
+        </div>
       </div>
 
       <div class="lab-actions">
@@ -415,6 +581,7 @@ onBeforeUnmount(() => {
         </div>
         <button v-if="state !== 'running'" class="btn btn-primary" @click="startRun">{{ startBtn }}</button>
         <button class="btn" @click="resetAll">重置</button>
+        <button class="btn" :class="{ 'btn-primary': editMode }" @click="editMode = !editMode">{{ editMode ? '完成摆放' : '编辑摆放位置' }}</button>
         <span class="feedback" :class="completed ? 'ok' : 'no'">{{ hint }}</span>
         <FullscreenBtn />
       </div>
@@ -467,3 +634,92 @@ onBeforeUnmount(() => {
     </aside>
   </div>
 </template>
+
+<style scoped>
+.pos-editor {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 196px;
+  background: #fffef5;
+  border: 2px solid #111;
+  border-radius: 8px;
+  box-shadow: 4px 4px 0 #111;
+  padding: 10px;
+  font-size: 12px;
+  color: #111;
+  z-index: 6;
+}
+.pe-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.pe-head strong {
+  font-size: 13px;
+  font-weight: 800;
+}
+.pe-tip {
+  font-size: 10px;
+  color: #666;
+}
+.pe-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.pe-row label {
+  font-weight: 700;
+}
+.pe-select {
+  flex: 1;
+  border: 2px solid #111;
+  border-radius: 6px;
+  padding: 3px 4px;
+  font-size: 12px;
+  background: #fff;
+}
+.pe-arrows {
+  justify-content: space-between;
+}
+.pe-btn {
+  border: 2px solid #111;
+  border-radius: 6px;
+  background: #ffe14d;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 4px 8px;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 #111;
+}
+.pe-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 #111;
+}
+.pe-copy {
+  background: #6fe0a8;
+}
+.pe-vals {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  background: #f3f1e3;
+  border: 1px dashed #999;
+  border-radius: 5px;
+  padding: 4px 6px;
+}
+.pe-json {
+  margin: 0;
+  max-height: 150px;
+  overflow: auto;
+  font-size: 10px;
+  line-height: 1.35;
+  background: #1d2330;
+  color: #d7f5e0;
+  border-radius: 5px;
+  padding: 6px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+</style>
