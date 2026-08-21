@@ -160,7 +160,7 @@ function setupCanvas() {
 let resizeObs = null
 function layout() {
   groundY = CH - ROAD_TOP_GAP
-  wallX = CW - 96
+  wallX = CW - 36
   cliffFaceX = wallX - 8
   personNearX = wallX - 130
   personFarX = 120
@@ -236,22 +236,24 @@ function drawCar(x, honking) {
   const ch = (carImg.complete && carImg.naturalWidth)
     ? cw * (carImg.naturalHeight / carImg.naturalWidth)
     : cw
-  const jx = honking ? Math.sin(frame * 0.7) * 1.4 : 0
-  // car.png 真实车底在图像 y=299/400 处；让该点落在 (路面顶 + overlap)，
-  // 即车轮略陷入路面、车“压”在路上而非悬空（图像底部还有 100px 透明留白）。
+  // 去掉横向抖动：原 jx=sin*1.4 在车每帧仅前进 ~0.4px 时，会把“向前位移”淹没成
+  // 原地左右晃动，看起来卡顿。改为整数像素对齐——贴图对齐到像素网格后，亚像素重采样
+  // 抖动消失，每帧位移干净顺滑（丝滑）。
   const overlap = 8
   const yTop = groundY + overlap - CAR_BOTTOM_FRAC * ch
+  const dx = Math.round(x - cw / 2)
+  const dy = Math.round(yTop)
   if (carImg.complete && carImg.naturalWidth) {
-    ctx.drawImage(carImg, x - cw / 2 + jx, yTop, cw, ch)
+    ctx.drawImage(carImg, dx, dy, cw, ch)
   } else {
     ctx.fillStyle = '#5b6570'
-    roundRectPath(x - cw / 2, yTop, cw, ch, 10); ctx.fill()
+    roundRectPath(dx, dy, cw, ch, 10); ctx.fill()
     ctx.strokeStyle = '#0b0b0b'; ctx.lineWidth = 2; ctx.stroke()
   }
   // 鸣笛时喇叭波纹（从车头偏上位置发出）
   if (honking) {
-    const hx = x + cw / 2 - 4
-    const hy = yTop + ch * 0.34
+    const hx = dx + cw / 2 - 4
+    const hy = dy + ch * 0.34
     ctx.strokeStyle = 'rgba(123,91,214,0.55)'; ctx.lineWidth = 2
     for (let i = 1; i <= 3; i++) {
       const r = i * 7 + (frame % 12)
@@ -413,7 +415,8 @@ function drawCarEchoMode() {
   drawCliffStatic()
   // 像素缩放：车放在左侧，到山崖的像素距离 = D0 米（行走路程随 carRunPx 增大而增大）
   const cliffX = wallX
-  const carStartX = Math.max(120, Math.round(CW * 0.15))
+  // 车尽量靠左起步、山崖尽量靠右，拉长路面可用像素，使 60m 行驶在屏上位移更大
+  const carStartX = Math.max(58, Math.round(CW * 0.07))
   const carRunPx = cliffX - carStartX
   const D0 = d0.value
   const pxPerM = carRunPx / D0
