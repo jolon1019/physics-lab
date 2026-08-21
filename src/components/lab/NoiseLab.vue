@@ -32,7 +32,16 @@ let roadPatt = null
 function getRoadPatt() {
   if (!ctx) return null
   if (!roadPatt && roadImg.complete && roadImg.naturalWidth) {
-    roadPatt = ctx.createPattern(roadImg, 'repeat')
+    // road.png 是 400×400，路带在 y=164..281 区域；
+    // 若直接 createPattern 全图，fillRect 只看到顶部黑色。
+    // 先把路带裁出来并缩放到与路面同高 (40px)，再以这个 400×40 的
+    // 离屏画布作为 pattern 源，沿 x 重复铺满整条路面。
+    const strip = document.createElement('canvas')
+    strip.width = 400
+    strip.height = 40
+    const sctx = strip.getContext('2d')
+    sctx.drawImage(roadImg, 0, 164, 400, 118, 0, 0, 400, 40)
+    roadPatt = ctx.createPattern(strip, 'repeat')
   }
   return roadPatt
 }
@@ -60,9 +69,8 @@ function personXAt(d) {
 const echoTime = computed(() => (2 * distance.value) / 340)
 const echoCan = computed(() => echoTime.value >= 0.1)
 
-/* 汽车尺寸（绘制时统一引用） */
-const CAR_W = 92
-const CAR_H = 68
+/* 汽车尺寸（按 car.png 原始 1:1 比例不拉伸，略微放大） */
+const CAR_W = 100
 
 /* ============ 噪声布局（随容器自适应） ============ */
 let srcX = 730
@@ -307,15 +315,19 @@ function drawPerson(x, mouthOpen, isEarMode, earBlocked) {
   }
 }
 
-/* 汽车：car.png 面朝右，x 为车身中心，底边贴地面 */
+/* 汽车：car.png 保持原始宽高比不拉伸，x 为车身中心，底边贴地面 */
 function drawCar(x, honking) {
-  const cw = CAR_W, ch = CAR_H
+  const cw = CAR_W
+  // 按原图比例计算高度，避免 92×68 把 400×400 的方图横向拉变形
+  const ch = (carImg.complete && carImg.naturalWidth)
+    ? cw * (carImg.naturalHeight / carImg.naturalWidth)
+    : cw
   const jx = honking ? Math.sin(frame * 0.7) * 1.4 : 0
   if (carImg.complete && carImg.naturalWidth) {
     ctx.drawImage(carImg, x - cw / 2 + jx, groundY - ch, cw, ch)
   } else {
     ctx.fillStyle = '#5b6570'
-    roundRectPath(x - cw / 2, groundY - ch, cw, ch - 18, 10); ctx.fill()
+    roundRectPath(x - cw / 2, groundY - cw, cw, cw - 18, 10); ctx.fill()
     ctx.strokeStyle = '#0b0b0b'; ctx.lineWidth = 2; ctx.stroke()
   }
   // 鸣笛时喇叭波纹
@@ -598,10 +610,10 @@ function drawCarEchoWave(carX, carStartX, cliffX, pxPerM, D0) {
 function drawCarEchoMode() {
   drawSky(); drawRoad()
   drawCliffStatic()
-  // 像素缩放：起点到山崖的像素距离 = D0 米
-  const carRunPx = 260
+  // 像素缩放：车放在左侧，到山崖的像素距离 = D0 米（行走路程随 carRunPx 增大而增大）
   const cliffX = wallX
-  const carStartX = cliffX - carRunPx
+  const carStartX = Math.max(120, Math.round(CW * 0.15))
+  const carRunPx = cliffX - carStartX
   const D0 = d0.value
   const pxPerM = carRunPx / D0
   // 实时距离与车位置
