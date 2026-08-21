@@ -1,4 +1,6 @@
 <script setup>
+import { boardFg, boardText } from '../../lib/boardText'
+
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
@@ -104,7 +106,7 @@ function render() {
   ctx.strokeStyle = 'rgba(90,140,200,0.8)'
   ctx.lineWidth = 2
   ctx.strokeRect(mx - 3, topY, 6, baseY - topY)
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '600 12px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'bottom'
@@ -140,7 +142,7 @@ function render() {
   }
 
   // 文字：物距 / 像距
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '600 12px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'

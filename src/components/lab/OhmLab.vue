@@ -1,4 +1,6 @@
 <script setup>
+import { boardFg, boardText } from '../../lib/boardText'
+
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
@@ -212,7 +214,7 @@ function drawLightBulb(g) {
   drawCircuitIcon(ctx, 'bulb', c.x, c.y, w, h, { glow: b, label: false })
   drawDot(g.term.bulbL); drawDot(g.term.bulbR)
   // 自定义标签：亮时显示明暗程度百分比，断/熄时显示"熄灭"
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '800 11px system-ui'
   ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
   const bright = on ? ' · 亮度 ' + Math.round(b * 100) + '%' : ' · 熄灭'
@@ -225,7 +227,7 @@ function drawRheostatPNG(g) {
   const [w, h] = g.BOX.rheo
   drawCircuitIcon(ctx, 'rheostat', c.x, c.y, w, h, { frac: Math.min(rheo.value, RHEO_MAX) / RHEO_MAX, label: false })
   drawDot(g.term.rheoL); drawDot(g.term.rheoR)
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '800 10px system-ui'
   ctx.textAlign = 'center'; ctx.textBaseline = 'top'
   ctx.fillText('滑动变阻器 R′ = ' + rheo.value.toFixed(0) + ' Ω', c.x, c.y + Math.min(w, h) / 2 + 4)
@@ -347,7 +349,7 @@ function renderGraph() {
   ctx.moveTo(px0, py0); ctx.lineTo(px0, py0 + ph); ctx.lineTo(px0 + pw, py0 + ph)
   ctx.stroke()
   // 坐标轴标题
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '800 12px system-ui'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
@@ -422,7 +424,7 @@ function renderGraph() {
 
   // 自由模式下给出说明（此时 U、R 同时可变，曲线按当前 U 给出 I–R 关系）
   if (mode.value === 'free') {
-    ctx.fillStyle = '#9a6b3a'
+    ctx.fillStyle = boardText(ctx.canvas)
     ctx.font = '700 11px system-ui'
     ctx.textAlign = 'left'; ctx.textBaseline = 'top'
     ctx.fillText('自由模式：曲线为当前 U=' + U.value.toFixed(1) + 'V 下的 I–R 关系，建议切换到「探究 I–U / I–R」做控制变量分析', px0, py0 - 22)
@@ -436,7 +438,7 @@ function render() {
     return
   }
   paintBoard(ctx, cssW, cssH, 'chalk')
-  ctx.fillStyle = '#050505'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '800 13px system-ui'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'

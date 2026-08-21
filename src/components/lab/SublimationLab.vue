@@ -1,4 +1,6 @@
 <script setup>
+import { boardFg, boardText } from '../../lib/boardText'
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
@@ -91,7 +93,7 @@ function drawApparatus(L) {
     ctx.lineWidth = 2
     rr(bx, by, bw, bh, 8)
     ctx.stroke()
-    ctx.fillStyle = '#3a3026'
+    ctx.fillStyle = boardText(ctx.canvas)
     ctx.font = '600 12px system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
@@ -113,7 +115,7 @@ function drawApparatus(L) {
       ctx.quadraticCurveTo(g.cx - 9, lampY - 26, g.cx, lampY - 8)
       ctx.fill()
     }
-    ctx.fillStyle = '#3a3026'
+    ctx.fillStyle = boardText(ctx.canvas)
     ctx.font = '600 12px system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
@@ -169,7 +171,7 @@ function drawApparatus(L) {
   }
 
   // 标签
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
@@ -188,7 +190,7 @@ function drawCompare(L) {
   ctx.lineWidth = 1
   rr(x, y, w, 110, 10)
   ctx.stroke()
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'

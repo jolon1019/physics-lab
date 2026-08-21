@@ -1,4 +1,6 @@
 <script setup>
+import { boardFg, boardText } from '../../lib/boardText'
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
@@ -114,7 +116,7 @@ function render() {
   ctx.fillRect(ux - tubeW, uBase, tubeW + 6 + tubeW, 14)
   ctx.strokeRect(ux - tubeW, uBase, tubeW + 6 + tubeW, 14)
   // 液面标注
-  ctx.fillStyle = '#22324a'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 12px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.fillText('U 形管压强计', ux + tubeW / 2 - 3, uBase + 26)
@@ -122,7 +124,7 @@ function render() {
   ctx.fillText(`液面差 ∝ p`, ux + tubeW / 2 - 3, uTop - 40)
 
   // 文字标注
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'

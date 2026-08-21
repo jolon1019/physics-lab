@@ -23,8 +23,8 @@ const instrument = ref('tuning')
 
 const INST = {
   tuning: { label: '音叉', harm: [1] },
-  piano: { label: '🎹 钢琴', harm: [1, 0.45, 0.25, 0.12] },
-  flute: { label: '🎺 长笛', harm: [1, 0.28, 0.12] }
+  piano: { label: '钢琴', harm: [1, 0.45, 0.25, 0.12] },
+  flute: { label: '长笛', harm: [1, 0.28, 0.12] }
 }
 
 const seen = { freq: false, amp: false, timbre: false }
@@ -214,7 +214,7 @@ function render() {
   ctx.textAlign = 'left'
   ctx.fillStyle = C.text
   ctx.font = 'bold 15px sans-serif'
-  ctx.fillText(`📡 示波器 · ${INST[instrument.value].label}`, 30, 34)
+  ctx.fillText(`示波器 · ${INST[instrument.value].label}`, 30, 34)
   ctx.fillStyle = C.trace
   ctx.font = '600 13px sans-serif'
   ctx.fillText(`f = ${freq.value} Hz　T = ${period.value.toFixed(4)} s　λ = ${wavelength.value.toFixed(2)} m`, 30, 58)

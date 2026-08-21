@@ -1,4 +1,6 @@
 <script setup>
+import { boardFg, boardText } from '../../lib/boardText'
+
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { paintBoard } from '../../lib/boardBg'
 import FullscreenBtn from './FullscreenBtn.vue'
@@ -115,7 +117,7 @@ function drawBeaker(L, r, idx) {
     }
   }
   // 名称
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 14px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
@@ -176,7 +178,7 @@ function drawThermometer(L) {
 
   // 刻度尺（每 10℃ 标注，每 2℃ 一短线）
   ctx.strokeStyle = 'rgba(60,60,70,0.6)'
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '600 11px system-ui, sans-serif'
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'

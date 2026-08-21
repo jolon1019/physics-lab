@@ -1,4 +1,6 @@
 <script setup>
+import { boardFg, boardText } from '../../lib/boardText'
+
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
@@ -93,7 +95,7 @@ function render() {
     ctx.lineTo(x - 10, mirrorY + 16)
     ctx.stroke()
   }
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '600 12px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
@@ -108,7 +110,7 @@ function render() {
   ctx.lineTo(cx, mirrorY - L - 40)
   ctx.stroke()
   ctx.setLineDash([])
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.textAlign = 'left'
   ctx.fillText('法线', cx + 6, mirrorY - L - 36)
 
@@ -155,7 +157,7 @@ function render() {
   }
 
   // 结论
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 14px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'bottom'

@@ -1,4 +1,6 @@
 <script setup>
+import { boardFg, boardText } from '../../lib/boardText'
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
@@ -112,7 +114,7 @@ function drawBalance(W, H, label) {
       ctx.fillRect(bx - 80 - 16, beamY + 40, 32, 10)
     }
   }
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 14px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
@@ -135,7 +137,7 @@ function drawCylinder(W, H) {
   ctx.strokeRect(x, top, cw, bot - top)
   // 刻度
   ctx.strokeStyle = 'rgba(90,90,100,0.5)'
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '600 10px system-ui, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
@@ -162,7 +164,7 @@ function drawCylinder(W, H) {
     ctx.lineTo(cx + 16, bot - 4)
     ctx.closePath()
     ctx.fill()
-    ctx.fillStyle = '#3a3026'
+    ctx.fillStyle = boardText(ctx.canvas)
     ctx.font = '700 13px system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'bottom'
@@ -171,7 +173,7 @@ function drawCylinder(W, H) {
     const ly = volToY(vL.value)
     ctx.fillStyle = 'rgba(120,170,120,0.6)'
     ctx.fillRect(x + 2, ly, cw - 4, bot - ly - 2)
-    ctx.fillStyle = '#3a3026'
+    ctx.fillStyle = boardText(ctx.canvas)
     ctx.font = '700 13px system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'bottom'

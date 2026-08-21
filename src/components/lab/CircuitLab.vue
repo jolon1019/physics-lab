@@ -1,4 +1,6 @@
 <script setup>
+import { boardFg, boardText } from '../../lib/boardText'
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
@@ -59,7 +61,7 @@ function battery(x, y) {
   ctx.moveTo(x - 9, y + 8)
   ctx.lineTo(x + 9, y + 8)
   ctx.stroke()
-  ctx.fillStyle = '#22324a'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 12px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.fillText(`${U.value} V`, x, y - 26)
@@ -72,7 +74,7 @@ function ammeter(x, y, val) {
   ctx.arc(x, y, 18, 0, Math.PI * 2)
   ctx.fill()
   ctx.stroke()
-  ctx.fillStyle = '#22324a'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
@@ -99,7 +101,7 @@ function bulb(x, y, I) {
   ctx.lineTo(x - 7, y)
   ctx.lineTo(x - 1, y + 6)
   ctx.stroke()
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 12px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
@@ -129,7 +131,7 @@ function render() {
       [bx + 230, midY + 78], [bx + 150, midY + 78], [bx + 90, midY + 78], [bx + 90, midY + 22],
       [bx, midY + 22]
     ])
-    ctx.fillStyle = '#3a3026'
+    ctx.fillStyle = boardText(ctx.canvas)
     ctx.font = '700 13px system-ui, sans-serif'
     ctx.textAlign = 'left'
     ctx.textBaseline = 'top'
@@ -160,7 +162,7 @@ function render() {
     wire([
       [bx + 130, midY + 70], [bx + 70, midY + 70], [bx + 70, midY + 78], [bx, midY + 78]
     ])
-    ctx.fillStyle = '#3a3026'
+    ctx.fillStyle = boardText(ctx.canvas)
     ctx.font = '700 13px system-ui, sans-serif'
     ctx.textAlign = 'left'
     ctx.textBaseline = 'top'

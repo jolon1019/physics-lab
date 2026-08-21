@@ -1,4 +1,6 @@
 <script setup>
+import { boardFg, boardText } from '../../lib/boardText'
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
@@ -279,7 +281,7 @@ function drawCliffStatic() {
   // 峰顶略斜
   ctx.fillStyle = '#3a2a18'
   ctx.beginPath(); ctx.moveTo(wx - 10, top); ctx.lineTo(wx + w + 10, top); ctx.lineTo(wx + w + 10, top + 8); ctx.lineTo(wx - 10, top + 8); ctx.closePath(); ctx.fill()
-  ctx.fillStyle = '#3a3026'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
+  ctx.fillStyle = boardText(ctx.canvas); ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
   ctx.fillText('山崖 · 反射面', wx + w / 2, top - 8)
 }
 
@@ -350,9 +352,9 @@ function drawEchoMode() {
     ctx.fillText('回声返回', px, groundY - 168)
   }
   // 标题与说明
-  ctx.fillStyle = cssVar('--text-h', '#111'); ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'
+  ctx.fillStyle = boardFg(ctx.canvas); ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'
   ctx.fillText('回声测距：汽车鸣笛，声波从山崖反射返回', 28, 22)
-  ctx.fillStyle = cssVar('--text', '#555'); ctx.font = '13px sans-serif'
+  ctx.fillStyle = boardText(ctx.canvas); ctx.font = '13px sans-serif'
   const desc = wave.active
     ? (echoCan.value ? `回声时间 ${echoTime.value.toFixed(3)} s ≥ 0.1 s，能区分原声与回声` : '间隔 < 0.1 s，原声与回声重叠，听不清')
     : `距山崖 ${distance.value} m（山崖固定，移动汽车改变距离），点「按喇叭」或画面发声`
@@ -444,9 +446,9 @@ function drawCarEchoMode() {
   ctx.fillStyle = '#ffffff'
   ctx.fillText(dTxt, carX, groundY + ROAD_H + 14)
   // 标题与题面
-  ctx.fillStyle = cssVar('--text-h', '#111'); ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'
+  ctx.fillStyle = boardFg(ctx.canvas); ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'
   ctx.fillText('回声测距（例题）', 28, 22)
-  ctx.fillStyle = cssVar('--text', '#555'); ctx.font = '13px sans-serif'
+  ctx.fillStyle = boardText(ctx.canvas); ctx.font = '13px sans-serif'
   ctx.fillText('汽车以 v车 驶向山崖，按喇叭 3 s 后听到回声（声速 340 m/s），求听到回声时车与山崖的距离。', 28, 46)
   const status = carDemo.done
     ? `3 s 后听到回声 —— 车距山崖 = ${dAtEcho.value.toFixed(0)} m`

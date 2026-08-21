@@ -1,4 +1,6 @@
 <script setup>
+import { boardFg, boardText } from '../../lib/boardText'
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
@@ -100,7 +102,7 @@ function render() {
   ctx.lineTo(rulerX, supportY + 6 + L0 + FMAX * PX_PER_N + 20)
   ctx.stroke()
   ctx.font = '600 11px system-ui, sans-serif'
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
   for (let i = 0; i <= 10; i++) {

@@ -1,4 +1,6 @@
 <script setup>
+import { boardFg, boardText } from '../../lib/boardText'
+
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
@@ -189,7 +191,7 @@ function drawElectrons(path, segsInfo) {
 function render() {
   if (!ctx || cssW === 0) return
   paintBoard(ctx, cssW, cssH, 'chalk')
-  ctx.fillStyle = '#050505'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '800 13px system-ui'
   ctx.textAlign = 'left'; ctx.textBaseline = 'top'
   ctx.fillText('测量电路 · 电流表串联测 I，电压表并联测 U（亮度由实际功率 P=UI 决定）', 14, 12)

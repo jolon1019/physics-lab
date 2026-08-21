@@ -1,4 +1,6 @@
 <script setup>
+import { boardFg, boardText } from '../../lib/boardText'
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
@@ -201,7 +203,7 @@ function drawSetup(L) {
   ctx.lineTo(tgX(tgx), tgy1)
   ctx.stroke()
   // 标签
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
@@ -242,7 +244,7 @@ function drawGraph(L) {
   ctx.lineTo(px1, py0)
   ctx.stroke()
   // 刻度
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '600 11px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
@@ -261,7 +263,7 @@ function drawGraph(L) {
     ctx.stroke()
   }
   // 轴名
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '600 12px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
@@ -306,7 +308,7 @@ function drawGraph(L) {
     ctx.fill()
   }
   // 标题
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'

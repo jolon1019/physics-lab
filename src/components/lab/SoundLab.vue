@@ -1,4 +1,6 @@
 <script setup>
+import { boardFg, boardText } from '../../lib/boardText'
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
@@ -272,8 +274,8 @@ function roundRectPath(x, y, w, h, r) {
 }
 
 function drawForkMode() {
-  const textH = cssVar('--text-h', '#111')
-  const textCol = cssVar('--text', '#555')
+  const textH = boardFg(ctx.canvas)
+  const textCol = boardText(ctx.canvas)
   const amp = vibr.value > 0.02 ? vibr.value : 0
   const sw = Math.sin(flickerT * 0.5) * amp * 7  // 音叉振动水平偏移
 
@@ -319,8 +321,8 @@ function drawForkMode() {
 }
 
 function drawVacuumMode() {
-  const textH = cssVar('--text-h', '#111')
-  const textCol = cssVar('--text', '#555')
+  const textH = boardFg(ctx.canvas)
+  const textCol = boardText(ctx.canvas)
   const pumpX = 640
 
   const ringing = volume.value > 30
@@ -374,8 +376,8 @@ function drawVacuumMode() {
 }
 
 function drawWaveMode() {
-  const textH = cssVar('--text-h', '#111')
-  const textCol = cssVar('--text', '#555')
+  const textH = boardFg(ctx.canvas)
+  const textCol = boardText(ctx.canvas)
   const m = MEDIA[medium.value]
   const A = 11
   const k = (2 * Math.PI) / 150
@@ -487,10 +489,10 @@ onBeforeUnmount(() => {
         <button class="btn" :class="{ 'btn-primary': mode === 'vacuum' }" @click="mode = 'vacuum'">真空罩</button>
         <button class="btn" :class="{ 'btn-primary': mode === 'wave' }" @click="mode = 'wave'">声波传播</button>
         <button v-if="mode === 'fork'" class="btn btn-primary" @click="swingFork">{{ vibr > 0.02 ? '再敲一下' : '敲击音叉' }}</button>
-        <button v-if="mode === 'wave'" class="btn btn-primary" @click="toggleWave">{{ wavePlay ? '⏸ 暂停' : '▶ 播放' }}</button>
+        <button v-if="mode === 'wave'" class="btn btn-primary" @click="toggleWave">{{ wavePlay ? '暂停' : '播放' }}</button>
         <button v-if="mode === 'vacuum'" class="btn btn-primary" @click="restore">放气</button>
         <button class="btn" @click="reset">重置</button>
-        <button class="btn" :class="{ 'btn-primary': muted }" @click="toggleMute">{{ muted ? '🔇 静音' : '🔊 音效开' }}</button>
+        <button class="btn" :class="{ 'btn-primary': muted }" @click="toggleMute">{{ muted ? '静音' : '音效开' }}</button>
         <span class="feedback" :class="completed ? 'ok' : 'no'">{{ hint }}</span>
         <FullscreenBtn />
       </div>

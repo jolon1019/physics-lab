@@ -1,4 +1,6 @@
 <script setup>
+import { boardFg, boardText } from '../../lib/boardText'
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
@@ -270,7 +272,7 @@ function drawMarker(L, f, color, num) {
   ctx.beginPath()
   ctx.arc(tip.x, tip.y, 4, 0, Math.PI * 2)
   ctx.fill()
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 12px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'bottom'
@@ -305,7 +307,7 @@ function drawProps(L) {
   ctx.beginPath()
   ctx.arc(sx, sy, 2.5, 0, Math.PI * 2)
   ctx.fill()
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '600 11px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
@@ -353,7 +355,7 @@ function drawOverlay() {
   ctx.fillStyle = 'rgba(255,255,255,0.82)'
   rr(12, 12, Math.min(W - 24, 360), 34, 8)
   ctx.fill()
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '600 13px system-ui, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'

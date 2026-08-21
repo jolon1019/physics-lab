@@ -1,4 +1,6 @@
 <script setup>
+import { boardFg, boardText } from '../../lib/boardText'
+
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
@@ -170,7 +172,7 @@ function drawCoil() {
   // 连接端（盖住导线）
   drawDot(n.coilTop)
   drawDot(n.coilBot)
-  ctx.fillStyle = '#3a3026'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '800 10px system-ui'
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle'
   ctx.fillText('螺线管', cx + rw + 4, topY + 2)
@@ -247,7 +249,7 @@ function drawElectrons(path, segsInfo) {
 function render() {
   if (!ctx || cssW === 0) return
   paintBoard(ctx, cssW, cssH, 'chalk')
-  ctx.fillStyle = '#050505'
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '800 13px system-ui'
   ctx.textAlign = 'left'; ctx.textBaseline = 'top'
   ctx.fillText('电磁铁电路 · 磁性 ∝ 电流 × 匝数（插入铁芯大幅增强）；用吸引大头针数比较磁性强弱（转换法）', 14, 12)
