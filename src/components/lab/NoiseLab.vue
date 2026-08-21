@@ -40,8 +40,13 @@ const echoCan = computed(() => echoTime.value >= 0.1)
 /* 汽车尺寸（按 car.png 原始 1:1 比例不拉伸，略微放大） */
 const CAR_W = 100
 
-/* 路面：贴底满铺，使车能坐在最下沿的路面之上，没有下方留白 */
-const ROAD_H = 56
+/* 路面：回到之前的条带状位置（路面顶距画布底 110px，不再贴死底边）；
+   路面下方填充地面色，避免路条像悬浮在画面中间、下方留白。
+   汽车按 car.png 实际车底（图像 y=299/400）对齐路面，
+   不再因底部 100px 透明留白而“悬空”在路面之上。 */
+const ROAD_H = 40
+const ROAD_TOP_GAP = 110          // groundY = CH - 110，路面顶在距画布底 110px 处
+const CAR_BOTTOM_FRAC = 299 / 400 // car.png 不透明车底占图像高度的纵向比例
 
 /* ============ 图片预加载 ============ */
 const carImg = new Image(); carImg.src = '/assets/lab/car.png'
@@ -99,11 +104,11 @@ function resetCarDemo() {
 /* ============ 交互 / 完成 ============ */
 const seen = { echo: false, carEcho: false }
 let completed = false
-const hint = ref('点「📯 按喇叭」或点击画面，汽车鸣笛后声波从山崖反射返回')
+const hint = ref('点「按喇叭」或点击画面，汽车鸣笛后声波从山崖反射返回')
 
 const actionLabel = computed(() => {
-  if (mode.value === 'echo') return wave.active ? '鸣笛中…' : '📯 按喇叭'
-  return carDemo.running ? '鸣笛中…' : carDemo.done ? '🔄 再演示一次' : '📯 按喇叭开始'
+  if (mode.value === 'echo') return wave.active ? '鸣笛中…' : '按喇叭'
+  return carDemo.running ? '鸣笛中…' : carDemo.done ? '再演示一次' : '按喇叭开始'
 })
 function runAction() {
   if (mode.value === 'echo') shout()
@@ -148,14 +153,14 @@ function reset() {
   resetCarDemo()
   hint.value = mode.value === 'car-echo'
     ? '设定车速，点「按喇叭」开始 3 秒演示'
-    : '点「📯 按喇叭」或点击画面，汽车鸣笛后声波从山崖反射返回'
+    : '点「按喇叭」或点击画面，汽车鸣笛后声波从山崖反射返回'
 }
 
 watch(mode, (m) => {
   resetCarDemo()
   hint.value = m === 'car-echo'
     ? '设定车速，点「按喇叭」开始 3 秒演示'
-    : '点「📯 按喇叭」或点击画面，汽车鸣笛后声波从山崖反射返回'
+    : '点「按喇叭」或点击画面，汽车鸣笛后声波从山崖反射返回'
 })
 
 /* ============ 画布初始化（响应式铺满） ============ */
@@ -167,7 +172,7 @@ function setupCanvas() {
 }
 let resizeObs = null
 function layout() {
-  groundY = CH - ROAD_H
+  groundY = CH - ROAD_TOP_GAP
   wallX = CW - 96
   cliffFaceX = wallX - 8
   personNearX = wallX - 130
@@ -211,36 +216,46 @@ function drawGround() {
   ctx.beginPath(); ctx.moveTo(0, groundY + 4); ctx.lineTo(CW, groundY + 4); ctx.stroke()
 }
 function drawRoad() {
-  // 路面：贴底铺满 groundY..CH（高 ROAD_H），下方不留空
   const patt = getRoadPatt()
   const ry = groundY
-  const rh = CH - ry
+  const rh = ROAD_H
+  const gy = ry + rh
+  // 路面下方填充地面色，避免路条像悬浮在画面中间、下方留白
+  ctx.fillStyle = '#10211a'
+  ctx.fillRect(0, gy, CW, CH - gy)
+  // 路面（路带平铺）
   ctx.fillStyle = patt || '#4a4a4a'
   ctx.fillRect(0, ry, CW, rh)
-  ctx.strokeStyle = 'rgba(225,238,228,0.55)'
-  ctx.lineWidth = 1.5
+  // 路面上下边缘线
+  ctx.strokeStyle = 'rgba(225,238,228,0.6)'; ctx.lineWidth = 1.5
   ctx.beginPath(); ctx.moveTo(0, ry); ctx.lineTo(CW, ry); ctx.stroke()
+  ctx.strokeStyle = 'rgba(225,238,228,0.32)'; ctx.lineWidth = 1
+  ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(CW, gy); ctx.stroke()
 }
 
-/* 汽车：car.png 保持原始宽高比不拉伸，x 为车身中心，底边贴地面 */
+/* 汽车：car.png 保持原始宽高比不拉伸，x 为车身中心，车轮“压”在路面上 */
 function drawCar(x, honking) {
   const cw = CAR_W
-  // 按原图比例计算高度，避免 92×68 把 400×400 的方图横向拉变形
+  // 按原图比例计算绘制高度（car.png 为 400×400 方图，不拉伸）
   const ch = (carImg.complete && carImg.naturalWidth)
     ? cw * (carImg.naturalHeight / carImg.naturalWidth)
     : cw
   const jx = honking ? Math.sin(frame * 0.7) * 1.4 : 0
+  // car.png 真实车底在图像 y=299/400 处；让该点落在 (路面顶 + overlap)，
+  // 即车轮略陷入路面、车“压”在路上而非悬空（图像底部还有 100px 透明留白）。
+  const overlap = 8
+  const yTop = groundY + overlap - CAR_BOTTOM_FRAC * ch
   if (carImg.complete && carImg.naturalWidth) {
-    ctx.drawImage(carImg, x - cw / 2 + jx, groundY - ch, cw, ch)
+    ctx.drawImage(carImg, x - cw / 2 + jx, yTop, cw, ch)
   } else {
     ctx.fillStyle = '#5b6570'
-    roundRectPath(x - cw / 2, groundY - cw, cw, cw - 18, 10); ctx.fill()
+    roundRectPath(x - cw / 2, yTop, cw, ch, 10); ctx.fill()
     ctx.strokeStyle = '#0b0b0b'; ctx.lineWidth = 2; ctx.stroke()
   }
-  // 鸣笛时喇叭波纹
+  // 鸣笛时喇叭波纹（从车头偏上位置发出）
   if (honking) {
     const hx = x + cw / 2 - 4
-    const hy = groundY - ch * 0.55
+    const hy = yTop + ch * 0.34
     ctx.strokeStyle = 'rgba(123,91,214,0.55)'; ctx.lineWidth = 2
     for (let i = 1; i <= 3; i++) {
       const r = i * 7 + (frame % 12)
@@ -323,10 +338,12 @@ function drawEchoMode() {
   ctx.fillText('17 m', person17X, groundY - 216)
   // 山崖
   drawCliffStatic()
-  // 距离标签（贴在路面上，白字带深色描边）
-  ctx.fillStyle = '#ffffff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-  ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 3
-  ctx.strokeText('d = ' + distance.value + ' m', px, groundY + ROAD_H - 12)
+  // 距离标签（路面下方地面色上，白字带深色描边，避开汽车）
+  ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+  ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 3
+  ctx.strokeText('d = ' + distance.value + ' m', px, groundY + ROAD_H + 14)
+  ctx.fillStyle = '#ffffff'
+  ctx.fillText('d = ' + distance.value + ' m', px, groundY + ROAD_H + 14)
   ctx.fillText('d = ' + distance.value + ' m', px, groundY + ROAD_H - 12)
   // 汽车（鸣笛时整体微抖 + 喇叭波纹）
   drawCar(px, wave.active && wave.prog < 0.12)
@@ -336,11 +353,11 @@ function drawEchoMode() {
   if (justEchoed.value && echoFlash > 0) {
     ctx.fillStyle = `rgba(123,91,214,${Math.min(1, echoFlash)})`
     ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
-    ctx.fillText('🔊 回声返回', px, groundY - 168)
+    ctx.fillText('回声返回', px, groundY - 168)
   }
   // 标题与说明
   ctx.fillStyle = cssVar('--text-h', '#111'); ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'
-  ctx.fillText('🚗 回声测距：汽车鸣笛，声波从山崖反射返回', 28, 22)
+  ctx.fillText('回声测距：汽车鸣笛，声波从山崖反射返回', 28, 22)
   ctx.fillStyle = cssVar('--text', '#555'); ctx.font = '13px sans-serif'
   const desc = wave.active
     ? (echoCan.value ? `回声时间 ${echoTime.value.toFixed(3)} s ≥ 0.1 s，能区分原声与回声` : '间隔 < 0.1 s，原声与回声重叠，听不清')
@@ -429,16 +446,16 @@ function drawCarEchoMode() {
   ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
   ctx.strokeStyle = 'rgba(0,0,0,0.55)'; ctx.lineWidth = 3
   const dTxt = 'd = ' + dNow.toFixed(0) + ' m'
-  ctx.strokeText(dTxt, carX, groundY + ROAD_H - 12)
+  ctx.strokeText(dTxt, carX, groundY + ROAD_H + 14)
   ctx.fillStyle = '#ffffff'
-  ctx.fillText(dTxt, carX, groundY + ROAD_H - 12)
+  ctx.fillText(dTxt, carX, groundY + ROAD_H + 14)
   // 标题与题面
   ctx.fillStyle = cssVar('--text-h', '#111'); ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top'
-  ctx.fillText('🚗 山崖回声测距（例题）', 28, 22)
+  ctx.fillText('回声测距（例题）', 28, 22)
   ctx.fillStyle = cssVar('--text', '#555'); ctx.font = '13px sans-serif'
   ctx.fillText('汽车以 v车 驶向山崖，按喇叭 3 s 后听到回声（声速 340 m/s），求听到回声时车与山崖的距离。', 28, 46)
   const status = carDemo.done
-    ? `✅ 3 s 后听到回声 —— 车距山崖 = ${dAtEcho.value.toFixed(0)} m`
+    ? `3 s 后听到回声 —— 车距山崖 = ${dAtEcho.value.toFixed(0)} m`
     : carDemo.running
       ? `已用时 ${carDemo.elapsed.toFixed(2)} s ／ 3.00 s`
       : `设定车速 ${carSpeed.value} m/s、声速 340 m/s，点「按喇叭」开始 3 s 演示`
@@ -508,9 +525,9 @@ onBeforeUnmount(() => {
       </div>
       <div class="lab-actions">
         <button class="btn" :class="{ 'btn-primary': mode === 'echo' }" @click="mode = 'echo'">回声测距</button>
-        <button class="btn" :class="{ 'btn-primary': mode === 'car-echo' }" @click="mode = 'car-echo'">🚗 山崖回声（例题）</button>
+        <button class="btn" :class="{ 'btn-primary': mode === 'car-echo' }" @click="mode = 'car-echo'">回声测距（例题）</button>
         <button v-if="mode === 'echo' || mode === 'car-echo'" class="btn btn-primary" @click="runAction">{{ actionLabel }}</button>
-        <button class="btn" :class="{ 'btn-primary': muted }" @click="muted = !muted">{{ muted ? '🔇 静音' : '🔊 音效开' }}</button>
+        <button class="btn" :class="{ 'btn-primary': muted }" @click="muted = !muted">{{ muted ? '静音' : '音效开' }}</button>
         <button class="btn" @click="reset">重置</button>
         <span class="feedback" :class="completed ? 'ok' : 'no'">{{ hint }}</span>
         <FullscreenBtn />
@@ -565,7 +582,7 @@ onBeforeUnmount(() => {
       </div>
 
       <FormulaPanel
-        :title="mode === 'echo' ? '回声测距' : '山崖回声测距（例题）'"
+        :title="mode === 'echo' ? '回声测距' : '回声测距（例题）'"
         :formula="mode === 'echo' ? 't = 2d / v（回声路程 = 2d）' : '2d₀ = v声·t + v车·t　→　d₁ = (v声 − v车)·t / 2'"
         :desc="mode === 'echo'
           ? '声音传播到障碍物再反射回来，路程为往返 2d；间隔 ≥ 0.1 s 才能区分原声与回声，对应 d ≥ 17 m。'
