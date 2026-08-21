@@ -51,23 +51,8 @@ const CAR_BOTTOM_FRAC = 299 / 400 // car.png 不透明车底占图像高度的�
 /* ============ 图片预加载 ============ */
 const carImg = new Image(); carImg.src = '/assets/lab/car.png'
 const roadImg = new Image(); roadImg.src = '/assets/lab/road.png'
-let roadPatt = null
-function getRoadPatt() {
-  if (!ctx) return null
-  if (!roadPatt && roadImg.complete && roadImg.naturalWidth) {
-    // road.png 是 400×400，路带在 y=164..281 区域；
-    // 若直接 createPattern 全图，fillRect 只看到顶部黑色。
-    // 先把路带裁出来并缩放到与路面同高 (ROAD_H)，再以这个 400×ROAD_H 的
-    // 离屏画布作为 pattern 源，沿 x 重复铺满整条路面。
-    const strip = document.createElement('canvas')
-    strip.width = 400
-    strip.height = ROAD_H
-    const sctx = strip.getContext('2d')
-    sctx.drawImage(roadImg, 0, 164, 400, 118, 0, 0, 400, ROAD_H)
-    roadPatt = ctx.createPattern(strip, 'repeat')
-  }
-  return roadPatt
-}
+/* 声波交互：点击"鸣笛"或点击画布，生成一个向前运动、遇崖反射返回的声波包 */
+
 
 /* 声波交互：点击"鸣笛"或点击画布，生成一个向前运动、遇崖反射返回的声波包 */
 let wave = { active: false, prog: 0, frames: 150, path: 1 }
@@ -178,7 +163,6 @@ function layout() {
   personNearX = wallX - 130
   personFarX = 120
   person17X = personXAt(17)
-  roadPatt = null // 容器尺寸变了，重建 pattern
 }
 function resizeCanvas() {
   const canvas = canvasRef.value
@@ -216,16 +200,26 @@ function drawGround() {
   ctx.beginPath(); ctx.moveTo(0, groundY + 4); ctx.lineTo(CW, groundY + 4); ctx.stroke()
 }
 function drawRoad() {
-  const patt = getRoadPatt()
   const ry = groundY
   const rh = ROAD_H
   const gy = ry + rh
   // 路面下方填充地面色，避免路条像悬浮在画面中间、下方留白
   ctx.fillStyle = '#10211a'
   ctx.fillRect(0, gy, CW, CH - gy)
-  // 路面（路带平铺）
-  ctx.fillStyle = patt || '#4a4a4a'
-  ctx.fillRect(0, ry, CW, rh)
+  // 路面：把 road.png 的路带（源 y=164..281，高 118px）显式平铺为
+  // 400×ROAD_H 的瓦片，每个瓦片“顶边”对齐路面顶 ry。这样纹理只沿 x 重复，
+  // 垂直方向零相位偏移——无论容器高度如何，路面“上边缘”永远是路带顶、
+  // “下边缘”永远是路带底，彻底消除之前 createPattern 锚定画布原点导致的
+  // “下边缘显示在上边缘”错位。
+  if (roadImg.complete && roadImg.naturalWidth) {
+    const TILE_W = 400, SRC_Y = 164, SRC_H = 118
+    for (let x = 0; x < CW; x += TILE_W) {
+      ctx.drawImage(roadImg, 0, SRC_Y, TILE_W, SRC_H, x, ry, TILE_W, rh)
+    }
+  } else {
+    ctx.fillStyle = '#4a4a4a'
+    ctx.fillRect(0, ry, CW, rh)
+  }
   // 路面上下边缘线
   ctx.strokeStyle = 'rgba(225,238,228,0.6)'; ctx.lineWidth = 1.5
   ctx.beginPath(); ctx.moveTo(0, ry); ctx.lineTo(CW, ry); ctx.stroke()
