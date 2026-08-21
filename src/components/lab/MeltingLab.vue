@@ -6,85 +6,41 @@ import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
 import FullscreenBtn from './FullscreenBtn.vue'
+import MeltLamp     from './melt/MeltLamp.vue'
+import MeltBeaker   from './melt/MeltBeaker.vue'
+import MeltTube     from './melt/MeltTube.vue'
+import MeltThermo   from './melt/MeltThermo.vue'
+import MeltStand    from './melt/MeltStand.vue'
+import MeltHeatFlow from './melt/MeltHeatFlow.vue'
+import './melt/melt.css'
 
 const emit = defineEmits(['complete'])
 
-// ===== 装置素材（cartoon 风格 PNG；用 /assets/lab/* 静态直链）=====
-const standImg    = new Image(); standImg.src   = '/assets/lab/sancengzhijia.png'
-const beakerImg   = new Image(); beakerImg.src  = '/assets/lab/shaobei.png'
-// 试管按状态切换：空 / 固（晶粒）/ 融化 / 沸腾
-const tubeImgKong    = new Image(); tubeImgKong.src    = '/assets/lab/shiguan-kong.png'
-const tubeImgGu      = new Image(); tubeImgGu.src      = '/assets/lab/shiguan-gu.png'
-const tubeImgRong    = new Image(); tubeImgRong.src    = '/assets/lab/shiguan-rong.png'
-const tubeImgFeiteng = new Image(); tubeImgFeiteng.src = '/assets/lab/shiguan-feiteng.png'
-const thermoImg      = new Image(); thermoImg.src  = '/assets/lab/wenduji.png'
-const lampOffImg     = new Image(); lampOffImg.src = '/assets/lab/jiujingdeng-off.png'
-const lampOnImg      = new Image(); lampOnImg.src  = '/assets/lab/jiujingdeng-on.png'
-
-// 各素材不透明 bbox（用 PIL alpha.bbox() 测得），用于按需缩放时保持内容宽高比 & 底边对齐。
-// 格式：[opaqueBotY, opaqueW, opaqueH]
-//   opaqueBotY 源图像内不透明区域底部 y（像素），与 400×400 帧顶的距离
-//   opaqueW/H  不透明区域的宽高
-// 拿掉透明 padding 后只剩实际可见物件，按 opaqueW/H 算缩放，再用 opaqueBotY 把图实际底部对齐到 baseline。
-const IMG_META = {
-  stand:    [389, 226, 389],   // 三脚铁架台
-  beaker:   [388, 291, 370],   // 烧杯
-  tubeKong:    [394, 126, 385],   // 试管（空）
-  tubeGu:      [394, 130, 385],   // 试管（底部晶体颗粒）
-  tubeRong:    [394, 131, 385],   // 试管（液态+少量气泡）
-  tubeFeiteng: [394, 147, 394],   // 试管（沸腾：蒸汽+液面+气泡）
-  thermo:   [388, 144, 384],   // 温度计
-  lampOff:  [390, 253, 247],   // 酒精灯（关）
-  lampOn:   [390, 253, 368],   // 酒精灯（开，含火焰）
-}
-// 试管图与 meta 的快速映射表（用 'tube' + 当前阶段 key 取 img/meta）
-const TUBE_MAP = {
-  kong:    { img: tubeImgKong,    meta: IMG_META.tubeKong },
-  gu:      { img: tubeImgGu,      meta: IMG_META.tubeGu },
-  rong:    { img: tubeImgRong,    meta: IMG_META.tubeRong },
-  feiteng: { img: tubeImgFeiteng, meta: IMG_META.tubeFeiteng },
-}
-
-// 按 (state, 物质, 当前温度) 选 试管阶段
+// 试管 4 阶段判定：按 (state, 物质, 当前温度) 选 kong/gu/rong/feiteng
 function pickTubePhase() {
-  // 开始加热前：晶体展示晶粒在管底；非晶（石蜡）显示空管（无定形晶粒视觉）
   if (state.value === 'ready') return isCrystal.value ? 'gu' : 'kong'
   const T = temp.value
   if (isCrystal.value) {
-    // 海波（晶体）：未到熔点 → 晶粒；熔点±几℃ → 融化；超过 65℃ → 沸腾示意
     if (T < MELT - 1) return 'gu'
     if (T < 65) return 'rong'
     return 'feiteng'
   }
-  // 石蜡（非晶）：< 软化区 → 空管；融化 → 液态；> 65 → 沸腾示意
   if (T < T_START.wax) return 'kong'
   if (T < 65) return 'rong'
   return 'feiteng'
-}
-
-// 放置素材图：把不透明底边对齐到 baseline，居中于 xCenter；按目标内容宽 targetContentW 缩放。
-// 返回 {x, y, w, h}（逻辑坐标），未加载 / 参数缺失返回 null。name 用于编辑器命中测试。
-function placeAsset(img, meta, xCenter, baseline, targetContentW, name) {
-  if (xCenter == null || baseline == null || !targetContentW) return null
-  if (!img.complete || !img.naturalWidth) return null
-  const [opaqueBotY, opaqueW, opaqueH] = meta
-  const scale = targetContentW / opaqueW
-  const drawW = 400 * scale        // 整张 400×400 帧绘制宽（包含透明 padding）
-  const drawH = 400 * scale        // 高
-  const drawX = xCenter - drawW / 2
-  const drawY = baseline - opaqueBotY * scale
-  ctx.drawImage(img, drawX, drawY, drawW, drawH)
-  const rect = { x: drawX, y: drawY, w: drawW, h: drawH, cx: xCenter, baseline }
-  if (name) lastRects[name] = rect
-  return rect
 }
 
 // ===== 摆放编辑器（editMode 下可拖动 / 滚轮缩放每个元件）=====
 // 每个元件用绝对逻辑坐标 {x:中心x, baseline:底部y, w:内容宽} 描述，便于手动微调。
 const editMode = ref(false)
 const selected = ref('stand')          // 当前选中的元件
-const layout = reactive({})            // 各元件坐标（drawSetup 直接使用）
-const lastRects = {}                   // 每帧绘制后记录实际矩形，用于命中测试 & 高亮
+const layout = reactive({              // 各元件坐标（SVG 组件直接读取）
+  stand:  { x: 0, baseline: 0, w: 0 },
+  beaker: { x: 0, baseline: 0, w: 0 },
+  tube:   { x: 0, baseline: 0, w: 0 },
+  thermo: { x: 0, baseline: 0, w: 0 },
+  lamp:   { x: 0, baseline: 0, w: 0 },
+})
 const LS_KEY = 'emelt-layout-v1'       // 已保存摆放的 localStorage 键
 const savedLayout = ref(null)          // 用户保存过的固定布局（优先于自适应）
 // 编辑器内实时显示 / 复制用：随 layout 与画布尺寸自动更新
@@ -254,60 +210,54 @@ function rr(x, y, w, h, r) {
   ctx.closePath()
 }
 
-// 左侧实验装置（cartoon PNG 拼接）：铁架台 + 酒精灯 + 烧杯 + 试管 + 温度计
-// 所有元件位置来自 layout（编辑模式下可手动拖动 / 缩放）
+// 左侧实验装置：现由 SVG 组件渲染（melt/*），仅在 canvas 画物质标签。
 function drawSetup(L) {
-  // 1) 三脚铁架台：底部贴 baseline（先画，最深）
-  placeAsset(standImg, IMG_META.stand, layout.stand.x, layout.stand.baseline, layout.stand.w, 'stand')
-
-  // 2) 烧杯
-  const beakerRect = placeAsset(beakerImg, IMG_META.beaker, layout.beaker.x, layout.beaker.baseline, layout.beaker.w, 'beaker')
-
-  // 3) 试管：按 (state, 物质, 温度) 选 空/固/融/沸 之一，底部仍对齐 layout.tube.baseline
-  const phase = pickTubePhase()
-  const tubeSel = TUBE_MAP[phase] || TUBE_MAP.kong
-  const tubeRect = placeAsset(tubeSel.img, tubeSel.meta, layout.tube.x, layout.tube.baseline, layout.tube.w, 'tube')
-
-  // 4) 温度计：紧贴试管右侧
-  const thermoRect = placeAsset(thermoImg, IMG_META.thermo, layout.thermo.x, layout.thermo.baseline, layout.thermo.w, 'thermo')
-
-  // 5) 酒精灯（离立柱有一定间距）：底部贴 baseline
-  const isOn = state.value === 'running' || state.value === 'done'
-  const lampImg = isOn ? lampOnImg : lampOffImg
-  const lampMeta = isOn ? IMG_META.lampOn : IMG_META.lampOff
-  placeAsset(lampImg, lampMeta, layout.lamp.x, layout.lamp.baseline, layout.lamp.w, 'lamp')
-
-  // 6) 汞柱动态显示：图片加载完成前不画（避免 null.y）
-  if (thermoRect) {
-    const thermoScale = thermoRect.w / 400
-    const bulbY0 = thermoRect.y + 350 * thermoScale   // 汞泡顶
-    const bulbY1 = thermoRect.y + 388 * thermoScale   // 汞泡底（=温度计可见底）
-    const mercuryTopY = bulbY0 - (bulbY0 - (thermoRect.y + 20 * thermoScale)) * clamp((temp.value - Tmin) / (Tmax - Tmin), 0, 1)
-    ctx.fillStyle = '#e0584f'
-    ctx.fillRect(thermoRect.x + thermoRect.w / 2 - 3, mercuryTopY, 6, bulbY1 - mercuryTopY)
-    ctx.strokeStyle = 'rgba(60,30,30,0.45)'
-    ctx.lineWidth = 1
-    ctx.strokeRect(thermoRect.x + thermoRect.w / 2 - 3, mercuryTopY, 6, bulbY1 - mercuryTopY)
-  }
-
-  // 7) 物质标签（在铁架台脚下）
   ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
   ctx.fillText(isCrystal.value ? '海波' : '石蜡', layout.stand.x, layout.stand.baseline + 14)
+}
 
-  // 8) 编辑器高亮：选中元件画虚线框
-  if (editMode.value && selected.value && lastRects[selected.value]) {
-    const r = lastRects[selected.value]
-    ctx.save()
-    ctx.strokeStyle = '#ffcf33'
-    ctx.lineWidth = 2
-    ctx.setLineDash([6, 4])
-    ctx.strokeRect(r.x - 4, r.y - 4, r.w + 8, r.h + 8)
-    ctx.restore()
+// ===== 装置状态（供模板用） =====
+const phase = computed(() => pickTubePhase())
+const isOn  = computed(() => state.value === 'running' || state.value === 'done')
+function onLampToggle(next) {
+  // 仅在未开始时允许手动切换；开始/停止仍走下方按钮
+  if (state.value === 'ready') {
+    if (next) startRun()   // 点灯 = 开始加热
+    else      hint.value = '点击「开始加热」或再次点击酒精灯'
+  } else if (state.value === 'running') {
+    stopRun()              // 灭火 = 停止
+  } else {
+    // done 状态：再点 = 重置后开始
+    if (next) {
+      resetAll()
+      startRun()
+    }
   }
 }
+// ===== 热流箭头关键点（从各装置的 layout / viewBox 推算） =====
+const rigW = computed(() => canvasRef.value ? canvasRef.value.clientWidth : 880)
+const rigH = computed(() => canvasRef.value ? canvasRef.value.clientHeight : 520)
+const flameX = computed(() => layout.lamp.x)
+const flameY = computed(() => {
+  // 酒精灯火焰顶 y：lamp SVG 高 = 2*w，火焰在 SVG 顶端 ~ y=14（viewBox 100×200）
+  const h = layout.lamp.w * 2
+  return layout.lamp.baseline - h + (14 / 200) * h
+})
+const beakerX = computed(() => layout.beaker.x)
+const beakerTopY = computed(() => {
+  // 烧杯高 = w * 150/200 = 0.75w；杯顶距 SVG 顶 28px（viewBox 200×150）
+  const h = layout.beaker.w * 0.75
+  return layout.beaker.baseline - h + (28 / 150) * h
+})
+const tubeX = computed(() => layout.tube.x)
+const tubeMidY = computed(() => {
+  // 试管高 = w * 360/100 = 3.6w；液面 y 在 SVG 中 120（feiteng 时）
+  const h = layout.tube.w * 3.6
+  return layout.tube.baseline - h + (120 / 360) * h
+})
 
 // 右侧 T-t 图
 function drawGraph(L) {
@@ -420,6 +370,7 @@ function render() {
 }
 
 // ===== 摆放编辑器：交互（拖动 / 滚轮缩放 / 方向键微调）=====
+// 每个装置组件 emit @pointerdown(name, e) → 这里路由；拖动改用 window-level 监听，绕开 SVG 自身 capture 的坑。
 let dragging = false
 let dragStart = null
 
@@ -427,36 +378,27 @@ function toLogical(e) {
   const rect = canvasRef.value.getBoundingClientRect()
   return { x: e.clientX - rect.left, y: e.clientY - rect.top }
 }
-function hitTest(lx, ly) {
-  // 逆向绘制顺序：后画的在上层
-  const order = ['lamp', 'thermo', 'tube', 'beaker', 'stand']
-  for (const name of order) {
-    const r = lastRects[name]
-    if (!r) continue
-    if (lx >= r.x && lx <= r.x + r.w && ly >= r.y && ly <= r.y + r.h) return name
-  }
-  return null
-}
-function onPointerDown(e) {
+function onPiecePointerDown(name, e) {
   if (!editMode.value) return
   const { x, y } = toLogical(e)
-  const name = hitTest(x, y)
-  if (name) {
-    selected.value = name
-    dragging = true
-    dragStart = { name, lx: x, ly: y, x: layout[name].x, baseline: layout[name].baseline }
-    try { canvasRef.value.setPointerCapture?.(e.pointerId) } catch (_) {}
-  }
+  selected.value = name
+  dragging = true
+  dragStart = { name, lx: x, ly: y, x: layout[name].x, baseline: layout[name].baseline }
+  // 不在 SVG 内部 setPointerCapture，改用 window 监听 pointermove/pointerup（更稳）
+  window.addEventListener('pointermove', onWinPointerMove)
+  window.addEventListener('pointerup',   onWinPointerUp,   { once: true })
+  window.addEventListener('pointercancel', onWinPointerUp, { once: true })
 }
-function onPointerMove(e) {
-  if (!editMode.value || !dragging || !dragStart) return
+function onWinPointerMove(e) {
+  if (!dragging || !dragStart) return
   const { x, y } = toLogical(e)
   layout[dragStart.name].x = dragStart.x + (x - dragStart.lx)
   layout[dragStart.name].baseline = dragStart.baseline + (y - dragStart.ly)
 }
-function onPointerUp() {
+function onWinPointerUp() {
   dragging = false
   dragStart = null
+  window.removeEventListener('pointermove', onWinPointerMove)
 }
 function onWheel(e) {
   if (!editMode.value || !selected.value) return
@@ -580,6 +522,9 @@ onBeforeUnmount(() => {
   if (raf) cancelAnimationFrame(raf)
   if (resizeObs) resizeObs.disconnect()
   window.removeEventListener('keydown', onKey)
+  window.removeEventListener('pointermove', onWinPointerMove)
+  window.removeEventListener('pointerup', onWinPointerUp)
+  window.removeEventListener('pointercancel', onWinPointerUp)
 })
 </script>
 
@@ -590,12 +535,52 @@ onBeforeUnmount(() => {
         <canvas
           ref="canvasRef"
           style="display:block;width:100%;height:520px;touch-action:none;border-radius:8px"
-          @pointerdown="onPointerDown"
-          @pointermove="onPointerMove"
-          @pointerup="onPointerUp"
-          @pointerleave="onPointerUp"
-          @wheel="onWheel"
         ></canvas>
+
+        <!-- 装置区（SVG 组件层），绝对覆盖在 canvas 之上；自身不处理滚轮，由 .melt-rig 统一接管 -->
+        <div
+          class="melt-rig"
+          style="position:absolute;inset:0;height:520px"
+          @wheel="onWheel"
+        >
+          <MeltStand
+            :x="layout.stand.x" :baseline="layout.stand.baseline" :w="layout.stand.w"
+            :selected="selected === 'stand'" :edit-mode="editMode"
+            @pointerdown="(e) => onPiecePointerDown('stand', e)"
+          />
+          <MeltBeaker
+            :x="layout.beaker.x" :baseline="layout.beaker.baseline" :w="layout.beaker.w"
+            :hot="isOn"
+            :selected="selected === 'beaker'" :edit-mode="editMode"
+            @pointerdown="(e) => onPiecePointerDown('beaker', e)"
+          />
+          <MeltLamp
+            :x="layout.lamp.x" :baseline="layout.lamp.baseline" :w="layout.lamp.w"
+            :on="isOn"
+            :selected="selected === 'lamp'" :edit-mode="editMode"
+            @pointerdown="(e) => onPiecePointerDown('lamp', e)"
+            @toggle="onLampToggle"
+          />
+          <MeltTube
+            :x="layout.tube.x" :baseline="layout.tube.baseline" :w="layout.tube.w"
+            :phase="phase" :temp="temp"
+            :selected="selected === 'tube'" :edit-mode="editMode"
+            @pointerdown="(e) => onPiecePointerDown('tube', e)"
+          />
+          <MeltThermo
+            :x="layout.thermo.x" :baseline="layout.thermo.baseline" :w="layout.thermo.w"
+            :temp="temp" :t-min="Tmin" :t-max="Tmax"
+            :selected="selected === 'thermo'" :edit-mode="editMode"
+            @pointerdown="(e) => onPiecePointerDown('thermo', e)"
+          />
+          <MeltHeatFlow
+            v-if="isOn"
+            :W="rigW" :H="rigH"
+            :lamp-flame-x="flameX" :lamp-flame-y="flameY"
+            :beaker-x="beakerX" :beaker-top-y="beakerTopY"
+            :tube-x="tubeX" :tube-mid-y="tubeMidY"
+          />
+        </div>
 
         <!-- 摆放编辑器浮层 -->
         <div v-if="editMode" class="pos-editor">
