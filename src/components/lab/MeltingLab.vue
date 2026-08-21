@@ -9,6 +9,42 @@ import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 
+// ===== 装置素材（cartoon 风格 PNG；用 /assets/lab/* 静态直链）=====
+const standImg    = new Image(); standImg.src   = '/assets/lab/sancengzhijia.png'
+const beakerImg   = new Image(); beakerImg.src  = '/assets/lab/shaobei.png'
+const tubeImg     = new Image(); tubeImg.src    = '/assets/lab/shiguan.png'
+const thermoImg   = new Image(); thermoImg.src  = '/assets/lab/wenduji.png'
+const lampOffImg  = new Image(); lampOffImg.src = '/assets/lab/jiujingdeng-off.png'
+const lampOnImg   = new Image(); lampOnImg.src  = '/assets/lab/jiujingdeng-on.png'
+
+// 各素材不透明 bbox（用 PIL alpha.bbox() 测得），用于按需缩放时保持内容宽高比 & 底边对齐。
+// 格式：[opaqueBotY, opaqueW, opaqueH]
+//   opaqueBotY 源图像内不透明区域底部 y（像素），与 400×400 帧顶的距离
+//   opaqueW/H  不透明区域的宽高
+// 拿掉透明 padding 后只剩实际可见物件，按 opaqueW/H 算缩放，再用 opaqueBotY 把图实际底部对齐到 baseline。
+const IMG_META = {
+  stand:    [389, 226, 389],   // 三脚铁架台
+  beaker:   [388, 291, 370],   // 烧杯
+  tube:     [389, 125, 375],   // 试管
+  thermo:   [388, 144, 384],   // 温度计
+  lampOff:  [390, 253, 247],   // 酒精灯（关）
+  lampOn:   [390, 253, 368],   // 酒精灯（开，含火焰）
+}
+
+// 放置素材图：把不透明底边对齐到 baseline，居中于 xCenter；按目标内容宽 targetContentW 缩放。
+// 返回 {x, y, w, h}（逻辑坐标），未加载返回 null。
+function placeAsset(img, meta, xCenter, baseline, targetContentW) {
+  if (!img.complete || !img.naturalWidth) return null
+  const [opaqueBotY, opaqueW, opaqueH] = meta
+  const scale = targetContentW / opaqueW
+  const drawW = 400 * scale        // 整张 400×400 帧绘制宽（包含透明 padding）
+  const drawH = 400 * scale        // 高
+  const drawX = xCenter - drawW / 2
+  const drawY = baseline - opaqueBotY * scale
+  ctx.drawImage(img, drawX, drawY, drawW, drawH)
+  return { x: drawX, y: drawY, w: drawW, h: drawH }
+}
+
 // ===== 可调变量 =====
 const material = ref('sea') // 'sea' 海波(晶体) | 'wax' 石蜡(非晶体)
 const heatRate = ref(50) // 加热功率 0~100，影响升温快慢
@@ -113,104 +149,59 @@ function rr(x, y, w, h, r) {
   ctx.closePath()
 }
 
-// 左侧实验装置：铁架台 + 烧杯 + 水浴 + 试管 + 温度计 + 酒精灯
+// 左侧实验装置（cartoon PNG 拼接）：铁架台 + 酒精灯 + 烧杯 + 试管 + 温度计
 function drawSetup(L) {
   const cx = L.W * 0.27
   const baseY = L.H - 70
-  // 铁架台底座
-  ctx.fillStyle = '#8a8f98'
-  rr(cx - 60, baseY, 120, 12, 4)
-  ctx.fill()
-  ctx.fillRect(cx - 4, baseY - 150, 8, 150)
-  // 酒精灯
-  const lampX = cx - 70
-  const lampY = baseY + 6
-  ctx.fillStyle = '#c4453d'
-  rr(lampX, lampY, 34, 28, 6)
-  ctx.fill()
-  ctx.fillStyle = '#7a7a7a'
-  rr(lampX + 12, lampY - 8, 10, 8, 3)
-  ctx.fill()
-  // 火焰（加热时）
-  if (state.value === 'running' || state.value === 'done') {
-    ctx.fillStyle = '#f5a623'
-    ctx.beginPath()
-    ctx.moveTo(lampX + 17, lampY - 8)
-    ctx.quadraticCurveTo(lampX + 26, lampY - 26, lampX + 17, lampY - 34)
-    ctx.quadraticCurveTo(lampX + 8, lampY - 26, lampX + 17, lampY - 8)
-    ctx.fill()
+
+  // 1) 三脚铁架台：底部贴 baseY（先画，最深）
+  const standW = Math.min(86, L.W * 0.13)
+  placeAsset(standImg, IMG_META.stand, cx, baseY, standW)
+
+  // 2) 烧杯：坐在铁架台中环上（baseY − 130）
+  const beakerBottomY = baseY - 130
+  const beakerW = Math.min(110, L.W * 0.16)
+  const beakerRect = placeAsset(beakerImg, IMG_META.beaker, cx, beakerBottomY, beakerW)
+
+  // 3) 试管：底部浸入烧杯水面下 ≈ 烧杯底部（让液面看到试管沉底）
+  const tubeCx = cx - 12      // 试管略偏左
+  const tubeBottomY = beakerBottomY + 4   // 试管底在烧杯底外侧 ~4，使试管沉到底
+  const tubeW = Math.min(38, beakerW * 0.32)
+  const tubeRect = placeAsset(tubeImg, IMG_META.tube, tubeCx, tubeBottomY, tubeW)
+
+  // 4) 温度计：紧贴试管右侧，汞泡在试管下方内
+  const thermoW = Math.min(26, beakerW * 0.22)
+  const thermoCx = cx + (tubeW / 2) + (thermoW / 2) + 2
+  const thermoBottomY = tubeRect ? tubeRect.y + tubeRect.h * 0.7 : tubeBottomY - 60
+  const thermoRect = placeAsset(thermoImg, IMG_META.thermo, thermoCx, thermoBottomY, thermoW)
+
+  // 5) 酒精灯（左下），离立柱有一定间距：底部贴 baseY
+  const lampCx = Math.max(60, cx - standW * 0.85)
+  const isOn = state.value === 'running' || state.value === 'done'
+  const lampImg = isOn ? lampOnImg : lampOffImg
+  const lampMeta = isOn ? IMG_META.lampOn : IMG_META.lampOff
+  const lampW = Math.min(46, L.W * 0.07)
+  placeAsset(lampImg, lampMeta, lampCx, baseY, lampW)
+
+  // 6) 汞柱动态显示：图片加载完成前不画（避免 null.y）
+  if (thermoRect) {
+    const thermoScale = thermoRect.w / 400
+    const bulbY0 = thermoRect.y + 350 * thermoScale   // 汞泡顶
+    const bulbY1 = thermoRect.y + 388 * thermoScale   // 汞泡底（=温度计可见底）
+    const mercuryTopY = bulbY0 - (bulbY0 - (thermoRect.y + 20 * thermoScale)) * clamp((temp.value - Tmin) / (Tmax - Tmin), 0, 1)
+    ctx.fillStyle = '#e0584f'
+    ctx.fillRect(thermoRect.x + thermoRect.w / 2 - 3, mercuryTopY, 6, bulbY1 - mercuryTopY)
+    ctx.strokeStyle = 'rgba(60,30,30,0.45)'
+    ctx.lineWidth = 1
+    ctx.strokeRect(thermoRect.x + thermoRect.w / 2 - 3, mercuryTopY, 6, bulbY1 - mercuryTopY)
   }
-  // 烧杯（水浴）
-  const bw = 120
-  const bx = cx - bw / 2 + 4
-  const by = baseY - 110
-  const bh = 96
-  ctx.fillStyle = 'rgba(180,210,235,0.55)'
-  rr(bx, by, bw, bh, 8)
-  ctx.fill()
-  ctx.strokeStyle = 'rgba(80,90,110,0.6)'
-  ctx.lineWidth = 2
-  rr(bx, by, bw, bh, 8)
-  ctx.stroke()
-  // 水浴水面波纹
-  ctx.strokeStyle = 'rgba(90,140,200,0.5)'
-  ctx.lineWidth = 1.5
-  ctx.beginPath()
-  for (let x = bx + 6; x < bx + bw - 6; x += 6) {
-    const yy = by + 14 + Math.sin((x + (state.value === 'running' ? performance.now() / 200 : 0)) / 10) * 2
-    if (x === bx + 6) ctx.moveTo(x, yy)
-    else ctx.lineTo(x, yy)
-  }
-  ctx.stroke()
-  // 试管（装固体）
-  const tw = 26
-  const tx = cx - tw / 2 + 4
-  const ty = by - 6
-  const th = 70
-  ctx.fillStyle = 'rgba(255,255,255,0.85)'
-  rr(tx, ty, tw, th, 6)
-  ctx.fill()
-  ctx.strokeStyle = 'rgba(80,90,110,0.7)'
-  ctx.lineWidth = 2
-  rr(tx, ty, tw, th, 6)
-  ctx.stroke()
-  // 固体（熔化状态：晶体在平台期为固液共存）
-  const melted = isCrystal.value ? tNow.value >= 4 && tNow.value < 8 : tNow.value > 6
-  ctx.fillStyle = melted ? '#e0b34f' : '#caa24a'
-  rr(tx + 4, ty + th - 30, tw - 8, 26, 4)
-  ctx.fill()
-  if (melted) {
-    ctx.fillStyle = 'rgba(224,179,79,0.5)'
-    ctx.fillRect(tx + 4, ty + 18, tw - 8, th - 46)
-  }
-  // 温度计插入试管
-  const tgx = tx + tw / 2
-  const tgy0 = ty - 40
-  const tgy1 = ty + th - 18
-  ctx.strokeStyle = 'rgba(80,90,110,0.7)'
-  ctx.lineWidth = 4
-  ctx.beginPath()
-  ctx.moveTo(tgX(tgx), tgy0)
-  ctx.lineTo(tgX(tgx), tgy1)
-  ctx.stroke()
-  // 汞柱位置
-  const f = clamp((temp.value - Tmin) / (Tmax - Tmin), 0, 1)
-  const my = tgy1 - (tgy1 - tgy0) * f
-  ctx.strokeStyle = '#e0584f'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(tgX(tgx), my)
-  ctx.lineTo(tgX(tgx), tgy1)
-  ctx.stroke()
-  // 标签
+
+  // 7) 物质标签（在铁架台脚下）
   ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
-  ctx.fillText(isCrystal.value ? '海波' : '石蜡', cx, baseY + 20)
-}
-function tgX(x) {
-  return x
+  ctx.fillText(isCrystal.value ? '海波' : '石蜡', cx, baseY + 14)
 }
 
 // 右侧 T-t 图
