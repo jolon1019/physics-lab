@@ -76,6 +76,41 @@ export function createTone({ freq = 440, volume = 0.3, type = 'sine', harmonics 
   }
 }
 
+// 音叉敲击音：接近真实的“衰减音”（正弦为主、时长有限、自然淡出），
+// 避免持续恒定音量的拖长感与刺耳感
+export function playForkTone({ peak = 0.25 } = {}) {
+  const c = ensureAudio()
+  if (!c) return null
+  const now = c.currentTime
+  const osc = c.createOscillator()
+  osc.type = 'sine' // 音叉接近纯正弦，最不刺耳
+  osc.frequency.value = 440
+  const g = c.createGain()
+  g.gain.setValueAtTime(0.0001, now)
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), now + 0.012)
+  g.gain.exponentialRampToValueAtTime(0.0001, now + 1.8) // 约 1.8s 自然衰减，不会拖长
+  osc.connect(g)
+  g.connect(masterGain)
+  osc.start(now)
+  osc.stop(now + 2.0)
+  let stopped = false
+  return {
+    stop() {
+      if (stopped) return
+      stopped = true
+      try {
+        g.gain.cancelScheduledValues(c.currentTime)
+        g.gain.setTargetAtTime(0.0001, c.currentTime, 0.05)
+        setTimeout(() => {
+          try {
+            osc.stop()
+          } catch (e) {}
+        }, 300)
+      } catch (e) {}
+    }
+  }
+}
+
 // 噪声（white / brown）
 export function playNoise({ duration = 1.2, volume = 0.3, type = 'white', cutoff = null } = {}) {
   const c = ensureAudio()

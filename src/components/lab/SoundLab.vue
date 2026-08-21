@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
-import { createTone, playTone } from '../../lib/audio'
+import { playForkTone, playTone } from '../../lib/audio'
 import { paintBoard } from '../../lib/boardBg'
 import { boardTheme } from '../../lib/boardTheme'
 import FullscreenBtn from './FullscreenBtn.vue'
@@ -110,8 +110,8 @@ function ringOnce() {
   if (muted.value || mode.value !== 'vacuum') return
   if (volume.value < 12) return
   const vol = Math.min(1, Math.max(0.05, (volume.value - 8) / 90))
-  playTone({ freq: 880, duration: 0.32, volume: 0.22 * vol, type: 'square' })
-  setTimeout(() => playTone({ freq: 620, duration: 0.32, volume: 0.16 * vol, type: 'square' }), 140)
+  playTone({ freq: 880, duration: 0.26, volume: 0.14 * vol, type: 'triangle' })
+  setTimeout(() => playTone({ freq: 620, duration: 0.30, volume: 0.10 * vol, type: 'triangle' }), 130)
 }
 function startBell() {
   stopBell()
@@ -139,7 +139,7 @@ function swingFork() {
   forkTone?.stop()
   forkTone = muted.value
     ? null
-    : createTone({ freq: 440, volume: 0.06 + (strike.value / 100) * 0.35, harmonics: [1, 0.12] })
+    : playForkTone({ peak: 0.05 + (strike.value / 100) * 0.22 })
   if (vibr.value > 0.6) seen.hit = true
   hint.value = '音叉振动 → 乒乓球被弹开：用看得见的摆动“放大”显示看不见的振动（转换法）'
   tryComplete()
@@ -150,7 +150,7 @@ function toggleMute() {
     forkTone?.stop()
     forkTone = null
   } else if (vibr.value > 0.02) {
-    forkTone = createTone({ freq: 440, volume: 0.06 + (strike.value / 100) * 0.35, harmonics: [1, 0.12] })
+    forkTone = playForkTone({ peak: 0.05 + (strike.value / 100) * 0.22 })
   }
 }
 function pumpOn() {
