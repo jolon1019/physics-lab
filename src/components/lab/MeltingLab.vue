@@ -6,15 +6,37 @@ import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
 import FullscreenBtn from './FullscreenBtn.vue'
-import MeltLamp     from './melt/MeltLamp.vue'
-import MeltBeaker   from './melt/MeltBeaker.vue'
-import MeltTube     from './melt/MeltTube.vue'
+import MeltPieceImg from './melt/MeltPieceImg.vue'
 import MeltThermo   from './melt/MeltThermo.vue'
 import MeltStand    from './melt/MeltStand.vue'
 import MeltHeatFlow from './melt/MeltHeatFlow.vue'
 import './melt/melt.css'
 
 const emit = defineEmits(['complete'])
+
+// ===== 装置图片资源（PNG，400×400 帧 + 不透明 bbox 裁剪）=====
+// 格式 [opaqueBotY, opaqueW, opaqueH] —— 源帧内不透明区域的底边 y、宽、高
+// （去掉透明 padding 后只剩实际可见物件，按 opaqueW/H 算缩放，再用 opaqueBotY 把图实际底部对齐到 baseline）
+const IMG_META = {
+  stand:      [389, 226, 389],   // 三脚铁架台（仍由 MeltStand SVG 渲染，仅供参考）
+  beaker:     [388, 291, 370],   // 烧杯
+  tubeKong:   [394, 126, 385],   // 试管（空）
+  tubeGu:     [394, 130, 385],   // 试管（晶粒）
+  tubeRong:   [394, 131, 385],   // 试管（融化中）
+  tubeFeiteng:[394, 147, 394],   // 试管（沸腾，蒸汽+液面+气泡）
+  lampOff:    [390, 253, 247],   // 酒精灯（关，含底部小烧杯）
+  lampOn:     [390, 253, 368],   // 酒精灯（开，含火焰与底部小烧杯）
+}
+const TUBE_MAP = {
+  kong:    { src: '/assets/lab/shiguan-kong.png',    meta: IMG_META.tubeKong },
+  gu:      { src: '/assets/lab/shiguan-gu.png',      meta: IMG_META.tubeGu },
+  rong:    { src: '/assets/lab/shiguan-rong.png',    meta: IMG_META.tubeRong },
+  feiteng: { src: '/assets/lab/shiguan-feiteng.png', meta: IMG_META.tubeFeiteng },
+}
+const LAMP_SRC = {
+  on:  '/assets/lab/jiujingdeng-on.png',
+  off: '/assets/lab/jiujingdeng-off.png',
+}
 
 // 试管 4 阶段判定：按 (state, 物质, 当前温度) 选 kong/gu/rong/feiteng
 function pickTubePhase() {
@@ -222,42 +244,27 @@ function drawSetup(L) {
 // ===== 装置状态（供模板用） =====
 const phase = computed(() => pickTubePhase())
 const isOn  = computed(() => state.value === 'running' || state.value === 'done')
-function onLampToggle(next) {
-  // 仅在未开始时允许手动切换；开始/停止仍走下方按钮
-  if (state.value === 'ready') {
-    if (next) startRun()   // 点灯 = 开始加热
-    else      hint.value = '点击「开始加热」或再次点击酒精灯'
-  } else if (state.value === 'running') {
-    stopRun()              // 灭火 = 停止
-  } else {
-    // done 状态：再点 = 重置后开始
-    if (next) {
-      resetAll()
-      startRun()
-    }
-  }
-}
-// ===== 热流箭头关键点（从各装置的 layout / viewBox 推算） =====
+// 装置 PNG 资源（随状态/物质切换）
+const lampSrc  = computed(() => LAMP_SRC[isOn.value ? 'on' : 'off'])
+const lampMeta = computed(() => isOn.value ? IMG_META.lampOn : IMG_META.lampOff)
+const tubeMeta = computed(() => TUBE_MAP[phase.value].meta)
+const tubeSrc  = computed(() => TUBE_MAP[phase.value].src)
+const beakerSrc = '/assets/lab/shaobei.png'
+const beakerMeta = IMG_META.beaker
+
+// ===== 热流箭头关键点（按 PNG 的不透明 bbox 推算）=====
+// 不透明内容顶部 = baseline - opaqueH * (w / opaqueW)
+const lampScale  = computed(() => layout.lamp.w   / lampMeta.value[1])
+const beakerScale= computed(() => layout.beaker.w / beakerMeta[1])
+const tubeScale  = computed(() => layout.tube.w   / tubeMeta.value[1])
 const rigW = computed(() => canvasRef.value ? canvasRef.value.clientWidth : 880)
 const rigH = computed(() => canvasRef.value ? canvasRef.value.clientHeight : 520)
 const flameX = computed(() => layout.lamp.x)
-const flameY = computed(() => {
-  // 酒精灯火焰顶 y：lamp SVG 高 = 2*w，火焰在 SVG 顶端 ~ y=14（viewBox 100×200）
-  const h = layout.lamp.w * 2
-  return layout.lamp.baseline - h + (14 / 200) * h
-})
+const flameY = computed(() => layout.lamp.baseline - lampMeta.value[2] * lampScale.value)
 const beakerX = computed(() => layout.beaker.x)
-const beakerTopY = computed(() => {
-  // 烧杯高 = w * 150/200 = 0.75w；杯顶距 SVG 顶 28px（viewBox 200×150）
-  const h = layout.beaker.w * 0.75
-  return layout.beaker.baseline - h + (28 / 150) * h
-})
+const beakerTopY = computed(() => layout.beaker.baseline - beakerMeta[2] * beakerScale.value)
 const tubeX = computed(() => layout.tube.x)
-const tubeMidY = computed(() => {
-  // 试管高 = w * 360/100 = 3.6w；液面 y 在 SVG 中 120（feiteng 时）
-  const h = layout.tube.w * 3.6
-  return layout.tube.baseline - h + (120 / 360) * h
-})
+const tubeMidY = computed(() => layout.tube.baseline - 0.5 * tubeMeta.value[2] * tubeScale.value)
 
 // 右侧 T-t 图
 function drawGraph(L) {
@@ -548,24 +555,26 @@ onBeforeUnmount(() => {
             :selected="selected === 'stand'" :edit-mode="editMode"
             @pointerdown="(e) => onPiecePointerDown('stand', e)"
           />
-          <MeltBeaker
+          <MeltPieceImg
+            :src="beakerSrc" :meta="beakerMeta"
             :x="layout.beaker.x" :baseline="layout.beaker.baseline" :w="layout.beaker.w"
-            :hot="isOn"
             :selected="selected === 'beaker'" :edit-mode="editMode"
             @pointerdown="(e) => onPiecePointerDown('beaker', e)"
+            alt="烧杯"
           />
-          <MeltLamp
+          <MeltPieceImg
+            :src="lampSrc" :meta="lampMeta"
             :x="layout.lamp.x" :baseline="layout.lamp.baseline" :w="layout.lamp.w"
-            :on="isOn"
             :selected="selected === 'lamp'" :edit-mode="editMode"
             @pointerdown="(e) => onPiecePointerDown('lamp', e)"
-            @toggle="onLampToggle"
+            alt="酒精灯"
           />
-          <MeltTube
+          <MeltPieceImg
+            :src="tubeSrc" :meta="tubeMeta"
             :x="layout.tube.x" :baseline="layout.tube.baseline" :w="layout.tube.w"
-            :phase="phase" :temp="temp"
             :selected="selected === 'tube'" :edit-mode="editMode"
             @pointerdown="(e) => onPiecePointerDown('tube', e)"
+            alt="试管"
           />
           <MeltThermo
             :x="layout.thermo.x" :baseline="layout.thermo.baseline" :w="layout.thermo.w"

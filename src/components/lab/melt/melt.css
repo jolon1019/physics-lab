@@ -34,6 +34,7 @@
   cursor: grab;
   user-select: none;
   touch-action: none;
+  outline: none;
 }
 .melt-piece.is-dragging { cursor: grabbing; }
 .melt-piece.is-hover .melt-piece-hit { stroke: var(--rig-hover); stroke-width: 3.2; }
@@ -42,6 +43,10 @@
 .melt-piece[data-edit-mode="true"] { outline: none; }
 .melt-piece[data-edit-mode="false"] { cursor: default; }
 .melt-piece[data-edit-mode="false"] .melt-piece-handle { display: none; }
+
+/* PNG 装置（MeltPieceImg）：用 outline 做悬停/选中描边（与 SVG hit-path 风格一致） */
+.melt-piece.is-img.is-hover[data-edit-mode="true"]   { outline: 2px solid var(--rig-hover); }
+.melt-piece.is-img.is-selected                     { outline: 2.5px dashed var(--rig-selected); }
 
 /* 公共：玻璃描边 + 弱填充 */
 .melt-glass-fill { fill: var(--rig-glass-fill); stroke: var(--rig-glass-line); stroke-width: 1.6; stroke-linejoin: round; }
