@@ -11,6 +11,14 @@ const progress = useProgressStore()
 const auth = useAuthStore()
 const layout = useLayoutStore()
 
+// 收起/展开顶栏：切换 store 后，等顶栏高度过渡结束再重测吸顶偏移，
+// 否则实验舞台会按旧的 --lab-stick-top 吸顶，与收起后的真实顶距错位。
+function onToggleTopbar() {
+  layout.toggleTopbar()
+  window.requestAnimationFrame(() => syncStickTop())
+  setTimeout(syncStickTop, 300)
+}
+
 // 实测全局顶栏渲染高度，写入 --lab-stick-top，使各实验动画舞台吸顶时
 // 恰好贴在顶栏正下方（顶栏在移动端会换行变高，无法用固定常量）
 function syncStickTop() {
@@ -34,7 +42,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'nav-collapsed': layout.navCollapsed }">
+  <div class="app-shell" :class="{ 'nav-collapsed': layout.navCollapsed, 'topbar-hidden': layout.topbarHidden }">
     <header class="topbar">
       <div class="brand-block">
         <div class="brand-mark" aria-hidden="true"></div>
@@ -49,12 +57,12 @@ onBeforeUnmount(() => {
         <button
           class="nav-toggle-top"
           type="button"
-          :aria-expanded="!layout.navCollapsed"
-          :title="layout.navCollapsed ? '展开实验目录' : '收起实验目录'"
-          @click="layout.toggleNav()"
+          :aria-expanded="!layout.topbarHidden"
+          :title="layout.topbarHidden ? '展开顶栏' : '收起顶栏'"
+          @click="onToggleTopbar"
         >
-          <span class="nav-toggle-icon">{{ layout.navCollapsed ? '»' : '«' }}</span>
-          <span class="nav-toggle-text">{{ layout.navCollapsed ? '展开目录' : '收起目录' }}</span>
+          <span class="nav-toggle-icon">{{ layout.topbarHidden ? '⌄' : '⌃' }}</span>
+          <span class="nav-toggle-text">{{ layout.topbarHidden ? '展开顶栏' : '收起顶栏' }}</span>
         </button>
         <button class="board-toggle" type="button" :title="boardTheme.variant === 'light' ? '切回深色黑板背景' : '切换为浅色背景'" @click="toggleBoardVariant">
           {{ boardTheme.variant === 'light' ? '🌑 黑板' : '🟨 浅色' }}
@@ -66,6 +74,16 @@ onBeforeUnmount(() => {
         <button v-else class="btn btn-sm btn-primary" @click="auth.openLogin()">登录</button>
       </div>
     </header>
+
+    <!-- 顶栏收起时的浮动恢复按钮（常驻可点，点回顶栏） -->
+    <button
+      v-if="layout.topbarHidden"
+      class="topbar-restore-fab"
+      type="button"
+      title="展开顶栏"
+      aria-label="展开顶栏"
+      @click="onToggleTopbar"
+    >⌃ 顶栏</button>
 
     <div class="workspace">
       <SideNav />

@@ -127,6 +127,53 @@ p { margin: 0; }
   border-radius: 0 0 var(--radius) var(--radius);
   background: rgba(255, 254, 249, 0.96);
   backdrop-filter: blur(14px);
+  transition: margin-top 260ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms ease,
+    max-height 260ms cubic-bezier(0.4, 0, 0.2, 1), padding 260ms ease,
+    border-width 260ms ease;
+  overflow: hidden;
+}
+
+/* 顶栏整体收起：连同左侧目录一起隐藏，给实验区腾出高度 */
+.app-shell.topbar-hidden .topbar {
+  margin-top: calc(-1 * var(--topbar) - 2px);
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-top-width: 0;
+  border-bottom-width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 收起态浮动恢复按钮（常驻可点） */
+.topbar-restore-fab {
+  position: fixed;
+  top: 12px;
+  right: 14px;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 #050505;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.topbar-restore-fab:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 #050505;
+}
+.topbar-restore-fab:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #050505;
 }
 
 .brand-block {
@@ -305,6 +352,11 @@ p { margin: 0; }
 /* 折叠态：靠左收缩为窄轨 */
 .app-shell.nav-collapsed .side-nav {
   width: var(--nav-rail-w);
+}
+
+/* 顶栏收起时，左侧目录一并隐藏，最大化实验区 */
+.app-shell.topbar-hidden .side-nav {
+  display: none;
 }
 
 /* 折叠/展开按钮 */
