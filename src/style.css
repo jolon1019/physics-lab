@@ -133,6 +133,12 @@ p { margin: 0; }
   overflow: hidden;
 }
 
+/* 沉浸模式：把顶栏高度常量归零，实验区高度公式（calc(100vh - var(--topbar) - …)）
+   自动吃满整屏，避免收起顶栏后实验区仍被 76px 顶距压住、无法完整显示 */
+.app-shell.topbar-hidden {
+  --topbar: 0px;
+}
+
 /* 顶栏整体收起：连同左侧目录一起隐藏，给实验区腾出高度 */
 .app-shell.topbar-hidden .topbar {
   margin-top: calc(-1 * var(--topbar) - 2px);
@@ -143,6 +149,19 @@ p { margin: 0; }
   border-bottom-width: 0;
   opacity: 0;
   pointer-events: none;
+}
+
+/* 沉浸模式下隐藏页脚，实验区独占整屏 */
+.app-shell.topbar-hidden .app-footer {
+  display: none;
+}
+
+/* 沉浸模式：实验区吃满整屏（仅留给工作区外边距 + 详情页头/正文内边距的余量），
+   消除普通态为顶栏/页脚预留的 240px 留白，让浮力装置与读数整屏可见、无需滚动 */
+.app-shell.topbar-hidden .lab-left,
+.app-shell.topbar-hidden .lab-right {
+  height: calc(100vh - 36px - 200px);
+  max-height: calc(100vh - 36px - 200px);
 }
 
 /* 收起态浮动恢复按钮（常驻可点） */

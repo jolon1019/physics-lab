@@ -58,11 +58,11 @@ onBeforeUnmount(() => {
           class="nav-toggle-top"
           type="button"
           :aria-expanded="!layout.topbarHidden"
-          :title="layout.topbarHidden ? '展开顶栏' : '收起顶栏'"
+          :title="layout.topbarHidden ? '退出沉浸模式' : '进入沉浸模式（隐藏顶栏与边栏）'"
           @click="onToggleTopbar"
         >
-          <span class="nav-toggle-icon">{{ layout.topbarHidden ? '⌄' : '⌃' }}</span>
-          <span class="nav-toggle-text">{{ layout.topbarHidden ? '展开顶栏' : '收起顶栏' }}</span>
+          <span class="nav-toggle-icon">{{ layout.topbarHidden ? '⤢' : '⤡' }}</span>
+          <span class="nav-toggle-text">{{ layout.topbarHidden ? '退出沉浸' : '沉浸模式' }}</span>
         </button>
         <button class="board-toggle" type="button" :title="boardTheme.variant === 'light' ? '切回深色黑板背景' : '切换为浅色背景'" @click="toggleBoardVariant">
           {{ boardTheme.variant === 'light' ? '🌑 黑板' : '🟨 浅色' }}
@@ -75,15 +75,15 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <!-- 顶栏收起时的浮动恢复按钮（常驻可点，点回顶栏） -->
+    <!-- 沉浸模式下的浮动退出按钮（常驻可点，点回正常布局） -->
     <button
       v-if="layout.topbarHidden"
       class="topbar-restore-fab"
       type="button"
-      title="展开顶栏"
-      aria-label="展开顶栏"
+      title="退出沉浸模式"
+      aria-label="退出沉浸模式"
       @click="onToggleTopbar"
-    >⌃ 顶栏</button>
+    >⤢ 退出沉浸</button>
 
     <div class="workspace">
       <SideNav />
