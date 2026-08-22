@@ -6,6 +6,7 @@
     :data-edit-mode="editMode ? 'true' : 'false'"
     @pointerenter="hover = true"
     @pointerleave="hover = false"
+    @pointerdown="emit('pointerdown', $event)"
   >
     <svg viewBox="0 0 160 200" :width="size.w" :height="size.h" xmlns="http://www.w3.org/2000/svg" aria-label="铁架台">
       <rect class="melt-piece-hit" :x="-6" :y="-6" :width="VBW + 12" :height="VBH + 12" fill="transparent" />
@@ -17,15 +18,12 @@
       <!-- 螺丝帽 -->
       <circle :cx="VBW / 2" :cy="VBH - 12" r="2.4" :fill="colors.stroke" />
       <!-- 横杆（夹具臂） -->
-      <rect :x="20" y="clampY" width="VBW - 40" height="6" :fill="colors.iron" :stroke="colors.stroke" stroke-width="1.6" rx="1" />
+      <rect :x="20" :y="clampY" :width="VBW - 40" height="6" :fill="colors.iron" :stroke="colors.stroke" stroke-width="1.6" rx="1" />
       <!-- 横杆右端固定夹 -->
-      <rect :x="VBW - 28" y="clampY - 6" width="10" height="18" :fill="colors.iron" :stroke="colors.stroke" stroke-width="1.6" rx="1" />
+      <rect :x="VBW - 28" :y="clampY - 6" width="10" height="18" :fill="colors.iron" :stroke="colors.stroke" stroke-width="1.6" rx="1" />
       <!-- 试管夹（U 形铁夹抱向 tube 中心） -->
       <g :stroke="colors.stroke" stroke-width="1.8" fill="none" stroke-linejoin="round">
-        <path d="M68 clampY L48 clampY - 2" />
-        <path d="M48 clampY - 2 Q 42 clampY - 2 42 clampY + 4" />
-        <path d="M42 clampY + 4 L42 clampY + 16" />
-        <path d="M48 clampY - 2 L48 clampY + 8" />
+        <path :d="clampArmD" />
       </g>
       <circle :cx="68" :cy="clampY" r="2.4" :fill="colors.stroke" />
     </svg>
@@ -53,6 +51,13 @@ const colors = {
   ironLight: '#7d8392',
 }
 const clampY = 38  // 横杆高度
+// 试管夹（U 形铁夹）路径，按 clampY 计算，避免字面量被当字符串
+const clampArmD = computed(() =>
+  `M68 ${clampY} L48 ${clampY - 2} ` +
+  `M48 ${clampY - 2} Q 42 ${clampY - 2} 42 ${clampY + 4} ` +
+  `M42 ${clampY + 4} L42 ${clampY + 16} ` +
+  `M48 ${clampY - 2} L48 ${clampY + 8}`
+)
 
 const size = computed(() => {
   const w = props.w

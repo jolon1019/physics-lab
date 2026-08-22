@@ -7,6 +7,7 @@
     @pointerenter="hover = true"
     @pointerleave="hover = false"
     @click.stop="onClick"
+    @pointerdown="emit('pointerdown', $event)"
   >
     <svg viewBox="0 0 100 200" :width="size.w" :height="size.h" xmlns="http://www.w3.org/2000/svg" aria-label="酒精灯">
       <!-- 命中盒（不可见） -->

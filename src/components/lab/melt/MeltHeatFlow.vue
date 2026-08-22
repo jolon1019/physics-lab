@@ -48,6 +48,6 @@ const pathD = computed(() => {
 </script>
 
 <style scoped>
-.melt-heat-flow { position: absolute; pointer-events: none; }
+.melt-rig > .melt-heat-flow { position: absolute; pointer-events: none; }
 .melt-heat-flow { opacity: 1; transition: opacity 0.3s; }
 </style>

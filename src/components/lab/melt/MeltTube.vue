@@ -6,6 +6,7 @@
     :data-edit-mode="editMode ? 'true' : 'false'"
     @pointerenter="hover = true"
     @pointerleave="hover = false"
+    @pointerdown="emit('pointerdown', $event)"
   >
     <svg viewBox="0 0 100 360" :width="size.w" :height="size.h" xmlns="http://www.w3.org/2000/svg" :aria-label="`试管 ${phase}`">
       <rect class="melt-piece-hit" :x="-6" :y="-6" :width="VBW + 12" :height="VBH + 12" fill="transparent" />
