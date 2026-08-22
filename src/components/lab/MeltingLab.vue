@@ -15,23 +15,23 @@ import './melt/melt.css'
 const emit = defineEmits(['complete'])
 
 // ===== 装置图片资源（PNG，400×400 帧 + 不透明 bbox 裁剪）=====
-// 格式 [opaqueBotY, opaqueW, opaqueH] —— 源帧内不透明区域的底边 y、宽、高
-// （去掉透明 padding 后只剩实际可见物件，按 opaqueW/H 算缩放，再用 opaqueBotY 把图实际底部对齐到 baseline）
+// 格式 [opaqueBotY, opaqueW, opaqueH] —— yMax+1、不透明宽、不透明高
+// （opaqueBotY 用于 MeltPieceImg 把"不透明底部"贴到 baseline；缩放按 opaqueW 算）
+// 注意：2026-08-22 起，烧杯 + 试管合并为单张 3 态 PNG（keli/rongjie/yeti）。
 const IMG_META = {
-  stand:      [389, 226, 389],   // 三脚铁架台（仍由 MeltStand SVG 渲染，仅供参考）
-  beaker:     [388, 291, 370],   // 烧杯
-  tubeKong:   [394, 126, 385],   // 试管（空）
-  tubeGu:     [394, 130, 385],   // 试管（晶粒）
-  tubeRong:   [394, 131, 385],   // 试管（融化中）
-  tubeFeiteng:[394, 147, 394],   // 试管（沸腾，蒸汽+液面+气泡）
-  lampOff:    [390, 253, 247],   // 酒精灯（关，含底部小烧杯）
-  lampOn:     [390, 253, 368],   // 酒精灯（开，含火焰与底部小烧杯）
+  stand:      [389, 226, 389],   // 三脚铁架台（仍由 MeltStand SVG 渲染，仅作 meta 参考）
+  flaskKeli:    [388, 232, 368], // 烧杯+试管（颗粒/固态）
+  flaskRongjie: [388, 232, 368], // 烧杯+试管（融化中）
+  flaskYeti:    [388, 232, 368], // 烧杯+试管（全液）
+  lampOff:    [390, 253, 247],   // 酒精灯（关）
+  lampOn:     [390, 253, 368],   // 酒精灯（开，含火焰）
 }
-const TUBE_MAP = {
-  kong:    { src: '/assets/lab/shiguan-kong.png',    meta: IMG_META.tubeKong },
-  gu:      { src: '/assets/lab/shiguan-gu.png',      meta: IMG_META.tubeGu },
-  rong:    { src: '/assets/lab/shiguan-rong.png',    meta: IMG_META.tubeRong },
-  feiteng: { src: '/assets/lab/shiguan-feiteng.png', meta: IMG_META.tubeFeiteng },
+// 把 pickTubePhase() 返回的 4 态映射到 3 张 PNG：kong/gu→颗粒；rong→融化；feiteng→液体
+const PHASE_TO_FLASK = {
+  kong:    { src: '/assets/lab/shaobei-shiguan-keli.png',    meta: IMG_META.flaskKeli },
+  gu:      { src: '/assets/lab/shaobei-shiguan-keli.png',    meta: IMG_META.flaskKeli },
+  rong:    { src: '/assets/lab/shaobei-shiguan-rongjie.png', meta: IMG_META.flaskRongjie },
+  feiteng: { src: '/assets/lab/shaobei-shiguan-yeti.png',    meta: IMG_META.flaskYeti },
 }
 const LAMP_SRC = {
   on:  '/assets/lab/jiujingdeng-on.png',
@@ -58,8 +58,7 @@ const editMode = ref(false)
 const selected = ref('stand')          // 当前选中的元件
 const layout = reactive({              // 各元件坐标（SVG 组件直接读取）
   stand:  { x: 0, baseline: 0, w: 0 },
-  beaker: { x: 0, baseline: 0, w: 0 },
-  tube:   { x: 0, baseline: 0, w: 0 },
+  flask:  { x: 0, baseline: 0, w: 0 },
   thermo: { x: 0, baseline: 0, w: 0 },
   lamp:   { x: 0, baseline: 0, w: 0 },
 })
@@ -79,20 +78,18 @@ function computeDefaults(L) {
   const cx = L.W * 0.27
   const baseY = L.H - 70
   const standW = Math.min(86, L.W * 0.13)
-  const beakerW = Math.min(110, L.W * 0.16)
-  const tubeW = Math.min(38, beakerW * 0.32)
-  const thermoW = Math.min(26, beakerW * 0.22)
+  // 烧杯+试管合并图，比旧烧杯略宽
+  const flaskW = Math.min(140, L.W * 0.20)
+  const thermoW = Math.min(26, flaskW * 0.18)
   const lampW = Math.min(46, L.W * 0.07)
-  const beakerBottomY = baseY - 130
-  const tubeCx = cx - 12
-  const tubeBottomY = beakerBottomY + 4
-  const thermoCx = cx + (tubeW / 2) + (thermoW / 2) + 2
-  const thermoBottomY = tubeBottomY - 60
+  const flaskBottomY = baseY - 130
+  const flaskCx = cx - 5
+  const thermoCx = flaskCx + (flaskW / 2) - (thermoW / 2) - 4
+  const thermoBottomY = flaskBottomY + 4
   const lampCx = Math.max(60, cx - standW * 0.85)
   return {
     stand:  { x: cx, baseline: baseY, w: standW },
-    beaker: { x: cx, baseline: beakerBottomY, w: beakerW },
-    tube:   { x: tubeCx, baseline: tubeBottomY, w: tubeW },
+    flask:  { x: flaskCx, baseline: flaskBottomY, w: flaskW },
     thermo: { x: thermoCx, baseline: thermoBottomY, w: thermoW },
     lamp:   { x: lampCx, baseline: baseY, w: lampW },
   }
@@ -108,7 +105,7 @@ function loadSaved() {
     const s = localStorage.getItem(LS_KEY)
     if (!s) return
     const o = JSON.parse(s)
-    if (o && o.stand && o.beaker && o.tube && o.thermo && o.lamp) savedLayout.value = o
+    if (o && o.flask && o.thermo && o.lamp) savedLayout.value = o
   } catch (_) {}
 }
 // 保存当前摆放：写入 localStorage 并设为优先布局
@@ -247,24 +244,25 @@ const isOn  = computed(() => state.value === 'running' || state.value === 'done'
 // 装置 PNG 资源（随状态/物质切换）
 const lampSrc  = computed(() => LAMP_SRC[isOn.value ? 'on' : 'off'])
 const lampMeta = computed(() => isOn.value ? IMG_META.lampOn : IMG_META.lampOff)
-const tubeMeta = computed(() => TUBE_MAP[phase.value].meta)
-const tubeSrc  = computed(() => TUBE_MAP[phase.value].src)
-const beakerSrc = '/assets/lab/shaobei.png'
-const beakerMeta = IMG_META.beaker
+const flaskSrc  = computed(() => PHASE_TO_FLASK[phase.value].src)
+const flaskMeta = computed(() => PHASE_TO_FLASK[phase.value].meta)
 
 // ===== 热流箭头关键点（按 PNG 的不透明 bbox 推算）=====
 // 不透明内容顶部 = baseline - opaqueH * (w / opaqueW)
-const lampScale  = computed(() => layout.lamp.w   / lampMeta.value[1])
-const beakerScale= computed(() => layout.beaker.w / beakerMeta[1])
-const tubeScale  = computed(() => layout.tube.w   / tubeMeta.value[1])
+const lampScale   = computed(() => layout.lamp.w  / lampMeta.value[1])
+const flaskScale  = computed(() => layout.flask.w / flaskMeta.value[1])
 const rigW = computed(() => canvasRef.value ? canvasRef.value.clientWidth : 880)
 const rigH = computed(() => canvasRef.value ? canvasRef.value.clientHeight : 520)
 const flameX = computed(() => layout.lamp.x)
 const flameY = computed(() => layout.lamp.baseline - lampMeta.value[2] * lampScale.value)
-const beakerX = computed(() => layout.beaker.x)
-const beakerTopY = computed(() => layout.beaker.baseline - beakerMeta[2] * beakerScale.value)
-const tubeX = computed(() => layout.tube.x)
-const tubeMidY = computed(() => layout.tube.baseline - 0.5 * tubeMeta.value[2] * tubeScale.value)
+// 烧杯口 / 试管口 / 试管中：在 3 态合体图内的相对位置（基于目测：口 y≈70，中 y≈200）
+// 烧杯口 ABOVE opaque 底 ≈ 388 - 70 = 318
+// 试管中心 ABOVE opaque 底 ≈ 388 - 200 = 188
+// 试管 x 比组合图中心略偏右 ~10px（即 (210-200)/400*frame）
+const flaskX = computed(() => layout.flask.x)
+const beakerTopY = computed(() => layout.flask.baseline - (flaskMeta.value[0] - 70) * flaskScale.value)
+const tubeX = computed(() => layout.flask.x + 10 * flaskScale.value)
+const tubeMidY = computed(() => layout.flask.baseline - (flaskMeta.value[0] - 200) * flaskScale.value)
 
 // 右侧 T-t 图
 function drawGraph(L) {
@@ -556,11 +554,11 @@ onBeforeUnmount(() => {
             @pointerdown="(e) => onPiecePointerDown('stand', e)"
           />
           <MeltPieceImg
-            :src="beakerSrc" :meta="beakerMeta"
-            :x="layout.beaker.x" :baseline="layout.beaker.baseline" :w="layout.beaker.w"
-            :selected="selected === 'beaker'" :edit-mode="editMode"
-            @pointerdown="(e) => onPiecePointerDown('beaker', e)"
-            alt="烧杯"
+            :src="flaskSrc" :meta="flaskMeta"
+            :x="layout.flask.x" :baseline="layout.flask.baseline" :w="layout.flask.w"
+            :selected="selected === 'flask'" :edit-mode="editMode"
+            @pointerdown="(e) => onPiecePointerDown('flask', e)"
+            alt="烧杯+试管"
           />
           <MeltPieceImg
             :src="lampSrc" :meta="lampMeta"
@@ -568,13 +566,6 @@ onBeforeUnmount(() => {
             :selected="selected === 'lamp'" :edit-mode="editMode"
             @pointerdown="(e) => onPiecePointerDown('lamp', e)"
             alt="酒精灯"
-          />
-          <MeltPieceImg
-            :src="tubeSrc" :meta="tubeMeta"
-            :x="layout.tube.x" :baseline="layout.tube.baseline" :w="layout.tube.w"
-            :selected="selected === 'tube'" :edit-mode="editMode"
-            @pointerdown="(e) => onPiecePointerDown('tube', e)"
-            alt="试管"
           />
           <MeltThermo
             :x="layout.thermo.x" :baseline="layout.thermo.baseline" :w="layout.thermo.w"
@@ -586,7 +577,7 @@ onBeforeUnmount(() => {
             v-if="isOn"
             :W="rigW" :H="rigH"
             :lamp-flame-x="flameX" :lamp-flame-y="flameY"
-            :beaker-x="beakerX" :beaker-top-y="beakerTopY"
+            :beaker-x="flaskX" :beaker-top-y="beakerTopY"
             :tube-x="tubeX" :tube-mid-y="tubeMidY"
           />
         </div>
@@ -601,8 +592,7 @@ onBeforeUnmount(() => {
             <label>元件</label>
             <select v-model="selected" class="pe-select">
               <option value="stand">铁架台</option>
-              <option value="beaker">烧杯</option>
-              <option value="tube">试管</option>
+              <option value="flask">烧杯+试管</option>
               <option value="thermo">温度计</option>
               <option value="lamp">酒精灯</option>
             </select>
