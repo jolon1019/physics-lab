@@ -984,13 +984,6 @@ p { margin: 0; }
   position: relative;
   box-shadow: var(--bb-frame);
 }
-/* 非画板面板（如左栏内的实时读数）：不加黑板底与木框 */
-.lab-left > .lab-panel.plain {
-  box-shadow: none;
-}
-.lab-left > .lab-panel.plain::before {
-  content: none;
-}
 .lab-left > .lab-panel::before {
   content: '';
   position: absolute;

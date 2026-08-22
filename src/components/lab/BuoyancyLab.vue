@@ -377,15 +377,12 @@ watch([kAnim], () => {
           </text>
         </svg>
       </div>
-      <!-- 实时读数（演示动画下方） -->
-      <div class="lab-panel plain">
-        <div class="lab-panel-head"><strong>实时读数</strong><span>称重法</span></div>
-        <div class="lab-readout">
-          <div class="lab-stat"><span class="dot dot-g"></span><span class="lab-stat-label">物重 G</span><strong>{{ G.toFixed(2) }}<i>N</i></strong></div>
-          <div class="lab-stat accent"><span class="dot dot-fp"></span><span class="lab-stat-label">测力计 F拉</span><strong>{{ Fpull.toFixed(2) }}<i>N</i></strong></div>
-          <div class="lab-stat success"><span class="dot dot-fb"></span><span class="lab-stat-label">浮力 F浮</span><strong>{{ Fb.toFixed(2) }}<i>N</i></strong></div>
-          <div class="lab-stat"><span class="dot dot-v"></span><span class="lab-stat-label">排开 V排</span><strong>{{ Vrow.toFixed(0) }}<i>cm³</i></strong></div>
-        </div>
+      <!-- 实时读数（融入实验下方，不再用新框） -->
+      <div class="readout-strip">
+        <div class="readout-item"><span class="dot dot-g"></span><span class="rl">物重 G</span><span class="rv">{{ G.toFixed(2) }}<i>N</i></span></div>
+        <div class="readout-item"><span class="dot dot-fp"></span><span class="rl">测力计 F拉</span><span class="rv">{{ Fpull.toFixed(2) }}<i>N</i></span></div>
+        <div class="readout-item"><span class="dot dot-fb"></span><span class="rl">浮力 F浮</span><span class="rv">{{ Fb.toFixed(2) }}<i>N</i></span></div>
+        <div class="readout-item"><span class="dot dot-v"></span><span class="rl">排开 V排</span><span class="rv">{{ Vrow.toFixed(0) }}<i>cm³</i></span></div>
       </div>
       <div class="lab-actions">
         <button class="btn" @click="reset">重置</button>
@@ -544,35 +541,36 @@ watch([kAnim], () => {
   font-weight: 800;
   color: var(--success);
 }
-/* 读数卡 */
-.lab-stat {
+/* 读数条：融入实验下方，无外框 */
+.readout-strip {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 10px 22px;
+  padding: 12px 2px 4px;
+  border-top: 2px solid var(--line);
+}
+.readout-item {
+  display: inline-flex;
+  align-items: baseline;
   gap: 8px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border-left: 5px solid var(--muted-2);
-  background: #fff;
 }
-.lab-stat.accent {
-  border-left-color: var(--blue);
+.readout-item .dot {
+  align-self: center;
 }
-.lab-stat.success {
-  border-left-color: var(--success);
-}
-.lab-stat .lab-stat-label {
+.readout-item .rl {
   font-size: 12px;
   font-weight: 800;
   color: var(--muted-2);
-  flex: 1;
 }
-.lab-stat strong {
+.readout-item .rv {
   font-family: var(--mono);
   font-size: 19px;
-  font-weight: 800;
+  font-weight: 900;
   color: var(--text-h);
+  line-height: 1;
 }
-.lab-stat strong i {
+.readout-item .rv i {
   font-size: 11px;
   font-style: normal;
   font-weight: 700;
@@ -580,6 +578,7 @@ watch([kAnim], () => {
   margin-left: 2px;
 }
 .dot {
+  display: inline-block;
   width: 10px;
   height: 10px;
   border-radius: 50%;
