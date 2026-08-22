@@ -77,36 +77,15 @@
   filter: drop-shadow(0 2px 0 var(--rig-stroke));
 }
 
-/* 热流箭头动画 */
+/* 热流箭头（实心线，不画虚线） */
 .heat-flow-path {
   fill: none;
-  stroke: rgba(232, 90, 79, 0.55);
-  stroke-width: 2.4;
+  stroke: rgba(232, 90, 79, 0.7);
+  stroke-width: 2.6;
   stroke-linecap: round;
-  stroke-dasharray: 8 6;
-  animation: heatDash 1.2s linear infinite;
+  stroke-linejoin: round;
   filter: drop-shadow(0 0 4px rgba(232, 90, 79, 0.35));
 }
-@keyframes heatDash {
-  from { stroke-dashoffset: 0; }
-  to   { stroke-dashoffset: -28; }
-}
-
-/* 火焰摇曳（多层 path 同步做缩放/扭曲） */
-@keyframes flameFlicker {
-  0%   { transform: scaleY(1)   scaleX(1)   translateY(0); }
-  25%  { transform: scaleY(1.08) scaleX(0.94) translateY(-0.5px); }
-  50%  { transform: scaleY(0.96) scaleX(1.04) translateY(0.5px); }
-  75%  { transform: scaleY(1.04) scaleX(0.98) translateY(-0.3px); }
-  100% { transform: scaleY(1)   scaleX(1)   translateY(0); }
-}
-@keyframes flameInner {
-  0%, 100% { transform: scaleY(1)    scaleX(1); }
-  50%      { transform: scaleY(0.92) scaleX(1.06); }
-}
-.flame-outer { transform-origin: 50% 100%; animation: flameFlicker 0.42s ease-in-out infinite; }
-.flame-mid   { transform-origin: 50% 100%; animation: flameFlicker 0.34s ease-in-out infinite reverse; }
-.flame-inner { transform-origin: 50% 100%; animation: flameInner 0.22s ease-in-out infinite; }
 
 /* 蒸汽 */
 @keyframes steamRise {

@@ -8,7 +8,6 @@ import { paintBoard } from '../../lib/boardBg'
 import FullscreenBtn from './FullscreenBtn.vue'
 import MeltPieceImg from './melt/MeltPieceImg.vue'
 import MeltThermo   from './melt/MeltThermo.vue'
-import MeltStand    from './melt/MeltStand.vue'
 import MeltHeatFlow from './melt/MeltHeatFlow.vue'
 import './melt/melt.css'
 
@@ -19,7 +18,6 @@ const emit = defineEmits(['complete'])
 // （opaqueBotY 用于 MeltPieceImg 把"不透明底部"贴到 baseline；缩放按 opaqueW 算）
 // 注意：2026-08-22 起，烧杯 + 试管合并为单张 3 态 PNG（keli/rongjie/yeti）。
 const IMG_META = {
-  stand:      [389, 226, 389],   // 三脚铁架台（仍由 MeltStand SVG 渲染，仅作 meta 参考）
   flaskKeli:    [388, 232, 368], // 烧杯+试管（颗粒/固态）
   flaskRongjie: [388, 232, 368], // 烧杯+试管（融化中）
   flaskYeti:    [388, 232, 368], // 烧杯+试管（全液）
@@ -43,9 +41,9 @@ function pickTubePhase() {
   if (state.value === 'ready') return isCrystal.value ? 'gu' : 'kong'
   const T = temp.value
   if (isCrystal.value) {
-    if (T < MELT - 1) return 'gu'
-    if (T < 65) return 'rong'
-    return 'feiteng'
+    if (T < MELT) return 'gu'            // 固态（颗粒）：升温到熔点 48℃ 之前
+    if (T < MELT + 0.3) return 'rong'    // 熔化平台 @48℃：固液共存（温度不变）
+    return 'feiteng'                      // 已全熔：>48℃ 即液体
   }
   if (T < T_START.wax) return 'kong'
   if (T < 65) return 'rong'
@@ -55,9 +53,8 @@ function pickTubePhase() {
 // ===== 摆放编辑器（editMode 下可拖动 / 滚轮缩放每个元件）=====
 // 每个元件用绝对逻辑坐标 {x:中心x, baseline:底部y, w:内容宽} 描述，便于手动微调。
 const editMode = ref(false)
-const selected = ref('stand')          // 当前选中的元件
+const selected = ref('flask')          // 当前选中的元件
 const layout = reactive({              // 各元件坐标（SVG 组件直接读取）
-  stand:  { x: 0, baseline: 0, w: 0 },
   flask:  { x: 0, baseline: 0, w: 0 },
   thermo: { x: 0, baseline: 0, w: 0 },
   lamp:   { x: 0, baseline: 0, w: 0 },
@@ -77,8 +74,7 @@ const layoutJson = computed(() => {
 function computeDefaults(L) {
   const cx = L.W * 0.27
   const baseY = L.H - 70
-  const standW = Math.min(86, L.W * 0.13)
-  // 烧杯+试管合并图，比旧烧杯略宽
+  // 烧杯+试管合并图
   const flaskW = Math.min(140, L.W * 0.20)
   const thermoW = Math.min(26, flaskW * 0.18)
   const lampW = Math.min(46, L.W * 0.07)
@@ -86,9 +82,8 @@ function computeDefaults(L) {
   const flaskCx = cx - 5
   const thermoCx = flaskCx + (flaskW / 2) - (thermoW / 2) - 4
   const thermoBottomY = flaskBottomY + 4
-  const lampCx = Math.max(60, cx - standW * 0.85)
+  const lampCx = Math.max(60, cx - flaskW * 0.6)
   return {
-    stand:  { x: cx, baseline: baseY, w: standW },
     flask:  { x: flaskCx, baseline: flaskBottomY, w: flaskW },
     thermo: { x: thermoCx, baseline: thermoBottomY, w: thermoW },
     lamp:   { x: lampCx, baseline: baseY, w: lampW },
@@ -235,7 +230,7 @@ function drawSetup(L) {
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
-  ctx.fillText(isCrystal.value ? '海波' : '石蜡', layout.stand.x, layout.stand.baseline + 14)
+  ctx.fillText(isCrystal.value ? '海波' : '石蜡', layout.flask.x, layout.flask.baseline + 16)
 }
 
 // ===== 装置状态（供模板用） =====
@@ -548,11 +543,6 @@ onBeforeUnmount(() => {
           style="position:absolute;inset:0;height:520px"
           @wheel="onWheel"
         >
-          <MeltStand
-            :x="layout.stand.x" :baseline="layout.stand.baseline" :w="layout.stand.w"
-            :selected="selected === 'stand'" :edit-mode="editMode"
-            @pointerdown="(e) => onPiecePointerDown('stand', e)"
-          />
           <MeltPieceImg
             :src="flaskSrc" :meta="flaskMeta"
             :x="layout.flask.x" :baseline="layout.flask.baseline" :w="layout.flask.w"
@@ -591,7 +581,6 @@ onBeforeUnmount(() => {
           <div class="pe-row">
             <label>元件</label>
             <select v-model="selected" class="pe-select">
-              <option value="stand">铁架台</option>
               <option value="flask">烧杯+试管</option>
               <option value="thermo">温度计</option>
               <option value="lamp">酒精灯</option>
