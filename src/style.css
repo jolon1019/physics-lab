@@ -923,10 +923,12 @@ p { margin: 0; }
 
 .lab-left {
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr auto auto;
   gap: 12px;
   min-width: 0;
   min-height: 350px;
+  max-height: calc(100vh - var(--topbar) - 240px);
+  overflow-y: auto;
   height: calc(100vh - var(--topbar) - 240px);
 }
 
@@ -981,6 +983,13 @@ p { margin: 0; }
 .lab-left > .lab-panel {
   position: relative;
   box-shadow: var(--bb-frame);
+}
+/* 非画板面板（如左栏内的实时读数）：不加黑板底与木框 */
+.lab-left > .lab-panel.plain {
+  box-shadow: none;
+}
+.lab-left > .lab-panel.plain::before {
+  content: none;
 }
 .lab-left > .lab-panel::before {
   content: '';

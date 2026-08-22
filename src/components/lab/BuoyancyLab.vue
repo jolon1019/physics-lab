@@ -225,17 +225,6 @@ const gridH = [0.25, 0.5, 0.75].map((f) => CH_H - CH_PAD - f * (CH_H - 2 * CH_PA
 // ---- 阿基米德验证条 ----
 const archPct = computed(() => Math.min(100, (Fb.value / Fmax.value) * 100))
 
-// ---- 分步演示 ----
-function demo(step) {
-  if (step === 0) kTarget.value = 0
-  else if (step === 1) kTarget.value = 0.4
-  else if (step === 2) kTarget.value = 0.85
-  else if (step === 3) kTarget.value = 1
-  else if (step === 4) {
-    liquid.value = 'brine'
-    kTarget.value = 1
-  }
-}
 function reset() {
   kTarget.value = 0
 }
@@ -389,7 +378,7 @@ watch([kAnim], () => {
         </svg>
       </div>
       <!-- 实时读数（演示动画下方） -->
-      <div class="lab-panel">
+      <div class="lab-panel plain">
         <div class="lab-panel-head"><strong>实时读数</strong><span>称重法</span></div>
         <div class="lab-readout">
           <div class="lab-stat"><span class="dot dot-g"></span><span class="lab-stat-label">物重 G</span><strong>{{ G.toFixed(2) }}<i>N</i></strong></div>
@@ -472,18 +461,6 @@ watch([kAnim], () => {
             <text :x="CH_W - 34" y="11" font-size="10" font-weight="700" fill="#d92135">F拉</text>
           </g>
         </svg>
-      </div>
-
-      <!-- 分步演示 -->
-      <div class="lab-panel">
-        <div class="lab-panel-head"><strong>分步演示</strong></div>
-        <div class="lab-steps">
-          <button class="step" @click="demo(0)"><i>①</i>空气中称重</button>
-          <button class="step" @click="demo(1)"><i>②</i>部分浸入</button>
-          <button class="step" @click="demo(2)"><i>③</i>接近全浸</button>
-          <button class="step" @click="demo(3)"><i>④</i>完全浸没</button>
-          <button class="step" @click="demo(4)"><i>⑤</i>换盐水</button>
-        </div>
       </div>
     </aside>
   </div>
@@ -621,40 +598,5 @@ watch([kAnim], () => {
 .dot-v {
   background: #145fd2;
   opacity: 0.55;
-}
-/* 分步步进器 */
-.lab-steps {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding: 12px;
-}
-.step {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  justify-content: flex-start;
-  padding: 9px 10px;
-  border: 2px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  font-weight: 800;
-  font-size: 12.5px;
-  cursor: pointer;
-  box-shadow: 3px 3px 0 var(--line);
-  transition: transform 0.08s ease, box-shadow 0.08s ease;
-}
-.step i {
-  font-style: normal;
-  font-size: 15px;
-  color: var(--accent);
-}
-.step:hover {
-  transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0 var(--line);
-}
-.step:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 var(--line);
 }
 </style>
