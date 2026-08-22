@@ -47,12 +47,15 @@ onBeforeUnmount(() => {
 
       <div class="user-zone">
         <button
-          class="nav-fab"
-          v-if="layout.navCollapsed"
-          @click="layout.setNav(false)"
-          aria-label="打开实验目录"
-          title="打开实验目录"
-        >≡</button>
+          class="nav-toggle-top"
+          type="button"
+          :aria-expanded="!layout.navCollapsed"
+          :title="layout.navCollapsed ? '展开实验目录' : '收起实验目录'"
+          @click="layout.toggleNav()"
+        >
+          <span class="nav-toggle-icon">{{ layout.navCollapsed ? '»' : '«' }}</span>
+          <span class="nav-toggle-text">{{ layout.navCollapsed ? '展开目录' : '收起目录' }}</span>
+        </button>
         <button class="board-toggle" type="button" :title="boardTheme.variant === 'light' ? '切回深色黑板背景' : '切换为浅色背景'" @click="toggleBoardVariant">
           {{ boardTheme.variant === 'light' ? '🌑 黑板' : '🟨 浅色' }}
         </button>
