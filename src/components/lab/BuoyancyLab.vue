@@ -44,11 +44,11 @@ const subTop = computed(() => Math.max(yTop.value, liquidY.value))
 const subH = computed(() => Math.max(0, yTop.value + H_block.value - subTop.value))
 const blockMidY = computed(() => yTop.value + H_block.value / 2)
 const blockBotY = computed(() => yTop.value + H_block.value)
-const waterTopColor = computed(
-  () => ({ alcohol: '#f3e6b4', water: '#bfe2f6', brine: '#cfe9ef' }[liquid.value])
-)
-const waterBotColor = computed(
+const waterFill = computed(
   () => ({ alcohol: '#e7cf7e', water: '#5fb0e0', brine: '#8fc6d4' }[liquid.value])
+)
+const blockColor = computed(
+  () => ({ al: '#aab2c0', iron: '#6b7280', copper: '#c98a55' }[material.value])
 )
 
 // ---- 弹簧秤 ----
@@ -265,46 +265,6 @@ watch([kAnim], () => {
           preserveAspectRatio="xMidYMid meet"
         >
           <defs>
-            <linearGradient id="waterGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" :stop-color="waterTopColor" />
-              <stop offset="1" :stop-color="waterBotColor" />
-            </linearGradient>
-            <linearGradient id="glassGrad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0" stop-color="rgba(255,255,255,0)" />
-              <stop offset="0.45" stop-color="rgba(255,255,255,0.45)" />
-              <stop offset="1" stop-color="rgba(255,255,255,0.05)" />
-            </linearGradient>
-            <linearGradient id="blockal" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#cdd4df" />
-              <stop offset="1" stop-color="#8b94a4" />
-            </linearGradient>
-            <linearGradient id="blockiron" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#9aa1ac" />
-              <stop offset="1" stop-color="#565c66" />
-            </linearGradient>
-            <linearGradient id="blockcopper" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#e0a878" />
-              <stop offset="1" stop-color="#b06b3c" />
-            </linearGradient>
-            <linearGradient id="arrowG" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#ff6270" />
-              <stop offset="1" stop-color="#d92135" />
-            </linearGradient>
-            <linearGradient id="arrowFb" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#37d894" />
-              <stop offset="1" stop-color="#0d9b61" />
-            </linearGradient>
-            <linearGradient id="arrowFp" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#5b97f2" />
-              <stop offset="1" stop-color="#145fd2" />
-            </linearGradient>
-            <linearGradient id="fbAreaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="rgba(13,155,97,0.28)" />
-              <stop offset="1" stop-color="rgba(13,155,97,0.02)" />
-            </linearGradient>
-            <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
-              <feDropShadow dx="0" dy="2" stdDeviation="2.4" flood-color="rgba(0,0,0,0.22)" />
-            </filter>
             <clipPath id="tankClip">
               <path :d="tankClipPath" />
             </clipPath>
@@ -313,18 +273,15 @@ watch([kAnim], () => {
           <rect x="0" y="0" :width="VB_W" :height="VB_H" fill="#fbfaf7" />
 
           <!-- 玻璃烧杯 -->
-          <path :d="tankGlassPath" fill="rgba(255,255,255,0.5)" stroke="#0b0b0b" stroke-width="3" filter="url(#soft)" />
-          <!-- 水体（裁剪在烧杯内） -->
+          <path :d="tankGlassPath" fill="rgba(255,255,255,0.35)" stroke="#0b0b0b" stroke-width="3" />
+          <!-- 水体（裁剪在烧杯内，平涂） -->
           <g clip-path="url(#tankClip)">
-            <path :d="waterPath" fill="url(#waterGrad)" opacity="0.92" />
-            <path :d="waterSurfLine" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="2.4" stroke-linecap="round" />
-            <path :d="waterSurfLine" fill="none" stroke="rgba(40,110,160,0.5)" stroke-width="1" stroke-dasharray="2 5" transform="translate(0,3)" />
+            <path :d="waterPath" :fill="waterFill" opacity="0.9" />
+            <path :d="waterSurfLine" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="2.4" stroke-linecap="round" />
+            <path :d="waterSurfLine" fill="none" stroke="rgba(20,70,110,0.55)" stroke-width="1" stroke-dasharray="2 5" transform="translate(0,3)" />
             <!-- 气泡 -->
-            <circle v-for="(b, i) in bubbles" :key="i" :cx="b.cx" :cy="b.cy" :r="b.r" fill="rgba(255,255,255,0.8)" :opacity="b.op" />
+            <circle v-for="(b, i) in bubbles" :key="i" :cx="b.cx" :cy="b.cy" :r="b.r" fill="rgba(255,255,255,0.85)" :opacity="b.op" />
           </g>
-          <!-- 玻璃高光 -->
-          <path :d="tankGlassPath" fill="url(#glassGrad)" opacity="0.7" />
-          <rect :x="TANK_X + 14" :y="TANK_TOP + 18" width="14" :height="TANK_BOT - TANK_TOP - 60" rx="7" fill="rgba(255,255,255,0.5)" />
 
           <!-- 刻度尺（左侧浸入深度） -->
           <g class="ruler">
@@ -344,14 +301,14 @@ watch([kAnim], () => {
           </g>
 
           <!-- 物块（可拖拽） -->
-          <g style="cursor: grab" @pointerdown="onBlockDown" filter="url(#soft)">
+          <g style="cursor: grab" @pointerdown="onBlockDown">
             <rect
               :x="blockX"
               :y="yTop"
               :width="H_block"
               :height="H_block"
               rx="9"
-              :fill="`url(#block${material})`"
+              :fill="blockColor"
               stroke="#0b0b0b"
               stroke-width="2.4"
             />
@@ -393,7 +350,7 @@ watch([kAnim], () => {
 
           <!-- 弹簧秤 -->
           <line :x1="cx" :y1="8" :x2="cx" :y2="housingTop" stroke="#0b0b0b" stroke-width="3" />
-          <rect :x="cx - 26" :y="housingTop" width="52" :height="housingH" rx="7" fill="#fffef9" stroke="#0b0b0b" stroke-width="2.4" filter="url(#soft)" />
+          <rect :x="cx - 26" :y="housingTop" width="52" :height="housingH" rx="7" fill="#fffef9" stroke="#0b0b0b" stroke-width="2.4" />
           <rect :x="cx - 19" :y="housingTop + 4" width="38" :height="housingH - 8" rx="4" fill="#0d1330" />
           <text :x="cx" :y="housingTop + housingH / 2" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="800" fill="#7ff0c0">
             {{ Fpull.toFixed(2) }}N
@@ -404,19 +361,19 @@ watch([kAnim], () => {
 
           <!-- 受力箭头 -->
           <!-- 重力 G 向下（块中心） -->
-          <line :x1="cx" :y1="blockMidY" :x2="cx" :y2="blockMidY + gLen" stroke="url(#arrowG)" stroke-width="4" stroke-linecap="round" filter="url(#soft)" />
+          <line :x1="cx" :y1="blockMidY" :x2="cx" :y2="blockMidY + gLen" stroke="#d92135" stroke-width="4" stroke-linecap="round" />
           <polygon :points="arrowHead(cx, blockMidY + gLen, 'down')" fill="#d92135" />
           <text :x="cx - 14" :y="blockMidY + gLen / 2" text-anchor="end" font-size="12" font-weight="800" fill="#d92135" paint-order="stroke" stroke="#fffef9" stroke-width="3">
             G={{ G.toFixed(2) }}
           </text>
           <!-- 浮力 F浮 向上（块底） -->
-          <line :x1="cx" :y1="blockBotY" :x2="cx" :y2="blockBotY - fbLen" stroke="url(#arrowFb)" stroke-width="4" stroke-linecap="round" filter="url(#soft)" />
+          <line :x1="cx" :y1="blockBotY" :x2="cx" :y2="blockBotY - fbLen" stroke="#0d9b61" stroke-width="4" stroke-linecap="round" />
           <polygon :points="arrowHead(cx, blockBotY - fbLen, 'up')" fill="#0d9b61" />
           <text :x="cx - 14" :y="blockBotY - fbLen / 2" text-anchor="end" font-size="12" font-weight="800" fill="#0d9b61" paint-order="stroke" stroke="#fffef9" stroke-width="3">
             F浮={{ Fb.toFixed(2) }}
           </text>
           <!-- 拉力 F拉 向上（块右侧） -->
-          <line :x1="cx + H_block / 2 + 20" :y1="yTop" :x2="cx + H_block / 2 + 20" :y2="yTop - fpLen" stroke="url(#arrowFp)" stroke-width="4" stroke-linecap="round" filter="url(#soft)" />
+          <line :x1="cx + H_block / 2 + 20" :y1="yTop" :x2="cx + H_block / 2 + 20" :y2="yTop - fpLen" stroke="#145fd2" stroke-width="4" stroke-linecap="round" />
           <polygon :points="arrowHead(cx + H_block / 2 + 20, yTop - fpLen, 'up')" fill="#145fd2" />
           <text :x="cx + H_block / 2 + 28" :y="yTop - fpLen / 2" font-size="12" font-weight="800" fill="#145fd2" paint-order="stroke" stroke="#fffef9" stroke-width="3">
             F拉={{ Fpull.toFixed(2) }}
@@ -431,15 +388,7 @@ watch([kAnim], () => {
           </text>
         </svg>
       </div>
-      <div class="lab-actions">
-        <button class="btn" @click="reset">重置</button>
-        <span class="feedback ok">浮力只与 ρ液、V排 有关；完全浸没后 F浮 不再变化</span>
-        <FullscreenBtn />
-      </div>
-    </div>
-
-    <aside class="lab-right">
-      <!-- 实时读数 -->
+      <!-- 实时读数（演示动画下方） -->
       <div class="lab-panel">
         <div class="lab-panel-head"><strong>实时读数</strong><span>称重法</span></div>
         <div class="lab-readout">
@@ -449,7 +398,14 @@ watch([kAnim], () => {
           <div class="lab-stat"><span class="dot dot-v"></span><span class="lab-stat-label">排开 V排</span><strong>{{ Vrow.toFixed(0) }}<i>cm³</i></strong></div>
         </div>
       </div>
+      <div class="lab-actions">
+        <button class="btn" @click="reset">重置</button>
+        <span class="feedback ok">浮力只与 ρ液、V排 有关；完全浸没后 F浮 不再变化</span>
+        <FullscreenBtn />
+      </div>
+    </div>
 
+    <aside class="lab-right">
       <!-- 阿基米德原理验证 -->
       <div class="lab-panel">
         <div class="lab-panel-head"><strong>阿基米德原理验证</strong><span>F浮 = G排</span></div>
@@ -493,17 +449,11 @@ watch([kAnim], () => {
       <div class="lab-panel">
         <div class="lab-panel-head"><strong>F–浸入 关系</strong><span>称重法 / 排水法</span></div>
         <svg class="chart-svg" :viewBox="`0 0 ${CH_W} ${CH_H}`" preserveAspectRatio="xMidYMid meet">
-          <defs>
-            <linearGradient id="fbAreaGrad2" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="rgba(13,155,97,0.3)" />
-              <stop offset="1" stop-color="rgba(13,155,97,0.02)" />
-            </linearGradient>
-          </defs>
           <line :x1="CH_PAD" :y1="CH_H - CH_PAD" :x2="CH_W - CH_PAD" :y2="CH_H - CH_PAD" stroke="#0b0b0b" stroke-width="1.5" />
           <line :x1="CH_PAD" :y1="CH_PAD" :x2="CH_PAD" :y2="CH_H - CH_PAD" stroke="#0b0b0b" stroke-width="1.5" />
           <line v-for="(x, i) in gridV" :key="'v' + i" :x1="x" :y1="CH_PAD" :x2="x" :y2="CH_H - CH_PAD" stroke="rgba(0,0,0,0.07)" stroke-width="1" />
           <line v-for="(y, i) in gridH" :key="'h' + i" :x1="CH_PAD" :y1="y" :x2="CH_W - CH_PAD" :y2="y" stroke="rgba(0,0,0,0.07)" stroke-width="1" />
-          <path :d="fbArea" fill="url(#fbAreaGrad2)" />
+          <path :d="fbArea" fill="rgba(13,155,97,0.16)" />
           <path :d="fbPath" fill="none" stroke="#0d9b61" stroke-width="2.8" stroke-linejoin="round" />
           <path :d="fpPath" fill="none" stroke="#d92135" stroke-width="2.8" stroke-linejoin="round" />
           <circle :cx="curX" :cy="curFbY" r="5.5" fill="#0d9b61" stroke="#0b0b0b" stroke-width="1.5">
