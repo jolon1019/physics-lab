@@ -318,7 +318,9 @@ const dynBodyX0 = computed(() => layout.dyn.x - DYN_W / 2)
 const dynBodyX1 = computed(() => layout.dyn.x + DYN_W / 2)
 const dynCY = computed(() => layout.dyn.baseline)
 // 拉动行程：测力计整体随拉力向左位移（表现「拉」的实感），物块在阈值前不动
-const dynShift = computed(() => Math.min(pullPx.value * 0.6, 60))
+// 测力计外壳随手的拖动整体向左移动：跟随实际拉力行程，上限保证不跑出画布左边界
+const MAX_DYN_SHIFT = 240
+const dynShift = computed(() => Math.min(pullPx.value * 0.6, MAX_DYN_SHIFT))
 const dynDrawX0 = computed(() => dynBodyX0.value - dynShift.value) // 左端 = 挂钩端
 const dynDrawX1 = computed(() => dynBodyX1.value - dynShift.value) // 右端 = 提环端
 const baseLen = 30
