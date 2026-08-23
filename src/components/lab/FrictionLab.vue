@@ -143,56 +143,53 @@ function resetLayout() {
   hint.value = '已恢复为默认布局'
 }
 
+// ===== 互动：拖动测力计施加拉力（物理正确的匀速拉动模型）=====
+// 物理模型（教材实验）：手拉着弹簧测力计匀速水平拉动木块。
+//  ① 静摩擦阶段：拉力 F 从 0 增到 f（最大静摩擦 ≈ 动摩擦），木块不动，弹簧被拉长（读数 0→f）
+//  ② 滑动阶段：F = f（动摩擦），木块与手同步匀速左移，弹簧保持恒定伸长（读数恒 = f）
+const STATIC_STROKE = 44         // 静摩擦阶段弹簧拉伸行程(px)：dragDx 0→44 内读数 0→f，木块不动
+const SLIDE_BOUND_X = 20         // 物块/测力计左端允许到达的最小 x（画布左边界留白）
+const dragDx = ref(0)            // 手向左拖动的累计距离(px)，松手后保持（不复位）
+const motionState = ref('idle')  // idle 未拉 | static 静摩擦(木块不动) | uniform 匀速滑动
+const dragging = ref(false)
+const released = ref(false)      // 松手标志：松手后位移与读数保持
+
+// 画布边界限制（测力计左端 / 物块左面均不越过 x=SLIDE_BOUND_X）
+const maxDynShift = computed(() => layout.dyn.x - DYN_W / 2 - SLIDE_BOUND_X)
+const maxBlockShift = computed(() => layout.block.x - blockW.value / 2 - SLIDE_BOUND_X)
+const maxDragDx = computed(() => Math.min(maxDynShift.value, maxBlockShift.value + STATIC_STROKE))
+
+// 派生量：全部由 dragDx 驱动，三者严格自洽（不再各算各的）
+const dynShift = computed(() => dragDx.value)                                              // 测力计跟随手 1:1 左移
+const blockShift = computed(() => Math.max(0, dragDx.value - STATIC_STROKE))               // 木块滑动量（过阈值才动）
+const springStretch = computed(() => Math.min(dragDx.value, STATIC_STROKE))                // 弹簧伸长（仅静摩擦阶段增长，之后恒定）
+const readout = computed(() => (springStretch.value / STATIC_STROKE) * fNum.value)         // 读数 0→f，滑动后恒 = f
+const forceApplied = computed(() => readout.value)                                         // 拉力 = 测力计读数
+// 摩擦力：静止时静摩擦 = 拉力（随 F 增大到 f）；滑动时动摩擦恒 = f
+const frictionForce = computed(() => moving.value ? fNum.value : readout.value)
+const moving = computed(() => motionState.value === 'uniform' && !released.value)           // 仅拖动中匀速流动
+// 力箭头长度映射（N → px）
+const FORCE_ARROW_SCALE = 18 // 每 N 对应 px
+
+// 物理状态文案：交代「何时静止 / 何时匀速」（加速见底部说明）
+const statusText = computed(() => {
+  if (released.value && !dragging.value && dragDx.value > 0.5)
+    return '已松手停止：木块停在当前位置，位移与读数保持（可继续向左拉动）'
+  if (motionState.value === 'idle') return '请向左拉动测力计'
+  if (motionState.value === 'static')
+    return `拉力 F < f（最大静摩擦），二力平衡，木块静止`
+  return `F = f（动摩擦），二力平衡 → 木块匀速直线运动`
+})
+
 // 重置实验互动状态：拉力/位移/读数归零，物块回到原位（不影响已记录的数据表）
 function resetExperiment() {
-  pullTarget.value = 0
-  pullPx.value = 0
-  slideOffset.value = 0
+  dragDx.value = 0
   released.value = false
   dragging.value = false
   dragInfo = null
   motionState.value = 'idle'
   hint.value = '已重置：物块归位，可重新向左拉动测力计'
 }
-
-// ===== 互动：拖动测力计施加拉力（严格物理模型）=====
-const K_FORCE = 0.16 // px → N
-// 不设终点：物块可一直向左拉动；唯一限制是画布左边界（物块左面最小 x 留白）
-const SLIDE_BOUND_X = 20 // 物块左面允许到达的最小 x（画布左边界留白）
-const maxSlideBound = computed(() => Math.max(0, layout.block.x - blockW.value / 2 - SLIDE_BOUND_X))
-const pullTarget = ref(0)
-const pullPx = ref(0)
-const slideOffset = ref(0)
-// motionState: 'idle' 未拉 | 'static' 拉力≤最大静摩擦(物体静止) | 'uniform' 滑动且 F=f 匀速 | 'accel' 滑动且 F>f 加速
-const motionState = ref('idle')
-// 仅在拖动过程中才流动（匀速/加速动画）；松手后物体停住（不流动）
-const moving = computed(() => (motionState.value === 'uniform' || motionState.value === 'accel') && dragging.value)
-const dragging = ref(false)
-// 松手标志：松手后位移与读数保持，不复位
-const released = ref(false)
-
-const forceThreshold = computed(() => fNum.value / K_FORCE)
-const forceApplied = computed(() => Math.max(0, pullPx.value) * K_FORCE)
-// 测力计读数 = 实际施加的拉力（无论静摩擦还是滑动摩擦，测力计都显示真实拉力）
-const readout = computed(() => forceApplied.value)
-// 物块所受摩擦力：
-//  - 静止时：静摩擦随拉力增大而增大，最大 = f（最大静摩擦 ≈ 滑动摩擦）
-//  - 滑动时：动摩擦 f（恒定）
-const frictionForce = computed(() => moving.value ? fNum.value : Math.min(forceApplied.value, fNum.value))
-// 力箭头长度映射（N → px）
-const FORCE_ARROW_SCALE = 18 // 每 N 对应 px
-
-// 物理状态文案：交代「F=f 时是否移动 / 何时匀速 / 何时加速」
-const statusText = computed(() => {
-  if (released.value && !dragging.value && slideOffset.value > 0.5)
-    return '已松手停止：物体停在当前位置，位移与读数保持（可继续向左拉动）'
-  if (motionState.value === 'idle') return '请向左拉动测力计'
-  if (motionState.value === 'static')
-    return `F ≤ f_max：二力平衡，物体保持静止（拉力≠摩擦时本应加速，但已达最大静摩擦后仍为静平衡）`
-  if (motionState.value === 'uniform')
-    return `F = f：滑动后二力仍平衡 → 匀速直线运动（速度不变）`
-  return `F > f：合力向右？不，F向左 > f向右 → 向左加速运动`
-})
 
 // ===== 拖动系统（摆放 / 拉动 共用）=====
 let dragInfo = null
@@ -219,8 +216,8 @@ function onPiecePointerDown(name, e) {
     if (name !== 'block' && name !== 'dyn') return
     dragging.value = true
     released.value = false
-    // 不重置 pullTarget / pullPx / slideOffset：松手后保留位移与读数，可继续向左累加拉动
-    dragInfo = { mode: 'pull', lx: x, pull0: pullTarget.value }
+    // 不重置 dragDx：松手后保留位移与读数，可继续向左累加拉动
+    dragInfo = { mode: 'pull', lx: x, dx0: dragDx.value }
   }
   window.addEventListener('pointermove', onWinPointerMove)
   window.addEventListener('pointerup', onWinPointerUp, { once: true })
@@ -236,9 +233,8 @@ function onWinPointerMove(e) {
     const dx = x - dragInfo.lx
     // 仅允许向左拖动产生拉力：向左位移(-dx>0)增加拉力；向右拖动无效（拉力保持不变）
     const leftPull = Math.max(0, -dx)
-    // 拉力上限：受画布左边界限制（物块左面到 SLIDE_BOUND_X 为止），不设固定终点
-    const maxPull = forceThreshold.value + maxSlideBound.value / K_FORCE
-    pullTarget.value = Math.max(0, Math.min(maxPull, dragInfo.pull0 + leftPull))
+    // 总行程受画布左边界限制，不设固定终点
+    dragDx.value = Math.min(maxDragDx.value, dragInfo.dx0 + leftPull)
   }
 }
 function onWinPointerUp() {
@@ -291,33 +287,10 @@ const phase = ref(0)
 function tick(now) {
   const dt = Math.min(((now - lastT) || 16) / 1000, 0.05)
   lastT = now
-  pullPx.value += (pullTarget.value - pullPx.value) * Math.min(1, dt * 10)
-  const effectivePull = Math.max(0, pullPx.value)
-  const F = forceApplied.value
-  const f = fNum.value
-  if (released.value && !dragging.value) {
-    // 松手：保持当前位移与读数，物体停止（不流动）；不再重新计算 slideOffset
-    motionState.value = slideOffset.value > 0.5 ? 'static' : 'idle'
-  } else if (effectivePull <= 0.001) {
-    // 未施加拉力
-    slideOffset.value = 0
-    motionState.value = 'idle'
-  } else if (F <= f + 1e-6) {
-    // 拉力 ≤ 最大静摩擦：物体静止（二力平衡），拉力再大也到 f 封顶
-    slideOffset.value = 0
-    motionState.value = 'static'
-  } else {
-    // 拉力 > 最大静摩擦：物体开始滑动（不设固定终点，最多到画布左边界）
-    // 动摩擦 f 恒定；拉力维持在 f 附近（容差带内）→ 匀速；明显大于 f → 加速
-    slideOffset.value = Math.min(F - f, maxSlideBound.value)
-    if (slideOffset.value >= maxSlideBound.value - 0.5) {
-      motionState.value = 'uniform' // 已抵画布左边界，视为匀速抵达终点
-    } else if (F > f + 0.15) {
-      motionState.value = 'accel' // F 明显大于 f → 合力向左 → 加速
-    } else {
-      motionState.value = 'uniform' // F ≈ f（容差带 ±0.15N）→ 匀速
-    }
-  }
+  // 状态由 dragDx 直接推导：未拉 idle → 静摩擦 static（木块不动）→ 滑动 uniform（匀速）
+  if (dragDx.value <= 0.001) motionState.value = 'idle'
+  else if (dragDx.value <= STATIC_STROKE) motionState.value = 'static'
+  else motionState.value = 'uniform'
   if (moving.value) phase.value += dt * 6
   else phase.value += dt * 0.6
   raf = requestAnimationFrame(tick)
@@ -329,20 +302,13 @@ const DYN_H = 34          // 测力计外壳高度
 const dynBodyX0 = computed(() => layout.dyn.x - DYN_W / 2)
 const dynBodyX1 = computed(() => layout.dyn.x + DYN_W / 2)
 const dynCY = computed(() => layout.dyn.baseline)
-// 拉动行程：测力计整体随拉力向左位移（表现「拉」的实感），物块在阈值前不动
-// 测力计外壳随手的拖动整体向左移动：跟随实际拉力行程，上限保证不跑出画布左边界
-const MAX_DYN_SHIFT = 240
-const dynShift = computed(() => Math.min(pullPx.value * 0.6, MAX_DYN_SHIFT))
-const dynDrawX0 = computed(() => dynBodyX0.value - dynShift.value) // 左端 = 挂钩端
-const dynDrawX1 = computed(() => dynBodyX1.value - dynShift.value) // 右端 = 提环端
-const baseLen = 30
-// 弹簧伸长随实际拉力（pullPx），静止时也随拉力伸长，与读数一致
-const springStretch = computed(() => pullPx.value)
+// 测力计整体随拖动 1:1 左移（dynShift = dragDx），弹簧在壳内拉伸（springStretch）
+const dynDrawX0 = computed(() => dynBodyX0.value - dynShift.value) // 左端（挂钩端）
+const dynDrawX1 = computed(() => dynBodyX1.value - dynShift.value) // 右端（提环端）
 const hookX = computed(() => dynDrawX1.value) // 测力计在左，挂钩（连物块）在右端
-const blockLeft = computed(() => layout.block.x - blockW.value / 2 - slideOffset.value) // 物块在右，向左运动（减 slideOffset）
+const blockLeft = computed(() => layout.block.x - blockW.value / 2 - blockShift.value) // 物块左面，随滑动左移
 const blockTop = computed(() => layout.block.baseline - blockH.value)
 const blockCenterY = computed(() => blockTop.value + blockH.value / 2)
-const blockRight = computed(() => blockLeft.value + blockW.value) // 物块右面
 
 // 钩码：平底砝码，平铺叠放在物块顶部（不再悬浮），自下而上堆叠
 const HOOK_W = 64   // 砝码宽
@@ -484,9 +450,9 @@ onBeforeUnmount(() => {
             <text :x="dynDrawX0 + 20" :y="dynCY + 21" font-size="8" fill="#5b6b7a">0</text>
             <text :x="dynDrawX0 + DYN_W - 20" :y="dynCY + 21" text-anchor="end" font-size="8" fill="#5b6b7a">5N</text>
             <path
-              :d="`M ${dynDrawX1 - 12} ${dynCY}
-                ${Array.from({length:10},(_,i)=>{const xx=(dynDrawX1-12)+(springStretch/10)*i;const yy=dynCY+(i%2?5:-5);return `L ${xx.toFixed(1)} ${yy.toFixed(1)}`}).join(' ')}
-                L ${dynDrawX0 + 12} ${dynCY}`"
+              :d="`M ${dynDrawX0 + 12} ${dynCY}
+                ${Array.from({length:10},(_,i)=>{const xx=(dynDrawX0+12)+(springStretch/10)*(i+0.5);const yy=dynCY+(i%2?5:-5);return `L ${xx.toFixed(1)} ${yy.toFixed(1)}`}).join(' ')}
+                L ${dynDrawX0 + 12 + springStretch} ${dynCY}`"
               fill="none" :stroke="springStretch > 0 ? '#5b6b7a' : '#7d8a9a'" :stroke-width="springStretch > 0 ? 2.4 : 2"
               :opacity="springStretch > 0 ? 1 : 0.7"
             />
@@ -497,8 +463,8 @@ onBeforeUnmount(() => {
             <text :x="(dynDrawX0 + dynDrawX1) / 2" :y="dynCY + DYN_H / 2 + 29" text-anchor="middle" font-size="9" font-weight="700" fill="#555">N</text>
           </g>
 
-          <!-- 拉杆（测力计挂钩 → 物块右面） -->
-          <line :x1="hookX" :y1="dynCY" :x2="blockRight" :y2="blockCenterY" stroke="#3a6ea5" stroke-width="4" stroke-linecap="round" />
+          <!-- 拉杆（测力计挂钩 → 物块左面） -->
+          <line :x1="hookX" :y1="dynCY" :x2="blockLeft" :y2="blockCenterY" stroke="#3a6ea5" stroke-width="4" stroke-linecap="round" />
 
           <!-- 物块（可拖动）+ 钩码（平底平铺） -->
           <g
@@ -546,20 +512,15 @@ onBeforeUnmount(() => {
                 <path :d="`M ${Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE)} 0 l-9 -5 l0 10 z`" fill="var(--bb-blue)" />
                 <text :x="Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE) / 2" y="16" text-anchor="middle" font-size="10" font-weight="800" fill="var(--bb-blue)">f摩={{ frictionForce.toFixed(1) }}N</text>
               </g>
-              <!-- 加速状态：明确标出「合力向左 → 加速」（仅在拖动中显示物理结论） -->
-              <g v-if="dragging && motionState === 'accel'">
-                <text x="0" y="34" text-anchor="middle" font-size="10.5" font-weight="800" fill="var(--bb-red)">
-                  F &gt; f，合力向左 → 加速
-                </text>
-              </g>
-              <g v-else-if="dragging && motionState === 'uniform'">
+              <!-- 物块受力结论（仅在拖动中显示，避免松手误导） -->
+              <g v-if="dragging && motionState === 'uniform'">
                 <text x="0" y="34" text-anchor="middle" font-size="10.5" font-weight="800" fill="var(--bb-green)">
-                  F = f，合力为 0 → 匀速
+                  F = f（动摩擦），二力平衡 → 匀速
                 </text>
               </g>
               <g v-else-if="dragging && motionState === 'static'">
                 <text x="0" y="34" text-anchor="middle" font-size="10.5" font-weight="800" fill="var(--bb-amber)">
-                  F = f_max，二力平衡 → 静止
+                  F &lt; f（最大静摩擦），二力平衡 → 静止
                 </text>
               </g>
             </g>
@@ -590,7 +551,7 @@ onBeforeUnmount(() => {
             <text :x="dynDrawX0 + 85" :y="dynCY - 60" text-anchor="middle" font-size="11" font-weight="800" :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'">F = {{ forceApplied.toFixed(2) }} N</text>
             <!-- 状态（测力计下方，远离进度条）——交代物理：F=f 不动/匀速、F>f 加速 -->
             <text :x="dynDrawX0 + 85" :y="dynCY + 78" text-anchor="middle" font-size="11" font-weight="700"
-              :fill="motionState === 'accel' ? 'var(--bb-red)' : (motionState === 'uniform' ? 'var(--bb-green)' : (motionState === 'static' ? 'var(--bb-amber)' : 'var(--bb-fg-dim)'))">
+              :fill="motionState === 'uniform' ? 'var(--bb-green)' : (motionState === 'static' ? 'var(--bb-amber)' : 'var(--bb-fg-dim)')">
               {{ statusText }}
             </text>
           </g>
@@ -620,10 +581,10 @@ onBeforeUnmount(() => {
               压力 N = {{ N }} N（木块自重 {{ BLOCK_G }} N{{ weights > 0 ? ` + ${weights} 个钩码 × ${HOOK_G} N` : '' }}）・ 接触面积：{{ wide ? '大（平放）' : '小（侧放）' }}
             </text>
             <text x="20" y="486" font-size="13" font-weight="800" fill="var(--bb-fg)">
-              受力与运动状态：F = f（临界）→ 静止；F = f（滑动后）→ 匀速；F &gt; f → 向左加速
+              受力与运动：F &lt; f → 静止（二力平衡）；F = f → 匀速；F &gt; f → 向左加速（滑动后 F 恒 = f）
             </text>
             <text x="20" y="504" font-size="14" font-weight="800" fill="var(--bb-red)">
-              匀速拖动时：测力计示数 = 滑动摩擦力 f = μ・N = {{ fText }} N
+              匀速拉动时：测力计示数 = 滑动摩擦力 f = μ・N = {{ fText }} N
             </text>
           </g>
         </svg>
