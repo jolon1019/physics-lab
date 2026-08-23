@@ -106,17 +106,17 @@ const blockH = computed(() => (wide.value ? BW_H_WIDE : BW_H_NARROW))
 const editMode = ref(false)
 const selected = ref('block')
 const layout = reactive({
-  block: { x: 300, baseline: GROUND_Y, w: BW_WIDE },
-  dyn:   { x: 548, baseline: GROUND_Y - BW_H_WIDE / 2, w: 74 },
+  block: { x: 548, baseline: GROUND_Y, w: BW_WIDE },
+  dyn:   { x: 300, baseline: GROUND_Y - BW_H_WIDE / 2, w: 74 },
 })
-const LS_KEY = 'efriction-layout-v1'
+const LS_KEY = 'efriction-layout-v2'
 const savedLayout = ref(null)
-const hint = ref('按教材步骤实验：先选接触面 → 放钩码改变压力 → 向左拉动弹簧测力计，示数达到 f 后物块向右平移 → 拖动中按 Enter / R 记录数据。')
+const hint = ref('按教材步骤实验：先选接触面 → 放钩码改变压力 → 向左拉动弹簧测力计（测力计在左侧），示数达到 f 后物块向左平移 → 拖动中按 Enter / R 记录数据。')
 
 function computeDefaults() {
   return {
-    block: { x: 300, baseline: GROUND_Y, w: BW_WIDE },
-    dyn:   { x: 548, baseline: GROUND_Y - BW_H_WIDE / 2, w: 74 },
+    block: { x: 548, baseline: GROUND_Y, w: BW_WIDE },
+    dyn:   { x: 300, baseline: GROUND_Y - BW_H_WIDE / 2, w: 74 },
   }
 }
 function applyDefaults() {
@@ -284,11 +284,11 @@ const dynDrawX1 = computed(() => dynBodyX1.value - dynShift.value) // 右端 = �
 const baseLen = 30
 // 弹簧伸长随实际拉力（pullPx），静止时也随拉力伸长，与读数一致
 const springStretch = computed(() => pullPx.value)
-const hookX = computed(() => dynDrawX0.value) // 挂钩（连物块）在测力计左端
-const blockLeft = computed(() => layout.block.x - blockW.value / 2 + slideOffset.value)
+const hookX = computed(() => dynDrawX1.value) // 测力计在左，挂钩（连物块）在右端
+const blockLeft = computed(() => layout.block.x - blockW.value / 2 - slideOffset.value) // 物块在右，向左运动（减 slideOffset）
 const blockTop = computed(() => layout.block.baseline - blockH.value)
 const blockCenterY = computed(() => blockTop.value + blockH.value / 2)
-const blockRight = computed(() => blockLeft.value + blockW.value) // 物块右面（测力计挂此）
+const blockRight = computed(() => blockLeft.value + blockW.value) // 物块右面
 
 // 钩码：平底砝码，平铺叠放在物块顶部（不再悬浮），自下而上堆叠
 const HOOK_W = 64   // 砝码宽
@@ -480,17 +480,17 @@ onBeforeUnmount(() => {
 
             <!-- ===== 物块受力方向箭头（物理可视化）===== -->
             <g v-if="forceApplied > 0.001" :transform="`translate(${blockW / 2} ${blockH / 2})`">
-              <!-- 拉力 F：向右（红），起点中心，长度 ∝ forceApplied -->
+              <!-- 拉力 F：向左（红），起点中心，长度 ∝ forceApplied -->
               <g :transform="`translate(0 -10)`">
-                <line x1="0" y1="0" :x2="Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE)" y2="0" stroke="var(--bb-red)" stroke-width="3.5" stroke-linecap="round" />
-                <path :d="`M ${Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE)} 0 l-9 -5 l0 10 z`" fill="var(--bb-red)" />
-                <text :x="Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE) / 2" y="-7" text-anchor="middle" font-size="10" font-weight="800" fill="var(--bb-red)">F拉={{ forceApplied.toFixed(1) }}N</text>
+                <line x1="0" y1="0" :x2="-Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE)" y2="0" stroke="var(--bb-red)" stroke-width="3.5" stroke-linecap="round" />
+                <path :d="`M ${-Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE)} 0 l9 -5 l0 10 z`" fill="var(--bb-red)" />
+                <text :x="-Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE) / 2" y="-7" text-anchor="middle" font-size="10" font-weight="800" fill="var(--bb-red)">F拉={{ forceApplied.toFixed(1) }}N</text>
               </g>
-              <!-- 摩擦力 f：向左（蓝），起点中心，长度 ∝ frictionForce -->
+              <!-- 摩擦力 f：向右（蓝，阻碍向左运动），起点中心，长度 ∝ frictionForce -->
               <g :transform="`translate(0 12)`">
-                <line x1="0" y1="0" :x2="-Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE)" y2="0" stroke="var(--bb-blue)" stroke-width="3.5" stroke-linecap="round" />
-                <path :d="`M ${-Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE)} 0 l9 -5 l0 10 z`" fill="var(--bb-blue)" />
-                <text :x="-Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE) / 2" y="16" text-anchor="middle" font-size="10" font-weight="800" fill="var(--bb-blue)">f摩={{ frictionForce.toFixed(1) }}N</text>
+                <line x1="0" y1="0" :x2="Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE)" y2="0" stroke="var(--bb-blue)" stroke-width="3.5" stroke-linecap="round" />
+                <path :d="`M ${Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE)} 0 l-9 -5 l0 10 z`" fill="var(--bb-blue)" />
+                <text :x="Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE) / 2" y="16" text-anchor="middle" font-size="10" font-weight="800" fill="var(--bb-blue)">f摩={{ frictionForce.toFixed(1) }}N</text>
               </g>
             </g>
           </g>
@@ -520,20 +520,20 @@ onBeforeUnmount(() => {
             </text>
           </g>
 
-          <!-- 拉力方向箭头（物块受拉向右，滑动时显示） -->
+          <!-- 拉力方向箭头（物块受拉向左，滑动时显示在物块左侧） -->
           <g v-if="moving">
-            <line :x1="blockLeft + blockW + 6" :y1="blockCenterY - 30" :x2="blockLeft + blockW + 58" :y2="blockCenterY - 30" stroke="var(--bb-red)" stroke-width="4" stroke-linecap="round" />
-            <path :d="`M ${blockLeft + blockW + 58} ${blockCenterY - 30} l-12 -7 l0 14 z`" fill="var(--bb-red)" />
+            <line :x1="blockLeft - 6" :y1="blockCenterY - 30" :x2="blockLeft - 58" :y2="blockCenterY - 30" stroke="var(--bb-red)" stroke-width="4" stroke-linecap="round" />
+            <path :d="`M ${blockLeft - 58} ${blockCenterY - 30} l12 -7 l0 14 z`" fill="var(--bb-red)" />
           </g>
 
-          <!-- 运动线（仅滑动时流动） -->
+          <!-- 运动线（仅滑动时流动，位于物块左侧并向左流动） -->
           <g stroke="var(--bb-blue)" stroke-width="2" :opacity="moving ? 0.45 : 0.15" stroke-linecap="round">
             <line
               v-for="(d, i) in motionLines"
               :key="'ml' + i"
-              :x1="blockLeft + blockW + 10 + d"
+              :x1="blockLeft - 24 - d - 14"
               :y1="blockCenterY + 22"
-              :x2="blockLeft + blockW + 10 + d + 14"
+              :x2="blockLeft - 24 - d"
               :y2="blockCenterY + 22"
             />
           </g>
@@ -545,7 +545,7 @@ onBeforeUnmount(() => {
               压力 N = {{ N }} N（木块自重 {{ BLOCK_G }} N{{ weights > 0 ? ` + ${weights} 个钩码 × ${HOOK_G} N` : '' }}）・ 接触面积：{{ wide ? '大（平放）' : '小（侧放）' }}
             </text>
             <text x="20" y="504" font-size="14" font-weight="800" fill="var(--bb-red)">
-              拖动物块匀速拉动：测力计示数 = 滑动摩擦力 f = μ・N = {{ fText }} N
+              拖动弹簧测力计匀速：测力计示数 = 滑动摩擦力 f = μ・N = {{ fText }} N
             </text>
           </g>
         </svg>
@@ -604,7 +604,7 @@ onBeforeUnmount(() => {
           <ol>
             <li>选接触面（木板/毛巾/ 砂纸）</li>
             <li>在木块上放钩码改变压力（N = {{ N }} N）</li>
-            <li>向左拉动弹簧测力计，示数达到 f 后物块匀速向右滑动</li>
+            <li>向左拉动弹簧测力计（测力计在左侧），示数达到 f 后物块匀速向左滑动</li>
             <li>拖动中按 Enter / R 记录当前数据</li>
           </ol>
         </div>
