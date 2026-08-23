@@ -1,6 +1,5 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import FullscreenBtn from './FullscreenBtn.vue'
 
@@ -12,7 +11,6 @@ const BLOCK_G = 2
 const HOOK_G = 4
 const weights = ref(0) // 钩码数 0~3
 const surface = ref('wood') // wood / towel / sand
-const speed = ref(2) // 拉动速度 m/s（仅影响运动线密度）
 const wide = ref(true) // 接触面积（平放=大 / 侧放=小）
 
 const N = computed(() => BLOCK_G + weights.value * HOOK_G) // 压力（木块自重 + 钩码重）
@@ -147,6 +145,7 @@ function resetLayout() {
 
 // ===== 互动：拖动测力计施加拉力（严格物理模型）=====
 const K_FORCE = 0.16 // px → N
+const MAX_SLIDE = 60 // 物块/测力计外壳最大行程（px），拉到头即停，物块与拉力器同步
 const pullTarget = ref(0)
 const pullPx = ref(0)
 const slideOffset = ref(0)
@@ -203,8 +202,10 @@ function onWinPointerMove(e) {
     layout[dragInfo.name].baseline = dragInfo.b0 + (y - dragInfo.ly)
   } else {
     const dx = x - dragInfo.lx
-    // 拉力取拖动距离的绝对值（向左或向右拖动测力计都算施加拉力）
-    pullTarget.value = Math.max(0, Math.min(300, dragInfo.pull0 + Math.abs(dx)))
+    // 仅允许向左拖动产生拉力：向左位移(-dx>0)增加拉力；向右拖动无效（拉力保持不变）
+    const leftPull = Math.max(0, -dx)
+    const maxPull = forceThreshold.value + MAX_SLIDE / K_FORCE
+    pullTarget.value = Math.max(0, Math.min(maxPull, dragInfo.pull0 + leftPull))
   }
 }
 function onWinPointerUp() {
@@ -260,13 +261,13 @@ function tick(now) {
   const effectivePull = Math.max(0, pullPx.value)
   const threshold = Math.max(0.001, forceThreshold.value)
   if (effectivePull > threshold) {
-    slideOffset.value = effectivePull - threshold
-    moving.value = true
+    slideOffset.value = Math.min(effectivePull - threshold, MAX_SLIDE)
+    moving.value = slideOffset.value > 0.001
   } else {
     slideOffset.value = 0
     moving.value = false
   }
-  if (moving.value) phase.value += dt * (4 + speed.value * 2)
+  if (moving.value) phase.value += dt * 6
   else phase.value += dt * 0.6
   raf = requestAnimationFrame(tick)
 }
@@ -308,7 +309,7 @@ const blockLabelY = computed(() => blockTop.value - 14 - weights.value * HOOK_H)
 // 运动线
 const motionLines = computed(() => {
   const out = []
-  const count = Math.round(3 + speed.value * 2)
+  const count = 8
   const off = (phase.value * 26) % 30
   for (let i = 0; i < count; i++) out.push((i * 30 + off) % 150)
   return out
@@ -320,7 +321,7 @@ function mark() {
     emit('complete')
   }
 }
-watch([weights, surface, speed, wide], mark)
+watch([weights, surface, wide], mark)
 
 onMounted(() => {
   loadSaved()
@@ -484,7 +485,7 @@ onBeforeUnmount(() => {
               <g :transform="`translate(0 -10)`">
                 <line x1="0" y1="0" :x2="-Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE)" y2="0" stroke="var(--bb-red)" stroke-width="3.5" stroke-linecap="round" />
                 <path :d="`M ${-Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE)} 0 l9 -5 l0 10 z`" fill="var(--bb-red)" />
-                <text :x="-Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE) / 2" y="-7" text-anchor="middle" font-size="10" font-weight="800" fill="var(--bb-red)">F拉={{ forceApplied.toFixed(1) }}N</text>
+                <text :x="-Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE) / 2" y="-16" text-anchor="middle" font-size="10" font-weight="800" fill="var(--bb-red)">F拉={{ forceApplied.toFixed(1) }}N</text>
               </g>
               <!-- 摩擦力 f：向右（蓝，阻碍向左运动），起点中心，长度 ∝ frictionForce -->
               <g :transform="`translate(0 12)`">
@@ -500,22 +501,26 @@ onBeforeUnmount(() => {
             {{ weights > 0 ? `物块 + ${weights} 个钩码` : '物块' }}
           </text>
 
-          <!-- 施加拉力指示器（弹簧上方，拖动时显示） -->
+          <!-- 施加拉力指示器（拖动时显示在测力计上方，避免与拉力数字重叠） -->
           <g v-if="dragging && !editMode">
-            <rect :x="dynDrawX0" :y="dynCY - 58" width="170" height="10" rx="5" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.3)" stroke-width="1" />
+            <!-- 标题行（进度条上方） -->
+            <text :x="dynDrawX0" :y="dynCY - 86" font-size="10" fill="var(--bb-fg-dim)">施加拉力 F</text>
+            <text :x="dynDrawX0 + 170" :y="dynCY - 86" text-anchor="end" font-size="10" fill="var(--bb-red)">摩擦力 f</text>
+            <!-- 进度条 -->
+            <rect :x="dynDrawX0" :y="dynCY - 78" width="170" height="9" rx="4.5" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.3)" stroke-width="1" />
             <rect
               :x="dynDrawX0"
-              :y="dynCY - 58"
+              :y="dynCY - 78"
               :width="Math.min(170, forceApplied * 170 / Math.max(0.01, fNum))"
-              height="10"
-              rx="5"
+              height="9"
+              rx="4.5"
               :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'"
             />
-            <line :x1="dynDrawX0 + 170" :y1="dynCY - 64" :x2="dynDrawX0 + 170" :y2="dynCY - 42" stroke="var(--bb-red)" stroke-width="2" />
-            <text :x="dynDrawX0" :y="dynCY - 70" font-size="10" fill="var(--bb-fg-dim)">施加拉力 F</text>
-            <text :x="dynDrawX0 + 170" :y="dynCY - 70" text-anchor="end" font-size="10" fill="var(--bb-red)">摩擦力 f</text>
-            <text :x="dynDrawX0 + 85" :y="dynCY - 42" text-anchor="middle" font-size="11" font-weight="800" :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'">F = {{ forceApplied.toFixed(2) }} N</text>
-            <text :x="dynDrawX0 + 85" :y="dynCY + 76" text-anchor="middle" font-size="11" font-weight="700" :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'">
+            <line :x1="dynDrawX0 + 170" :y1="dynCY - 83" :x2="dynDrawX0 + 170" :y2="dynCY - 64" stroke="var(--bb-red)" stroke-width="2" />
+            <!-- 读数（进度条下方，隔开距离避免重叠） -->
+            <text :x="dynDrawX0 + 85" :y="dynCY - 60" text-anchor="middle" font-size="11" font-weight="800" :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'">F = {{ forceApplied.toFixed(2) }} N</text>
+            <!-- 状态（测力计下方，远离进度条） -->
+            <text :x="dynDrawX0 + 85" :y="dynCY + 78" text-anchor="middle" font-size="11" font-weight="700" :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'">
               {{ moving ? '✓ 已克服摩擦，物块滑动' : (forceApplied > 0 ? '⚠ 拉力不足，物块保持原位' : '请向左拉动测力计') }}
             </text>
           </g>
@@ -592,7 +597,6 @@ onBeforeUnmount(() => {
         <button class="btn" :class="{ 'btn-primary': wide }" @click="wide = true">接触面积大</button>
         <button class="btn" :class="{ 'btn-primary': !wide }" @click="wide = false">接触面积小</button>
         <button class="btn" :class="{ 'btn-primary': editMode }" @click="editMode = !editMode">{{ editMode ? '完成摆放' : '编辑摆放位置' }}</button>
-        <span class="feedback" :class="completed ? 'ok' : 'no'">{{ hint }}</span>
         <FullscreenBtn />
       </div>
     </div>
@@ -618,7 +622,6 @@ onBeforeUnmount(() => {
             </div>
             <p style="font-size: 11px; color: var(--text-dim)">每个钩码重 {{ HOOK_G }} N，压力 N = {{ BLOCK_G }} + {{ weights }}×{{ HOOK_G }} = <b>{{ N }} N</b></p>
           </div>
-          <ParamSlider v-model="speed" :min="1" :max="6" :step="1" :precision="0" label="运动线速度 v" unit=" m/s" hint="仅影响运动线密度，不影响物理" />
         </div>
       </div>
 
