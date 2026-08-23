@@ -155,8 +155,8 @@ const dragging = ref(false)
 
 const forceThreshold = computed(() => fNum.value / K_FORCE)
 const forceApplied = computed(() => Math.max(0, pullPx.value) * K_FORCE)
-const springStretch = computed(() => slideOffset.value)
-const readout = computed(() => moving.value ? fNum.value : 0)
+// 测力计读数 = 实际施加的拉力（无论静摩擦还是滑动摩擦，测力计都显示真实拉力）
+const readout = computed(() => forceApplied.value)
 // 物块所受摩擦力：静止时=拉力（静摩擦，随拉力增大而增大，最大=f）；滑动时=动摩擦 f
 const frictionForce = computed(() => moving.value ? fNum.value : Math.min(forceApplied.value, fNum.value))
 // 力箭头长度映射（N → px）
@@ -282,7 +282,8 @@ const dynShift = computed(() => Math.min(pullPx.value * 0.6, 60))
 const dynDrawX0 = computed(() => dynBodyX0.value - dynShift.value) // 左端 = 挂钩端
 const dynDrawX1 = computed(() => dynBodyX1.value - dynShift.value) // 右端 = 提环端
 const baseLen = 30
-const springLen = computed(() => baseLen + springStretch.value)
+// 弹簧伸长随实际拉力（pullPx），静止时也随拉力伸长，与读数一致
+const springStretch = computed(() => pullPx.value)
 const hookX = computed(() => dynDrawX0.value) // 挂钩（连物块）在测力计左端
 const blockLeft = computed(() => layout.block.x - blockW.value / 2 + slideOffset.value)
 const blockTop = computed(() => layout.block.baseline - blockH.value)
