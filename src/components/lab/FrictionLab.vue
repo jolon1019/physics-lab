@@ -143,6 +143,18 @@ function resetLayout() {
   hint.value = '已恢复为默认布局'
 }
 
+// 重置实验互动状态：拉力/位移/读数归零，物块回到原位（不影响已记录的数据表）
+function resetExperiment() {
+  pullTarget.value = 0
+  pullPx.value = 0
+  slideOffset.value = 0
+  released.value = false
+  dragging.value = false
+  dragInfo = null
+  motionState.value = 'idle'
+  hint.value = '已重置：物块归位，可重新向左拉动测力计'
+}
+
 // ===== 互动：拖动测力计施加拉力（严格物理模型）=====
 const K_FORCE = 0.16 // px → N
 // 不设终点：物块可一直向左拉动；唯一限制是画布左边界（物块左面最小 x 留白）
@@ -658,6 +670,7 @@ onBeforeUnmount(() => {
         <button class="btn" :class="{ 'btn-primary': wide }" @click="wide = true">接触面积大</button>
         <button class="btn" :class="{ 'btn-primary': !wide }" @click="wide = false">接触面积小</button>
         <button class="btn" :class="{ 'btn-primary': editMode }" @click="editMode = !editMode">{{ editMode ? '完成摆放' : '编辑摆放位置' }}</button>
+        <button class="btn" @click="resetExperiment">重置实验</button>
         <FullscreenBtn />
       </div>
     </div>
