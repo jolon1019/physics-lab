@@ -106,17 +106,17 @@ const blockH = computed(() => (wide.value ? BW_H_WIDE : BW_H_NARROW))
 const editMode = ref(false)
 const selected = ref('block')
 const layout = reactive({
-  block: { x: 372, baseline: GROUND_Y, w: BW_WIDE },
-  dyn:   { x: 78,  baseline: GROUND_Y - BW_H_WIDE / 2, w: 74 },
+  block: { x: 300, baseline: GROUND_Y, w: BW_WIDE },
+  dyn:   { x: 548, baseline: GROUND_Y - BW_H_WIDE / 2, w: 74 },
 })
 const LS_KEY = 'efriction-layout-v1'
 const savedLayout = ref(null)
-const hint = ref('按教材步骤实验：先选接触面 → 放钩码改变压力 → 向右拖动物块，使弹簧测力计示数达到 f 后匀速拉动 → 记录数据。')
+const hint = ref('按教材步骤实验：先选接触面 → 放钩码改变压力 → 向左拉动弹簧测力计，示数达到 f 后物块向右平移 → 拖动中按 Enter / R 记录数据。')
 
 function computeDefaults() {
   return {
-    block: { x: 372, baseline: GROUND_Y, w: BW_WIDE },
-    dyn:   { x: 78,  baseline: GROUND_Y - BW_H_WIDE / 2, w: 74 },
+    block: { x: 300, baseline: GROUND_Y, w: BW_WIDE },
+    dyn:   { x: 548, baseline: GROUND_Y - BW_H_WIDE / 2, w: 74 },
   }
 }
 function applyDefaults() {
@@ -145,7 +145,7 @@ function resetLayout() {
   hint.value = '已恢复为默认布局'
 }
 
-// ===== 互动：拖动物块施加拉力（严格物理模型）=====
+// ===== 互动：拖动测力计施加拉力（严格物理模型）=====
 const K_FORCE = 0.16 // px → N
 const pullTarget = ref(0)
 const pullPx = ref(0)
@@ -157,6 +157,10 @@ const forceThreshold = computed(() => fNum.value / K_FORCE)
 const forceApplied = computed(() => Math.max(0, pullPx.value) * K_FORCE)
 const springStretch = computed(() => slideOffset.value)
 const readout = computed(() => moving.value ? fNum.value : 0)
+// 物块所受摩擦力：静止时=拉力（静摩擦，随拉力增大而增大，最大=f）；滑动时=动摩擦 f
+const frictionForce = computed(() => moving.value ? fNum.value : Math.min(forceApplied.value, fNum.value))
+// 力箭头长度映射（N → px）
+const FORCE_ARROW_SCALE = 18 // 每 N 对应 px
 
 // ===== 拖动系统（摆放 / 拉动 共用）=====
 let dragInfo = null
@@ -180,12 +184,12 @@ function onPiecePointerDown(name, e) {
     dragging.value = true
     dragInfo = { mode: 'place', name, lx: x, ly: y, x0: layout[name].x, b0: layout[name].baseline }
   } else {
-    if (name !== 'block') return
+    if (name !== 'block' && name !== 'dyn') return
     dragging.value = true
     dragInfo = { mode: 'pull', lx: x, pull0: pullTarget.value }
     pullTarget.value = 0
-    pullPx.value = 0
-    slideOffset.value = 0
+    pullPx.value =
+      slideOffset.value = 0
   }
   window.addEventListener('pointermove', onWinPointerMove)
   window.addEventListener('pointerup', onWinPointerUp, { once: true })
@@ -199,7 +203,8 @@ function onWinPointerMove(e) {
     layout[dragInfo.name].baseline = dragInfo.b0 + (y - dragInfo.ly)
   } else {
     const dx = x - dragInfo.lx
-    pullTarget.value = Math.max(0, Math.min(300, dragInfo.pull0 + dx))
+    // 拉力取拖动距离的绝对值（向左或向右拖动测力计都算施加拉力）
+    pullTarget.value = Math.max(0, Math.min(300, dragInfo.pull0 + Math.abs(dx)))
   }
 }
 function onWinPointerUp() {
@@ -224,15 +229,23 @@ function scaleSel(factor) {
   layout[selected.value].w = Math.max(20, Math.min(260, layout[selected.value].w * factor))
 }
 function onKey(e) {
-  if (!editMode.value || !selected.value) return
-  const step = e.shiftKey ? 10 : 2
-  switch (e.key) {
-    case 'ArrowLeft': layout[selected.value].x -= step; e.preventDefault(); break
-    case 'ArrowRight': layout[selected.value].x += step; e.preventDefault(); break
-    case 'ArrowUp': layout[selected.value].baseline -= step; e.preventDefault(); break
-    case 'ArrowDown': layout[selected.value].baseline += step; e.preventDefault(); break
-    case '+': case '=': scaleSel(1.05); break
-    case '-': case '_': scaleSel(0.95); break
+  if (editMode.value) {
+    if (!selected.value) return
+    const step = e.shiftKey ? 10 : 2
+    switch (e.key) {
+      case 'ArrowLeft': layout[selected.value].x -= step; e.preventDefault(); break
+      case 'ArrowRight': layout[selected.value].x += step; e.preventDefault(); break
+      case 'ArrowUp': layout[selected.value].baseline -= step; e.preventDefault(); break
+      case 'ArrowDown': layout[selected.value].baseline += step; e.preventDefault(); break
+      case '+': case '=': scaleSel( 1.05); break
+      case '-': case '_': scaleSel(0.95); break
+    }
+    return
+  }
+  // 非编辑模式：拖动时无法点按钮，用快捷键记录数据
+  if (e.key === 'Enter' || e.key === 'r' || e.key === 'R') {
+    e.preventDefault()
+    recordRow()
   }
 }
 
@@ -259,27 +272,37 @@ function tick(now) {
 }
 
 // ===== 派生坐标（供 SVG 模板） =====
-const dynBodyX0 = computed(() => layout.dyn.x - 32)
-const dynBodyX1 = computed(() => layout.dyn.x + 6)
+const DYN_W = 96          // 测力计外壳长度
+const DYN_H = 34          // 测力计外壳高度
+const dynBodyX0 = computed(() => layout.dyn.x - DYN_W / 2)
+const dynBodyX1 = computed(() => layout.dyn.x + DYN_W / 2)
 const dynCY = computed(() => layout.dyn.baseline)
+// 拉动行程：测力计整体随拉力向左位移（表现「拉」的实感），物块在阈值前不动
+const dynShift = computed(() => Math.min(pullPx.value * 0.6, 60))
+const dynDrawX0 = computed(() => dynBodyX0.value - dynShift.value) // 左端 = 挂钩端
+const dynDrawX1 = computed(() => dynBodyX1.value - dynShift.value) // 右端 = 提环端
 const baseLen = 30
 const springLen = computed(() => baseLen + springStretch.value)
-const hookX = computed(() => dynBodyX1.value + springLen.value)
+const hookX = computed(() => dynDrawX0.value) // 挂钩（连物块）在测力计左端
 const blockLeft = computed(() => layout.block.x - blockW.value / 2 + slideOffset.value)
 const blockTop = computed(() => layout.block.baseline - blockH.value)
 const blockCenterY = computed(() => blockTop.value + blockH.value / 2)
+const blockRight = computed(() => blockLeft.value + blockW.value) // 物块右面（测力计挂此）
 
-// 钩码堆叠位置：物块正上方，自下而上堆 0~3 个
-const HOOK_PITCH = 30
+// 钩码：平底砝码，平铺叠放在物块顶部（不再悬浮），自下而上堆叠
+const HOOK_W = 64   // 砝码宽
+const HOOK_H = 20   // 单个砝码高（扁平）
 const hookPositions = computed(() => {
   const out = []
-  for (let i = 0; i < weights.value; i++) {
-    out.push({ y: -20 - i * HOOK_PITCH })
+  const n = weights.value
+  const startY = -HOOK_H // 第一个砝码紧贴物块上沿（blockTop 已是上沿）
+  for (let i = 0; i < n; i++) {
+    out.push({ y: startY - i * HOOK_H })
   }
   return out
 })
-// 「物块」标注随钩码上移
-const blockLabelY = computed(() => blockTop.value - 14 - weights.value * HOOK_PITCH)
+// 「物块 + 钩码」标注随钩码堆顶上移
+const blockLabelY = computed(() => blockTop.value - 14 - weights.value * HOOK_H)
 
 // 运动线
 const motionLines = computed(() => {
@@ -378,53 +401,69 @@ onBeforeUnmount(() => {
             </template>
           </g>
 
-          <!-- 弹簧测力计（水平，左侧，可拖动） -->
+          <!-- 弹簧测力计（水平，右侧，可拖动） -->
           <g filter="url(#fr-soft)" :class="{ 'is-sel': editMode && selected === 'dyn' }" @pointerdown="(e) => onPiecePointerDown('dyn', e)">
-            <rect :x="dynBodyX0" :y="dynCY - 15" :width="dynBodyX1 - dynBodyX0" height="30" rx="7" fill="url(#fr-dyn)" stroke="#2b3a4a" stroke-width="2.5" />
-            <rect :x="dynBodyX0 + 8" :y="dynCY - 10" :width="(dynBodyX1 - dynBodyX0) - 16" height="20" rx="3" fill="#f4f8fb" stroke="#9fb0c0" stroke-width="1.1" />
-            <g stroke="#9fb0c0" stroke-width="1">
-              <line v-for="i in 5" :key="'sc' + i" :x1="dynBodyX0 + 12" :y1="dynCY - 8 + i * 3.6" :x2="dynBodyX1 - 12" :y2="dynCY - 8 + i * 3.6" />
+            <!-- 右侧提环（人手向左拉） -->
+            <circle :cx="dynDrawX1 + 9" :cy="dynCY" r="9" fill="none" stroke="#2b3a4a" stroke-width="3.5" />
+            <!-- 外壳（圆筒） -->
+            <rect :x="dynDrawX0" :y="dynCY - DYN_H / 2" :width="DYN_W" :height="DYN_H" rx="9" fill="url(#fr-dyn)" stroke="#2b3a4a" stroke-width="2.5" />
+            <!-- 左端盖（挂钩端 / 连物块） -->
+            <rect :x="dynDrawX0" :y="dynCY - DYN_H / 2" width="14" :height="DYN_H" rx="6" fill="#2b3a4a" />
+            <!-- 右端盖（提环端） -->
+            <rect :x="dynDrawX1 - 12" :y="dynCY - DYN_H / 2" width="12" :height="DYN_H" rx="5" fill="#1f2c39" />
+            <!-- 顶部刻度窗 -->
+            <rect :x="dynDrawX0 + 18" :y="dynCY - 11" :width="DYN_W - 36" height="22" rx="3" fill="#f6fafd" stroke="#9fb0c0" stroke-width="1.2" />
+            <!-- 刻度线（0~5N，5 大格） -->
+            <g stroke="#5b6b7a" stroke-width="1">
+              <line v-for="i in 11" :key="'tk' + i" :x1="dynDrawX0 + 20 + (i - 1) * ((DYN_W - 40) / 10)" :y1="dynCY - 9" :x2="dynDrawX0 + 20 + (i - 1) * ((DYN_W - 40) / 10)" :y2="dynCY - 3" :stroke-width="i % 2 === 0 ? 1.6 : 0.8" />
             </g>
+            <!-- 指针（随读数在 0~5N 间移动） -->
             <line
-              :x1="dynBodyX0 + 10"
-              :x2="dynBodyX1 - 10"
-              :y1="dynCY - 9 + (readout / 26) * 18"
-              :y2="dynCY - 9 + (readout / 26) * 18"
+              :x1="dynDrawX0 + 20 + Math.min(1, readout / 5) * (DYN_W - 40)"
+              :x2="dynDrawX0 + 20 + Math.min(1, readout / 5) * (DYN_W - 40)"
+              :y1="dynCY - 10"
+              :y2="dynCY + 10"
               stroke="#d92135" stroke-width="2.4"
             />
-            <circle :cx="dynBodyX0 + 14" :cy="dynCY - 22" r="7" fill="none" stroke="#2b3a4a" stroke-width="3" />
+            <!-- 刻度端点文字 -->
+            <text :x="dynDrawX0 + 20" :y="dynCY + 21" font-size="8" fill="#5b6b7a">0</text>
+            <text :x="dynDrawX0 + DYN_W - 20" :y="dynCY + 21" text-anchor="end" font-size="8" fill="#5b6b7a">5N</text>
             <path
-              :d="`M ${dynBodyX1} ${dynCY}
-                ${Array.from({length:10},(_,i)=>{const xx=dynBodyX1+(springLen/10)*i;const yy=dynCY+(i%2?6:-6);return `L ${xx.toFixed(1)} ${yy.toFixed(1)}`}).join(' ')}
-                L ${hookX.toFixed(1)} ${dynCY}`"
+              :d="`M ${dynDrawX1 - 12} ${dynCY}
+                ${Array.from({length:10},(_,i)=>{const xx=(dynDrawX1-12)+(springLen/10)*i;const yy=dynCY+(i%2?5:-5);return `L ${xx.toFixed(1)} ${yy.toFixed(1)}`}).join(' ')}
+                L ${dynDrawX0 + 12} ${dynCY}`"
               fill="none" :stroke="springStretch > 0 ? '#5b6b7a' : '#7d8a9a'" :stroke-width="springStretch > 0 ? 2.4 : 2"
               :opacity="springStretch > 0 ? 1 : 0.7"
             />
+            <!-- 左端挂钩（连物块） -->
             <circle :cx="hookX" :cy="dynCY" r="4.5" fill="none" stroke="#2b3a4a" stroke-width="2.6" />
-            <text :x="(dynBodyX0 + dynBodyX1) / 2" :y="dynCY + 30" text-anchor="middle" font-size="13" font-weight="800" fill="#1a1a1a">{{ readout.toFixed(2) }}</text>
-            <text :x="(dynBodyX0 + dynBodyX1) / 2" :y="dynCY + 44" text-anchor="middle" font-size="9" font-weight="700" fill="#555">N</text>
+            <!-- 数值读数 -->
+            <text :x="(dynDrawX0 + dynDrawX1) / 2" :y="dynCY + DYN_H / 2 + 16" text-anchor="middle" font-size="13" font-weight="800" fill="#1a1a1a">{{ readout.toFixed(2) }}</text>
+            <text :x="(dynDrawX0 + dynDrawX1) / 2" :y="dynCY + DYN_H / 2 + 29" text-anchor="middle" font-size="9" font-weight="700" fill="#555">N</text>
           </g>
 
-          <!-- 拉杆（挂钩 → 物块左面） -->
-          <line :x1="hookX" :y1="dynCY" :x2="blockLeft" :y2="blockCenterY" stroke="#3a6ea5" stroke-width="4" stroke-linecap="round" />
+          <!-- 拉杆（测力计挂钩 → 物块右面） -->
+          <line :x1="hookX" :y1="dynCY" :x2="blockRight" :y2="blockCenterY" stroke="#3a6ea5" stroke-width="4" stroke-linecap="round" />
 
-          <!-- 物块（可拖动）+ 钩码堆叠 -->
+          <!-- 物块（可拖动）+ 钩码（平底平铺） -->
           <g
             :transform="`translate(${blockLeft} ${blockTop})`"
             :class="{ 'is-sel': editMode && selected === 'block', 'is-grab': !editMode }"
             @pointerdown="(e) => onPiecePointerDown('block', e)"
             style="cursor: grab"
           >
-            <!-- 钩码（物块上方，自下而上堆叠） -->
+            <!-- 钩码（砝码，平铺叠放在物块顶部，平底贴合物块上沿） -->
             <g v-for="(h, i) in hookPositions" :key="'hk' + i" :transform="`translate(${blockW / 2} ${h.y})`">
-              <!-- 挂钩环 -->
-              <circle cy="-16" r="4.5" fill="none" stroke="#8a5d1a" stroke-width="2.5" />
-              <!-- 横梁 -->
-              <rect x="-13" y="-13" width="26" height="5" rx="2.5" fill="url(#fr-hook)" stroke="#8a5d1a" stroke-width="1.4" />
-              <!-- 砝码主体（梯形圆盘） -->
-              <path d="M-10 -8 Q0 -6 10 -8 L8 6 Q0 10 -8 6 Z" fill="url(#fr-hook)" stroke="#8a5d1a" stroke-width="1.6" />
+              <!-- 砝码主体：扁平圆柱（平底） -->
+              <rect :x="-HOOK_W / 2" :y="0" :width="HOOK_W" :height="HOOK_H" rx="4" fill="url(#fr-hook)" stroke="#8a5d1a" stroke-width="1.6" />
+              <!-- 顶部凹槽环 -->
+              <rect :x="-HOOK_W / 2 + 8" y="2.5" :width="HOOK_W - 16" height="4" rx="2" fill="none" stroke="#8a5d1a" stroke-width="1.1" opacity="0.7" />
+              <!-- 中部刻痕 -->
+              <line :x1="-HOOK_W / 2 + 7" :y1="HOOK_H / 2" :x2="HOOK_W / 2 - 7" :y2="HOOK_H / 2" stroke="#8a5d1a" stroke-width="1" opacity="0.5" />
               <!-- 高光 -->
-              <path d="M-6 -6 L-4 -6 L-3 4 L-6 4 Z" fill="rgba(255,255,255,0.5)" />
+              <rect :x="-HOOK_W / 2 + 4" y="3" :width="HOOK_W - 8" height="3" rx="1.5" fill="rgba(255,255,255,0.55)" />
+              <!-- 数值 -->
+              <text :x="0" :y="HOOK_H / 2 + 4" text-anchor="middle" font-size="11" font-weight="800" fill="#8a5d1a">{{ HOOK_G }}</text>
             </g>
 
             <rect :width="blockW" :height="blockH" rx="6" :fill="wide ? 'url(#fr-wood)' : 'url(#fr-wood-side)'" :stroke="SURF_TONE.wood.edge" stroke-width="2.5" />
@@ -437,6 +476,22 @@ onBeforeUnmount(() => {
               <line x1="20" :y1="14" :x2="20" :y2="blockH - 14" />
               <line x1="44" :y1="14" :x2="44" :y2="blockH - 14" />
             </g>
+
+            <!-- ===== 物块受力方向箭头（物理可视化）===== -->
+            <g v-if="forceApplied > 0.001" :transform="`translate(${blockW / 2} ${blockH / 2})`">
+              <!-- 拉力 F：向右（红），起点中心，长度 ∝ forceApplied -->
+              <g :transform="`translate(0 -10)`">
+                <line x1="0" y1="0" :x2="Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE)" y2="0" stroke="var(--bb-red)" stroke-width="3.5" stroke-linecap="round" />
+                <path :d="`M ${Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE)} 0 l-9 -5 l0 10 z`" fill="var(--bb-red)" />
+                <text :x="Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE) / 2" y="-7" text-anchor="middle" font-size="10" font-weight="800" fill="var(--bb-red)">F拉={{ forceApplied.toFixed(1) }}N</text>
+              </g>
+              <!-- 摩擦力 f：向左（蓝），起点中心，长度 ∝ frictionForce -->
+              <g :transform="`translate(0 12)`">
+                <line x1="0" y1="0" :x2="-Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE)" y2="0" stroke="var(--bb-blue)" stroke-width="3.5" stroke-linecap="round" />
+                <path :d="`M ${-Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE)} 0 l9 -5 l0 10 z`" fill="var(--bb-blue)" />
+                <text :x="-Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE) / 2" y="16" text-anchor="middle" font-size="10" font-weight="800" fill="var(--bb-blue)">f摩={{ frictionForce.toFixed(1) }}N</text>
+              </g>
+            </g>
           </g>
 
           <!-- 物块上方的标注（随钩码上移） -->
@@ -446,25 +501,25 @@ onBeforeUnmount(() => {
 
           <!-- 施加拉力指示器（弹簧上方，拖动时显示） -->
           <g v-if="dragging && !editMode">
-            <rect :x="dynBodyX0" :y="dynCY - 58" width="210" height="10" rx="5" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.3)" stroke-width="1" />
+            <rect :x="dynDrawX0" :y="dynCY - 58" width="170" height="10" rx="5" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.3)" stroke-width="1" />
             <rect
-              :x="dynBodyX0"
+              :x="dynDrawX0"
               :y="dynCY - 58"
-              :width="Math.min(210, forceApplied * 210 / Math.max(0.01, fNum))"
+              :width="Math.min(170, forceApplied * 170 / Math.max(0.01, fNum))"
               height="10"
               rx="5"
               :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'"
             />
-            <line :x1="dynBodyX0 + 210" :y1="dynCY - 64" :x2="dynBodyX0 + 210" :y2="dynCY - 42" stroke="var(--bb-red)" stroke-width="2" />
-            <text :x="dynBodyX0" :y="dynCY - 70" font-size="10" fill="var(--bb-fg-dim)">施加拉力 F</text>
-            <text :x="dynBodyX0 + 210" :y="dynCY - 70" text-anchor="end" font-size="10" fill="var(--bb-red)">摩擦力 f</text>
-            <text :x="dynBodyX0 + 105" :y="dynCY - 42" text-anchor="middle" font-size="11" font-weight="800" :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'">F = {{ forceApplied.toFixed(2) }} N</text>
-            <text :x="dynBodyX0 + 105" :y="dynCY + 76" text-anchor="middle" font-size="11" font-weight="700" :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'">
-              {{ moving ? '✓ 已克服摩擦，物块滑动' : (forceApplied > 0 ? '⚠ 拉力不足，物块保持原位' : '请向右拖动物块') }}
+            <line :x1="dynDrawX0 + 170" :y1="dynCY - 64" :x2="dynDrawX0 + 170" :y2="dynCY - 42" stroke="var(--bb-red)" stroke-width="2" />
+            <text :x="dynDrawX0" :y="dynCY - 70" font-size="10" fill="var(--bb-fg-dim)">施加拉力 F</text>
+            <text :x="dynDrawX0 + 170" :y="dynCY - 70" text-anchor="end" font-size="10" fill="var(--bb-red)">摩擦力 f</text>
+            <text :x="dynDrawX0 + 85" :y="dynCY - 42" text-anchor="middle" font-size="11" font-weight="800" :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'">F = {{ forceApplied.toFixed(2) }} N</text>
+            <text :x="dynDrawX0 + 85" :y="dynCY + 76" text-anchor="middle" font-size="11" font-weight="700" :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'">
+              {{ moving ? '✓ 已克服摩擦，物块滑动' : (forceApplied > 0 ? '⚠ 拉力不足，物块保持原位' : '请向左拉动测力计') }}
             </text>
           </g>
 
-          <!-- 拉力方向箭头（向右，滑动时显示） -->
+          <!-- 拉力方向箭头（物块受拉向右，滑动时显示） -->
           <g v-if="moving">
             <line :x1="blockLeft + blockW + 6" :y1="blockCenterY - 30" :x2="blockLeft + blockW + 58" :y2="blockCenterY - 30" stroke="var(--bb-red)" stroke-width="4" stroke-linecap="round" />
             <path :d="`M ${blockLeft + blockW + 58} ${blockCenterY - 30} l-12 -7 l0 14 z`" fill="var(--bb-red)" />
@@ -546,10 +601,10 @@ onBeforeUnmount(() => {
         <div class="lab-panel-head"><strong>实验步骤</strong><span>教材 8.3-4</span></div>
         <div class="lab-steps">
           <ol>
-            <li>选接触面（木板/毛巾/砂纸）</li>
+            <li>选接触面（木板/毛巾/ 砂纸）</li>
             <li>在木块上放钩码改变压力（N = {{ N }} N）</li>
-            <li>向右拖动物块至匀速滑动，读测力计示数 = f</li>
-            <li>点「记录数据」填入实验表格</li>
+            <li>向左拉动弹簧测力计，示数达到 f 后物块匀速向右滑动</li>
+            <li>拖动中按 Enter / R 记录当前数据</li>
           </ol>
         </div>
         <div class="lab-params" style="padding: 8px 12px">
@@ -573,7 +628,7 @@ onBeforeUnmount(() => {
           <span>{{ records.length }} 组</span>
         </div>
         <div class="record-actions">
-          <button class="btn btn-sm btn-primary" @click="recordRow">＋ 记录本次数据</button>
+          <button class="btn btn-sm btn-primary" @click="recordRow" title="快捷键：Enter / R">＋ 记录本次数据<span class="kbd">Enter/R</span></button>
           <button class="btn btn-sm" @click="clearRecords" :disabled="records.length === 0">清空</button>
         </div>
         <table class="record-table" v-if="records.length">
@@ -605,7 +660,13 @@ onBeforeUnmount(() => {
           { label: '压力 N（木块+钩码）', value: N + ' N' }
         ]"
         :result="[{ label: '摩擦力 f = μN', value: fText + ' N' }]"
-        verify="大量实验表明：滑动摩擦力的大小与接触面所受压力有关（压力越大、f 越大）；还与接触面的粗糙程度和材料有关（越粗糙、f 越大）；与接触面积和运动速度无关。"
+        :verify="[
+          '控制变量：保持接触面不变，改变木块上的钩码数量，从而改变压力 N',
+          '记录每组压力 N 与对应测力计示数 f，发现 N 越大、f 越大 → f 与压力成正比',
+          '控制变量：保持压力不变，更换接触面（木板 / 毛巾 / 砂纸），f 随粗糙程度增大而增大',
+          '对比不同接触面积或拉动速度：在同样压力下 f 不变 → 与接触面积、运动速度无关',
+          '由此归纳：滑动摩擦力 f = μN，μ 为接触面间的动摩擦因数'
+        ]"
       />
     </aside>
   </div>
@@ -649,6 +710,16 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 8px;
   padding: 10px 12px 4px;
+}
+.kbd {
+  margin-left: 6px;
+  font-size: 10px;
+  font-family: ui-monospace, Menlo, monospace;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 5px;
+  background: var(--surface-3);
+  color: var(--text-dim);
 }
 .record-table {
   width: 100%;
