@@ -6,10 +6,16 @@ import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
 
-const N = ref(10) // 压力 N
+// ===== 教材实验参数 =====
+// 木块自重 G块 = 2 N；每个钩码 G码 = 4 N；压力 N = 2 + 钩码数 × 4
+const BLOCK_G = 2
+const HOOK_G = 4
+const weights = ref(0) // 钩码数 0~3
 const surface = ref('wood') // wood / towel / sand
 const speed = ref(2) // 拉动速度 m/s（仅影响运动线密度）
 const wide = ref(true) // 接触面积（平放=大 / 侧放=小）
+
+const N = computed(() => BLOCK_G + weights.value * HOOK_G) // 压力（木块自重 + 钩码重）
 
 const MU = { wood: 0.4, towel: 0.65, sand: 0.85 }
 const SURF_LABEL = { wood: '木板面', towel: '毛巾面', sand: '砂纸面' }
@@ -23,6 +29,67 @@ const fNum = computed(() => MU[surface.value] * N.value)
 const fText = computed(() => fNum.value.toFixed(2))
 
 let completed = false
+
+// ===== 实验记录表（教材：自己设计表格记录数据）=====
+const records = ref([]) // { id, surface, N, f }
+function recordRow() {
+  records.value.push({
+    id: records.value.length + 1,
+    surface: SURF_LABEL[surface.value],
+    surfaceKey: surface.value,
+    N: N.value,
+    f: fNum.value.toFixed(2),
+  })
+  hint.value = `已记录第 ${records.value.length} 组：${SURF_LABEL[surface.value]}、压力 ${N.value} N、f = ${fNum.value.toFixed(2)} N`
+  mark()
+}
+function clearRecords() {
+  records.value = []
+  hint.value = '已清空记录，重新开始实验'
+}
+
+// 自动归纳结论
+const conclusion = computed(() => {
+  const tips = []
+  // 同一接触面，不同压力
+  const bySurface = {}
+  records.value.forEach((r) => {
+    ;(bySurface[r.surfaceKey] = bySurface[r.surfaceKey] || []).push(r)
+  })
+  for (const [sk, rows] of Object.entries(bySurface)) {
+    const ns = new Set(rows.map((r) => r.N))
+    if (ns.size >= 2 && rows.length >= 2) {
+      rows.sort((a, b) => a.N - b.N)
+      const f1 = parseFloat(rows[0].f)
+      const f2 = parseFloat(rows[rows.length - 1].f)
+      if (f2 > f1) {
+        tips.push(`${SURF_LABEL[sk]}上：压力越大，滑动摩擦力越大`)
+        break
+      }
+    }
+  }
+  // 同一压力，不同接触面
+  const byN = {}
+  records.value.forEach((r) => {
+    ;(byN[r.N] = byN[r.N] || []).push(r)
+  })
+  for (const [n, rows] of Object.entries(byN)) {
+    if (rows.length >= 2) {
+      const muOrder = { wood: 0, towel: 1, sand: 2 }
+      rows.sort((a, b) => muOrder[a.surfaceKey] - muOrder[b.surfaceKey])
+      const f0 = parseFloat(rows[0].f)
+      const f1 = parseFloat(rows[rows.length - 1].f)
+      if (f1 > f0) {
+        tips.push(`压力 ${n} N 不变：接触面越粗糙，滑动摩擦力越大`)
+        break
+      }
+    }
+  }
+  if (tips.length === 0 && records.value.length > 0) {
+    tips.push('继续记录更多数据：可固定压力换接触面，或固定接触面加钩码')
+  }
+  return tips
+})
 
 // ===== 几何常量（SVG 逻辑坐标，viewBox 0 0 640 520）=====
 const VB_W = 640
@@ -44,7 +111,7 @@ const layout = reactive({
 })
 const LS_KEY = 'efriction-layout-v1'
 const savedLayout = ref(null)
-const hint = ref('拖动物块：当施加的拉力 ≥ 摩擦力 f = μN 时，物块才开始滑动、弹簧才会被拉伸。点击「编辑摆放位置」可调整装置布局。')
+const hint = ref('按教材步骤实验：先选接触面 → 放钩码改变压力 → 向右拖动物块，使弹簧测力计示数达到 f 后匀速拉动 → 记录数据。')
 
 function computeDefaults() {
   return {
@@ -79,20 +146,15 @@ function resetLayout() {
 }
 
 // ===== 互动：拖动物块施加拉力（严格物理模型）=====
-// 模型：cursor dx = 施加的位移；F = dx*K_FORCE。
-//   当 F < f (μN)：物块保持原位，弹簧不拉伸（cursor 可"悬空"在物块前方）。
-//   当 F ≥ f：物块开始滑动 slideOffset = dx - f/K_FORCE，弹簧随物块实际位移同步拉伸。
-//   松手：cursor 归零 → 弹簧回弹 → 物块回位。
 const K_FORCE = 0.16 // px → N
-const pullTarget = ref(0) // cursor dx（逻辑 px）
-const pullPx = ref(0)     // lerp 到 target（视觉平滑）
-const slideOffset = ref(0) // 物块实际位移
-const moving = ref(false)  // 物块是否正在滑动
+const pullTarget = ref(0)
+const pullPx = ref(0)
+const slideOffset = ref(0)
+const moving = ref(false)
 const dragging = ref(false)
 
-const forceThreshold = computed(() => fNum.value / K_FORCE) // 克服摩擦所需的 px
+const forceThreshold = computed(() => fNum.value / K_FORCE)
 const forceApplied = computed(() => Math.max(0, pullPx.value) * K_FORCE)
-// 弹簧仅在物块发生位移后才拉伸；测力计读数：滑动时=f（匀速二力平衡），静止时=0
 const springStretch = computed(() => slideOffset.value)
 const readout = computed(() => moving.value ? fNum.value : 0)
 
@@ -118,7 +180,6 @@ function onPiecePointerDown(name, e) {
     dragging.value = true
     dragInfo = { mode: 'place', name, lx: x, ly: y, x0: layout[name].x, b0: layout[name].baseline }
   } else {
-    // 互动：仅物块可拖动
     if (name !== 'block') return
     dragging.value = true
     dragInfo = { mode: 'pull', lx: x, pull0: pullTarget.value }
@@ -137,7 +198,6 @@ function onWinPointerMove(e) {
     layout[dragInfo.name].x = dragInfo.x0 + (x - dragInfo.lx)
     layout[dragInfo.name].baseline = dragInfo.b0 + (y - dragInfo.ly)
   } else {
-    // 拉力模式：cursor dx 即施加位移；向左拖不产生拉力
     const dx = x - dragInfo.lx
     pullTarget.value = Math.max(0, Math.min(300, dragInfo.pull0 + dx))
   }
@@ -146,7 +206,7 @@ function onWinPointerUp() {
   dragging.value = false
   dragInfo = null
   window.removeEventListener('pointermove', onWinPointerMove)
-  if (!editMode.value) pullTarget.value = 0 // 松手回弹
+  if (!editMode.value) pullTarget.value = 0
 }
 function onWheel(e) {
   if (!editMode.value || !selected.value) return
@@ -183,16 +243,13 @@ const phase = ref(0)
 function tick(now) {
   const dt = Math.min(((now - lastT) || 16) / 1000, 0.05)
   lastT = now
-  // 弹簧拉伸/物块位移 lerp 到目标（用于松手回弹）
   pullPx.value += (pullTarget.value - pullPx.value) * Math.min(1, dt * 10)
-  // 严格物理：只有当 cursor 施加的力 ≥ f 时，物块才开始滑动
   const effectivePull = Math.max(0, pullPx.value)
   const threshold = Math.max(0.001, forceThreshold.value)
   if (effectivePull > threshold) {
     slideOffset.value = effectivePull - threshold
     moving.value = true
   } else {
-    // 物块保持原位、弹簧不拉伸（即使 cursor 还在阈值附近抖动也不会出现"半拉"）
     slideOffset.value = 0
     moving.value = false
   }
@@ -212,7 +269,19 @@ const blockLeft = computed(() => layout.block.x - blockW.value / 2 + slideOffset
 const blockTop = computed(() => layout.block.baseline - blockH.value)
 const blockCenterY = computed(() => blockTop.value + blockH.value / 2)
 
-// 运动线（仅滑动时流动）
+// 钩码堆叠位置：物块正上方，自下而上堆 0~3 个
+const HOOK_PITCH = 30
+const hookPositions = computed(() => {
+  const out = []
+  for (let i = 0; i < weights.value; i++) {
+    out.push({ y: -20 - i * HOOK_PITCH })
+  }
+  return out
+})
+// 「物块」标注随钩码上移
+const blockLabelY = computed(() => blockTop.value - 14 - weights.value * HOOK_PITCH)
+
+// 运动线
 const motionLines = computed(() => {
   const out = []
   const count = Math.round(3 + speed.value * 2)
@@ -227,7 +296,7 @@ function mark() {
     emit('complete')
   }
 }
-watch([N, surface, speed, wide], mark)
+watch([weights, surface, speed, wide], mark)
 
 onMounted(() => {
   loadSaved()
@@ -272,6 +341,11 @@ onBeforeUnmount(() => {
               <stop offset="0" stop-color="#ffffff" />
               <stop offset="1" stop-color="#eef3f8" />
             </linearGradient>
+            <linearGradient id="fr-hook" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#ffe08a" />
+              <stop offset="0.5" stop-color="#ffd166" />
+              <stop offset="1" stop-color="#c9972e" />
+            </linearGradient>
             <filter id="fr-soft" x="-20%" y="-20%" width="140%" height="140%">
               <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.28" />
             </filter>
@@ -306,14 +380,11 @@ onBeforeUnmount(() => {
 
           <!-- 弹簧测力计（水平，左侧，可拖动） -->
           <g filter="url(#fr-soft)" :class="{ 'is-sel': editMode && selected === 'dyn' }" @pointerdown="(e) => onPiecePointerDown('dyn', e)">
-            <!-- 外壳 -->
             <rect :x="dynBodyX0" :y="dynCY - 15" :width="dynBodyX1 - dynBodyX0" height="30" rx="7" fill="url(#fr-dyn)" stroke="#2b3a4a" stroke-width="2.5" />
-            <!-- 刻度窗 -->
             <rect :x="dynBodyX0 + 8" :y="dynCY - 10" :width="(dynBodyX1 - dynBodyX0) - 16" height="20" rx="3" fill="#f4f8fb" stroke="#9fb0c0" stroke-width="1.1" />
             <g stroke="#9fb0c0" stroke-width="1">
               <line v-for="i in 5" :key="'sc' + i" :x1="dynBodyX0 + 12" :y1="dynCY - 8 + i * 3.6" :x2="dynBodyX1 - 12" :y2="dynCY - 8 + i * 3.6" />
             </g>
-            <!-- 指针（仅滑动时移动到 f 位置） -->
             <line
               :x1="dynBodyX0 + 10"
               :x2="dynBodyX1 - 10"
@@ -321,9 +392,7 @@ onBeforeUnmount(() => {
               :y2="dynCY - 9 + (readout / 26) * 18"
               stroke="#d92135" stroke-width="2.4"
             />
-            <!-- 顶部提环 -->
             <circle :cx="dynBodyX0 + 14" :cy="dynCY - 22" r="7" fill="none" stroke="#2b3a4a" stroke-width="3" />
-            <!-- 螺旋弹簧：仅物块发生位移后才被拉伸 -->
             <path
               :d="`M ${dynBodyX1} ${dynCY}
                 ${Array.from({length:10},(_,i)=>{const xx=dynBodyX1+(springLen/10)*i;const yy=dynCY+(i%2?6:-6);return `L ${xx.toFixed(1)} ${yy.toFixed(1)}`}).join(' ')}
@@ -331,9 +400,7 @@ onBeforeUnmount(() => {
               fill="none" :stroke="springStretch > 0 ? '#5b6b7a' : '#7d8a9a'" :stroke-width="springStretch > 0 ? 2.4 : 2"
               :opacity="springStretch > 0 ? 1 : 0.7"
             />
-            <!-- 挂钩 -->
             <circle :cx="hookX" :cy="dynCY" r="4.5" fill="none" stroke="#2b3a4a" stroke-width="2.6" />
-            <!-- 数字读数 -->
             <text :x="(dynBodyX0 + dynBodyX1) / 2" :y="dynCY + 30" text-anchor="middle" font-size="13" font-weight="800" fill="#1a1a1a">{{ readout.toFixed(2) }}</text>
             <text :x="(dynBodyX0 + dynBodyX1) / 2" :y="dynCY + 44" text-anchor="middle" font-size="9" font-weight="700" fill="#555">N</text>
           </g>
@@ -341,13 +408,25 @@ onBeforeUnmount(() => {
           <!-- 拉杆（挂钩 → 物块左面） -->
           <line :x1="hookX" :y1="dynCY" :x2="blockLeft" :y2="blockCenterY" stroke="#3a6ea5" stroke-width="4" stroke-linecap="round" />
 
-          <!-- 物块（可拖动；不显示内部文字，标注在物块上方） -->
+          <!-- 物块（可拖动）+ 钩码堆叠 -->
           <g
             :transform="`translate(${blockLeft} ${blockTop})`"
             :class="{ 'is-sel': editMode && selected === 'block', 'is-grab': !editMode }"
             @pointerdown="(e) => onPiecePointerDown('block', e)"
             style="cursor: grab"
           >
+            <!-- 钩码（物块上方，自下而上堆叠） -->
+            <g v-for="(h, i) in hookPositions" :key="'hk' + i" :transform="`translate(${blockW / 2} ${h.y})`">
+              <!-- 挂钩环 -->
+              <circle cy="-16" r="4.5" fill="none" stroke="#8a5d1a" stroke-width="2.5" />
+              <!-- 横梁 -->
+              <rect x="-13" y="-13" width="26" height="5" rx="2.5" fill="url(#fr-hook)" stroke="#8a5d1a" stroke-width="1.4" />
+              <!-- 砝码主体（梯形圆盘） -->
+              <path d="M-10 -8 Q0 -6 10 -8 L8 6 Q0 10 -8 6 Z" fill="url(#fr-hook)" stroke="#8a5d1a" stroke-width="1.6" />
+              <!-- 高光 -->
+              <path d="M-6 -6 L-4 -6 L-3 4 L-6 4 Z" fill="rgba(255,255,255,0.5)" />
+            </g>
+
             <rect :width="blockW" :height="blockH" rx="6" :fill="wide ? 'url(#fr-wood)' : 'url(#fr-wood-side)'" :stroke="SURF_TONE.wood.edge" stroke-width="2.5" />
             <rect :width="blockW" height="10" rx="6" fill="rgba(255,255,255,0.28)" />
             <g v-if="wide" :stroke="SURF_TONE.wood.grain" stroke-width="1.2" opacity="0.6">
@@ -360,14 +439,14 @@ onBeforeUnmount(() => {
             </g>
           </g>
 
-          <!-- 物块上方的标注（始终显示在物块上方） -->
-          <text :x="blockLeft + blockW / 2" :y="blockTop - 10" text-anchor="middle" font-size="14" font-weight="800" fill="var(--bb-fg)" stroke="#0b0b0b" stroke-width="0.6" paint-order="stroke">物块</text>
+          <!-- 物块上方的标注（随钩码上移） -->
+          <text :x="blockLeft + blockW / 2" :y="blockLabelY" text-anchor="middle" font-size="14" font-weight="800" fill="var(--bb-fg)" stroke="#0b0b0b" stroke-width="0.6" paint-order="stroke">
+            {{ weights > 0 ? `物块 + ${weights} 个钩码` : '物块' }}
+          </text>
 
           <!-- 施加拉力指示器（弹簧上方，拖动时显示） -->
           <g v-if="dragging && !editMode">
-            <!-- 背景条 -->
             <rect :x="dynBodyX0" :y="dynCY - 58" width="210" height="10" rx="5" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.3)" stroke-width="1" />
-            <!-- 施加力条（按 forceApplied/forceThreshold 比例） -->
             <rect
               :x="dynBodyX0"
               :y="dynCY - 58"
@@ -376,14 +455,10 @@ onBeforeUnmount(() => {
               rx="5"
               :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'"
             />
-            <!-- 摩擦力阈值线（条右端） -->
             <line :x1="dynBodyX0 + 210" :y1="dynCY - 64" :x2="dynBodyX0 + 210" :y2="dynCY - 42" stroke="var(--bb-red)" stroke-width="2" />
-            <!-- 标签 -->
             <text :x="dynBodyX0" :y="dynCY - 70" font-size="10" fill="var(--bb-fg-dim)">施加拉力 F</text>
             <text :x="dynBodyX0 + 210" :y="dynCY - 70" text-anchor="end" font-size="10" fill="var(--bb-red)">摩擦力 f</text>
-            <!-- 数值 -->
             <text :x="dynBodyX0 + 105" :y="dynCY - 42" text-anchor="middle" font-size="11" font-weight="800" :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'">F = {{ forceApplied.toFixed(2) }} N</text>
-            <!-- 状态提示 -->
             <text :x="dynBodyX0 + 105" :y="dynCY + 76" text-anchor="middle" font-size="11" font-weight="700" :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'">
               {{ moving ? '✓ 已克服摩擦，物块滑动' : (forceApplied > 0 ? '⚠ 拉力不足，物块保持原位' : '请向右拖动物块') }}
             </text>
@@ -411,10 +486,10 @@ onBeforeUnmount(() => {
           <g font-family="system-ui, sans-serif" font-weight="700">
             <text x="20" y="30" font-size="14" fill="var(--bb-fg)">接触面：{{ SURF_LABEL[surface] }}（μ = {{ MU[surface] }}）</text>
             <text x="20" y="52" font-size="12.5" fill="var(--bb-fg-dim)">
-              压力 N = {{ N }} N ・ 接触面积：{{ wide ? '大（平放）' : '小（侧放）' }}
+              压力 N = {{ N }} N（木块自重 {{ BLOCK_G }} N{{ weights > 0 ? ` + ${weights} 个钩码 × ${HOOK_G} N` : '' }}）・ 接触面积：{{ wide ? '大（平放）' : '小（侧放）' }}
             </text>
             <text x="20" y="504" font-size="14" font-weight="800" fill="var(--bb-red)">
-              拖动物块：当施加拉力 F ≥ 摩擦力 f = μ・N = {{ fText }} N 时，物块才开始滑动、弹簧才会被拉伸
+              拖动物块匀速拉动：测力计示数 = 滑动摩擦力 f = μ・N = {{ fText }} N
             </text>
           </g>
         </svg>
@@ -468,31 +543,57 @@ onBeforeUnmount(() => {
 
     <aside class="lab-right">
       <div class="lab-panel">
-        <div class="lab-panel-head"><strong>可调变量</strong><span>探究摩擦力</span></div>
-        <ParamSlider v-model="N" :min="2" :max="30" :step="1" :precision="0" label="压力 N（接触面正压力）" unit=" N" />
-        <ParamSlider v-model="speed" :min="1" :max="6" :step="1" :precision="0" label="运动线速度 v" unit=" m/s" hint="仅影响运动线密度，不影响物理" />
-        <p style="padding:4px 12px;font-size:12px;color:var(--text-dim)">接触面积（按钮切换）不影响滑动摩擦力大小。拖动右侧物块可手动施加拉力。</p>
+        <div class="lab-panel-head"><strong>实验步骤</strong><span>教材 8.3-4</span></div>
+        <div class="lab-steps">
+          <ol>
+            <li>选接触面（木板/毛巾/砂纸）</li>
+            <li>在木块上放钩码改变压力（N = {{ N }} N）</li>
+            <li>向右拖动物块至匀速滑动，读测力计示数 = f</li>
+            <li>点「记录数据」填入实验表格</li>
+          </ol>
+        </div>
+        <div class="lab-params" style="padding: 8px 12px">
+          <div class="param-group">
+            <span>钩码数量（改变压力）</span>
+            <div class="hook-btns">
+              <button v-for="n in [0, 1, 2, 3]" :key="n" class="btn btn-sm" :class="{ 'btn-primary': weights === n }" @click="weights = n">
+                {{ n }} 个
+              </button>
+            </div>
+            <p style="font-size: 11px; color: var(--text-dim)">每个钩码重 {{ HOOK_G }} N，压力 N = {{ BLOCK_G }} + {{ weights }}×{{ HOOK_G }} = <b>{{ N }} N</b></p>
+          </div>
+          <ParamSlider v-model="speed" :min="1" :max="6" :step="1" :precision="0" label="运动线速度 v" unit=" m/s" hint="仅影响运动线密度，不影响物理" />
+        </div>
       </div>
 
+      <!-- 实验记录表（教材：自己设计表格记录数据） -->
       <div class="lab-panel">
-        <div class="lab-panel-head"><strong>实时数据</strong><span>{{ dragging ? '拖动中' : '待操作' }}</span></div>
-        <div class="lab-readout">
-          <div class="lab-stat">
-            <span>施加拉力 F</span>
-            <strong>{{ forceApplied.toFixed(2) }} N</strong>
-          </div>
-          <div class="lab-stat">
-            <span>测力计读数</span>
-            <strong>{{ readout.toFixed(2) }} N</strong>
-          </div>
-          <div class="lab-stat accent">
-            <span>滑动摩擦力 f</span>
-            <strong>{{ fText }} N</strong>
-          </div>
-          <div class="lab-stat" :class="{ success: moving }">
-            <span>状态</span>
-            <strong>{{ moving ? '滑动中' : (dragging ? '静止（拉力未达 f）' : '静止') }}</strong>
-          </div>
+        <div class="lab-panel-head">
+          <strong>实验记录表</strong>
+          <span>{{ records.length }} 组</span>
+        </div>
+        <div class="record-actions">
+          <button class="btn btn-sm btn-primary" @click="recordRow">＋ 记录本次数据</button>
+          <button class="btn btn-sm" @click="clearRecords" :disabled="records.length === 0">清空</button>
+        </div>
+        <table class="record-table" v-if="records.length">
+          <thead>
+            <tr><th>#</th><th>接触面</th><th>压力 N (N)</th><th>摩擦力 f (N)</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in records" :key="r.id" :class="{ 'row-current': r.surfaceKey === surface && r.N === N }">
+              <td>{{ r.id }}</td>
+              <td>{{ r.surface }}</td>
+              <td>{{ r.N }}</td>
+              <td>{{ r.f }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="record-empty">尚无数据 — 按左侧步骤实验后点「记录本次数据」</div>
+        <!-- 结论 -->
+        <div class="record-concl" v-if="conclusion.length">
+          <div class="concl-title">📌 初步结论</div>
+          <p v-for="(c, i) in conclusion" :key="i">{{ c }}</p>
         </div>
       </div>
 
@@ -501,10 +602,10 @@ onBeforeUnmount(() => {
         formula="f = μ · N"
         :rows="[
           { label: '接触面 μ', value: MU[surface] },
-          { label: '压力 N', value: N + ' N' }
+          { label: '压力 N（木块+钩码）', value: N + ' N' }
         ]"
         :result="[{ label: '摩擦力 f = μN', value: fText + ' N' }]"
-        verify="用弹簧测力计水平拉动物块：施加拉力 F < f 时，物块保持原位、弹簧不拉伸；F ≥ f 时物块开始滑动、弹簧随物块位移同步拉伸；滑动后测力计读数 = f（二力平衡）。f 只与接触面粗糙程度 μ 和压力 N 有关，与接触面积无关。"
+        verify="大量实验表明：滑动摩擦力的大小与接触面所受压力有关（压力越大、f 越大）；还与接触面的粗糙程度和材料有关（越粗糙、f 越大）；与接触面积和运动速度无关。"
       />
     </aside>
   </div>
@@ -522,6 +623,76 @@ onBeforeUnmount(() => {
 .is-grab { cursor: grab; }
 .is-grab:active { cursor: grabbing; }
 
+/* 实验步骤 */
+.lab-steps ol {
+  margin: 0;
+  padding: 10px 12px 10px 32px;
+  font-size: 12px;
+  line-height: 1.9;
+  color: var(--text);
+}
+.lab-steps li::marker {
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+/* 钩码按钮 */
+.hook-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+/* 实验记录表 */
+.record-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px 4px;
+}
+.record-table {
+  width: 100%;
+  margin-top: 6px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.record-table th,
+.record-table td {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  text-align: center;
+}
+.record-table th {
+  background: var(--surface-3);
+  font-weight: 800;
+}
+.record-table tr.row-current {
+  background: var(--accent-bg);
+}
+.record-empty {
+  padding: 14px 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: center;
+}
+.record-concl {
+  margin: 10px 12px 12px;
+  padding: 10px 12px;
+  border: 2px dashed var(--success);
+  border-radius: var(--radius-sm);
+  background: var(--success-bg);
+  font-size: 12px;
+  color: var(--text-h);
+}
+.concl-title {
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.record-concl p {
+  line-height: 1.7;
+}
+
+/* 摆放编辑器 */
 .pos-editor {
   position: absolute;
   top: 12px;
