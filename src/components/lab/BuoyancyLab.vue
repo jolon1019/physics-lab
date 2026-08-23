@@ -280,11 +280,11 @@ watch([kAnim], () => {
             </g>
             <polygon
               :points="`${TANK_X - 14},${yTop - 6} ${TANK_X - 14},${yTop + 6} ${TANK_X - 4},${yTop}`"
-              fill="#d92135"
+              :fill="'var(--bb-red)'"
               stroke="#0b0b0b"
               stroke-width="1"
             />
-            <text :x="TANK_X - 30" :y="yTop + 4" text-anchor="end" font-size="12" font-weight="800" fill="#d92135">
+            <text :x="TANK_X - 30" :y="yTop + 4" text-anchor="end" font-size="12" font-weight="800" :fill="'var(--bb-red)'">
               {{ (kAnim * 100).toFixed(0) }}%
             </text>
           </g>
@@ -350,29 +350,29 @@ watch([kAnim], () => {
 
           <!-- 受力箭头 -->
           <!-- 重力 G 向下（块中心） -->
-          <line :x1="cx" :y1="blockMidY" :x2="cx" :y2="blockMidY + gLen" stroke="#d92135" stroke-width="4" stroke-linecap="round" />
-          <polygon :points="arrowHead(cx, blockMidY + gLen, 'down')" fill="#d92135" />
-          <text :x="cx - 14" :y="blockMidY + gLen / 2" text-anchor="end" font-size="12" font-weight="800" fill="#d92135" paint-order="stroke" stroke="#fffef9" stroke-width="3">
+          <line :x1="cx" :y1="blockMidY" :x2="cx" :y2="blockMidY + gLen" stroke="var(--bb-red)" stroke-width="4" stroke-linecap="round" />
+          <polygon :points="arrowHead(cx, blockMidY + gLen, 'down')" fill="var(--bb-red)" />
+          <text :x="cx - 14" :y="blockMidY + gLen / 2" text-anchor="end" font-size="12" font-weight="800" fill="var(--bb-red)" paint-order="stroke" stroke="#fffef9" stroke-width="3">
             G={{ G.toFixed(2) }}
           </text>
           <!-- 浮力 F浮 向上（块底） -->
-          <line :x1="cx" :y1="blockBotY" :x2="cx" :y2="blockBotY - fbLen" stroke="#0d9b61" stroke-width="4" stroke-linecap="round" />
-          <polygon :points="arrowHead(cx, blockBotY - fbLen, 'up')" fill="#0d9b61" />
-          <text :x="cx - 14" :y="blockBotY - fbLen / 2" text-anchor="end" font-size="12" font-weight="800" fill="#0d9b61" paint-order="stroke" stroke="#fffef9" stroke-width="3">
+          <line :x1="cx" :y1="blockBotY" :x2="cx" :y2="blockBotY - fbLen" stroke="var(--bb-green)" stroke-width="4" stroke-linecap="round" />
+          <polygon :points="arrowHead(cx, blockBotY - fbLen, 'up')" fill="var(--bb-green)" />
+          <text :x="cx - 14" :y="blockBotY - fbLen / 2" text-anchor="end" font-size="12" font-weight="800" fill="var(--bb-green)" paint-order="stroke" stroke="#fffef9" stroke-width="3">
             F浮={{ Fb.toFixed(2) }}
           </text>
           <!-- 拉力 F拉 向上（块右侧） -->
-          <line :x1="cx + H_block / 2 + 20" :y1="yTop" :x2="cx + H_block / 2 + 20" :y2="yTop - fpLen" stroke="#145fd2" stroke-width="4" stroke-linecap="round" />
-          <polygon :points="arrowHead(cx + H_block / 2 + 20, yTop - fpLen, 'up')" fill="#145fd2" />
-          <text :x="cx + H_block / 2 + 28" :y="yTop - fpLen / 2" font-size="12" font-weight="800" fill="#145fd2" paint-order="stroke" stroke="#fffef9" stroke-width="3">
+          <line :x1="cx + H_block / 2 + 20" :y1="yTop" :x2="cx + H_block / 2 + 20" :y2="yTop - fpLen" stroke="var(--bb-blue)" stroke-width="4" stroke-linecap="round" />
+          <polygon :points="arrowHead(cx + H_block / 2 + 20, yTop - fpLen, 'up')" fill="var(--bb-blue)" />
+          <text :x="cx + H_block / 2 + 28" :y="yTop - fpLen / 2" font-size="12" font-weight="800" fill="var(--bb-blue)" paint-order="stroke" stroke="#fffef9" stroke-width="3">
             F拉={{ Fpull.toFixed(2) }}
           </text>
 
           <!-- 上浮提示 -->
-          <text v-if="willRise" :x="cx" :y="TANK_BOT - 14" text-anchor="middle" font-size="13" font-weight="800" fill="#d92135">
+          <text v-if="willRise" :x="cx" :y="TANK_BOT - 14" text-anchor="middle" font-size="13" font-weight="800" fill="var(--bb-red)">
             浮力 &gt; 重力，物体将上浮（F拉 = 0）
           </text>
-          <text :x="cx" :y="TANK_BOT + 22" text-anchor="middle" font-size="12" font-weight="700" fill="#5a6b78">
+          <text :x="cx" :y="TANK_BOT + 22" text-anchor="middle" font-size="12" font-weight="700" fill="var(--bb-fg-dim)">
             {{ LIQ_LABEL[liquid] }}　ρ液 = {{ RHO_LIQ[liquid] }} g/cm³
           </text>
         </svg>

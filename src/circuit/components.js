@@ -139,7 +139,7 @@ export function buildArt(type, state = {}) {
         <circle cx="0" cy="0" r="22" fill="${fill}" stroke="#d8a93a" stroke-width="2.4"/>
         <circle cx="-6" cy="-6" r="6" fill="rgba(255,255,255,${on ? 0.7 : 0.3})"/>
         <path d="M -12 6 L -4 -2 L 2 6 L 10 -4" fill="none" stroke="${on ? '#caa23a' : '#6b6043'}" stroke-width="2" stroke-linejoin="round"/>
-        ${state.reading ? `<text x="0" y="40" font-size="11" font-weight="700" fill="#ffe9a8" text-anchor="middle" font-family="system-ui">${state.reading}</text>` : ''}`
+        ${state.reading ? `<text x="0" y="40" font-size="11" font-weight="700" fill="var(--bb-amber)" text-anchor="middle" font-family="system-ui">${state.reading}</text>` : ''}`
     }
     case 'resistor':
       return `
@@ -149,7 +149,7 @@ export function buildArt(type, state = {}) {
         <rect x="-20" y="-13" width="5" height="26" fill="#5b86b3"/>
         <rect x="-6" y="-13" width="5" height="26" fill="#5b86b3"/>
         <rect x="14" y="-13" width="5" height="26" fill="#5b86b3"/>
-        <text x="0" y="-20" font-size="11" font-weight="700" fill="#9fd4ff" text-anchor="middle" font-family="system-ui">${state.R != null ? state.R : 10}Ω</text>`
+        <text x="0" y="-20" font-size="11" font-weight="700" fill="var(--bb-blue)" text-anchor="middle" font-family="system-ui">${state.R != null ? state.R : 10}Ω</text>`
     case 'rheostat': {
       const frac = typeof state.frac === 'number' ? state.frac : 0.5
       const sliderX = -44 + frac * 88
@@ -161,7 +161,7 @@ export function buildArt(type, state = {}) {
         <line x1="0" y1="-32" x2="0" y2="-9" stroke="#cfd6df" stroke-width="3"/>
         <circle cx="0" cy="-32" r="4" fill="#cfd6df"/>
         <polygon points="${sliderX - 7},-9 ${sliderX + 7},-9 ${sliderX},4" fill="#ff7a85" stroke="#c23b46" stroke-width="1.5"/>
-        <text x="0" y="22" font-size="10" font-weight="700" fill="#9fd4ff" text-anchor="middle" font-family="system-ui">R=${(frac * RHEO_MAX).toFixed(0)}Ω</text>`
+        <text x="0" y="22" font-size="10" font-weight="700" fill="var(--bb-blue)" text-anchor="middle" font-family="system-ui">R=${(frac * RHEO_MAX).toFixed(0)}Ω</text>`
     }
     case 'ammeter':
     case 'voltmeter': {

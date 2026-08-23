@@ -4,6 +4,7 @@ import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { createTone } from '../../lib/audio'
 import { paintBoard } from '../../lib/boardBg'
+import { boardFg, boardText } from '../../lib/boardText'
 import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
@@ -210,9 +211,9 @@ function render() {
 
   drawWave()
 
-  // 顶栏信息
+  // 顶栏信息（颜色随画板主题自适应）
   ctx.textAlign = 'left'
-  ctx.fillStyle = C.text
+  ctx.fillStyle = boardFg(ctx.canvas)
   ctx.font = 'bold 15px sans-serif'
   ctx.fillText(`示波器 · ${INST[instrument.value].label}`, 30, 34)
   ctx.fillStyle = C.trace
@@ -220,7 +221,7 @@ function render() {
   ctx.fillText(`f = ${freq.value} Hz　T = ${period.value.toFixed(4)} s　λ = ${wavelength.value.toFixed(2)} m`, 30, 58)
   ctx.fillStyle = C.accent
   ctx.fillText(`音调：${pitch.value}　·　响度：${loudness.value}`, 30, 82)
-  ctx.fillStyle = C.muted
+  ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '12px sans-serif'
   ctx.fillText('波形疏密 → 音调（频率）　波形高低 → 响度（振幅）　波形形状 → 音色', 30, 104)
 }

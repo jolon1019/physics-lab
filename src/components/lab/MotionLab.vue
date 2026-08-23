@@ -469,8 +469,8 @@ onBeforeUnmount(() => {
             </g>
 
             <!-- 标题 -->
-            <text x="34" y="42" font-size="22" font-weight="900" fill="#ffffff">运动的描述 · 参照物</text>
-            <text x="34" y="64" font-size="14" fill="rgba(255,255,255,0.75)">换一个参照物，再看谁动谁静</text>
+            <text x="34" y="42" font-size="22" font-weight="900" fill="var(--bb-fg)">运动的描述 · 参照物</text>
+            <text x="34" y="64" font-size="14" fill="var(--bb-fg-dim)">换一个参照物，再看谁动谁静</text>
 
             <!-- 玻璃拟态结论卡片（右上角；窄屏自动隐藏，避免遮挡汽车） -->
             <g class="ml-card">

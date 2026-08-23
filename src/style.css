@@ -1055,6 +1055,14 @@ p { margin: 0; }
   /* 画板文字配色：默认深绿黑板 → 浅色文字；随主题切换 */
   --bb-fg: #f2f5f0;       /* 标题/高亮（最亮） */
   --bb-fg-dim: #c7d0c8;   /* 正文/标签（次级亮） */
+  /* 语义强调色（深色画板上用亮色，保证可读） */
+  --bb-red: #ff6b78;
+  --bb-green: #69f0ae;
+  --bb-blue: #7cb8ff;
+  --bb-amber: #ffd166;
+  --bb-cyan: #4dd8ff;
+  --bb-purple: #d5a8ff;
+  --bb-pink: #ff8fb0;
 }
 [data-board-theme="light"] {
   --bb-surface: radial-gradient(130% 120% at 50% -10%, #fbfaf7 0%, #f4f1ea 55%, #ece7da 100%);
@@ -1063,6 +1071,14 @@ p { margin: 0; }
   /* 浅色纸面 → 深色文字 */
   --bb-fg: #1a1a1a;
   --bb-fg-dim: #4a4a4a;
+  /* 语义强调色（浅色画板上用深色，保证可读） */
+  --bb-red: #d92135;
+  --bb-green: #0d9b61;
+  --bb-blue: #145fd2;
+  --bb-amber: #b87915;
+  --bb-cyan: #0e7490;
+  --bb-purple: #7c3aed;
+  --bb-pink: #d6336c;
 }
 .lab-left > .lab-panel {
   position: relative;
@@ -1084,6 +1100,14 @@ p { margin: 0; }
     inset 0 0 30px rgba(0, 0, 0, 0.5);
   --bb-fg: #eaf2fb;
   --bb-fg-dim: #b9c8da;
+  /* 深空板固定深色 → 语义强调色恒为亮色 */
+  --bb-red: #ff8090;
+  --bb-green: #7ee0b0;
+  --bb-blue: #8ec5ff;
+  --bb-amber: #ffd166;
+  --bb-cyan: #4dd8ff;
+  --bb-purple: #d5a8ff;
+  --bb-pink: #ff9fc0;
 }
 .lab-left > .lab-panel.board-dark::before {
   background: radial-gradient(130% 120% at 50% -10%, #14263a 0%, #0c1726 55%, #070d18 100%);
@@ -1093,6 +1117,14 @@ p { margin: 0; }
   box-shadow: var(--bb-frame);
   --bb-fg: #1a1a1a;
   --bb-fg-dim: #4a4a4a;
+  /* 浅色纸面 → 语义强调色转深，保证可读 */
+  --bb-red: #d92135;
+  --bb-green: #0d9b61;
+  --bb-blue: #145fd2;
+  --bb-amber: #b87915;
+  --bb-cyan: #0e7490;
+  --bb-purple: #7c3aed;
+  --bb-pink: #d6336c;
 }
 [data-board-theme="light"] .lab-left > .lab-panel.board-dark.board-adaptive::before {
   background: var(--bb-surface);

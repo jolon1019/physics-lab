@@ -79,22 +79,22 @@ function pngArtHtml(type, st) {
     }
   } else if (type === 'switch') {
     const closed = !st.open
-    extra += `<text x="0" y="-42" font-size="11" font-weight="700" fill="${closed ? '#7fd1a0' : '#ffb454'}" text-anchor="middle" font-family="system-ui">${closed ? '闭合' : '断开'}</text>`
+    extra += `<text x="0" y="-42" font-size="11" font-weight="700" fill="${closed ? 'var(--bb-green)' : 'var(--bb-amber)'}" text-anchor="middle" font-family="system-ui">${closed ? '闭合' : '断开'}</text>`
   } else if (type === 'battery') {
     const v = st.V != null ? st.V.toFixed(1) : '6.0'
-    extra += `<text x="0" y="42" font-size="10" font-weight="700" fill="#cfd6df" text-anchor="middle" font-family="system-ui">电源 ${v} V</text>`
+    extra += `<text x="0" y="42" font-size="10" font-weight="700" fill="var(--bb-fg-dim)" text-anchor="middle" font-family="system-ui">电源 ${v} V</text>`
   } else if (type === 'rheostat') {
     const frac = typeof st.frac === 'number' ? st.frac : 0.5
     const sx = -28 + frac * 56
     extra += `<polygon points="${sx.toFixed(1)},-44 ${(sx + 5).toFixed(1)},-34 ${(sx - 5).toFixed(1)},-34" fill="#ff5b67" stroke="#c23b46" stroke-width="1" />`
     const rOhm = Math.round(frac * 20)
-    extra += `<text x="0" y="40" font-size="10" font-weight="700" fill="#9fd4ff" text-anchor="middle" font-family="system-ui">R=${rOhm} Ω</text>`
+    extra += `<text x="0" y="40" font-size="10" font-weight="700" fill="var(--bb-blue)" text-anchor="middle" font-family="system-ui">R=${rOhm} Ω</text>`
   } else if (type === 'ammeter' || type === 'voltmeter') {
     // PNG 是笔记本形态：屏幕在 PNG 上半（y≈30-180），下方"A/V"铭牌 + 3 端子底座。
     // 数字读数放在屏幕内部（PNG y≈110 黑色显示区），按本框 contain 比例换算。
     const readingY = -90 * scale
     const txt = st.reading || (type === 'ammeter' ? '0.00A' : '0.00V')
-    extra += `<text x="0" y="${readingY.toFixed(2)}" font-size="14" font-weight="800" fill="#ff5566" text-anchor="middle" font-family="ui-monospace,monospace">${txt}</text>`
+    extra += `<text x="0" y="${readingY.toFixed(2)}" font-size="14" font-weight="800" fill="var(--bb-red)" text-anchor="middle" font-family="ui-monospace,monospace">${txt}</text>`
     // 屏幕底部"A"/"V"标签保留 PNG 自带的，不再画额外标签
   }
   return img + extra

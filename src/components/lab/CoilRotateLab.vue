@@ -461,7 +461,7 @@ const verifyList = [
             <g>
               <path v-for="(l, i) in bLines" :key="'bl' + i" :d="l.d" stroke="rgba(106,183,255,0.55)" stroke-width="2" marker-end="url(#mB)" fill="none" />
               <path v-for="(l, i) in bLines" :key="'bf' + i" :d="l.d" class="bflow" stroke="rgba(150,210,255,0.5)" stroke-width="2" fill="none" />
-              <text :x="bLbl.x" :y="bLbl.y" fill="#6ab7ff" font-size="15" font-weight="800" font-style="italic">B</text>
+              <text :x="bLbl.x" :y="bLbl.y" fill="var(--bb-blue)" font-size="15" font-weight="800" font-style="italic">B</text>
             </g>
 
             <!-- 转轴（竖直） -->
@@ -484,15 +484,15 @@ const verifyList = [
             <g v-show="mode === 'comm'">
               <path id="commE" fill="none" stroke="#d98e3f" stroke-width="4.6" stroke-linecap="round" />
               <path id="commF" fill="none" stroke="#9c5a2a" stroke-width="4.6" stroke-linecap="round" />
-              <text x="376" y="150" text-anchor="end" fill="#e8b06a" font-size="11.5" font-weight="700">换向器 E、F 半环</text>
+              <text x="376" y="150" text-anchor="end" fill="var(--bb-amber)" font-size="11.5" font-weight="700">换向器 E、F 半环</text>
               <line x1="378" y1="153" x2="428" y2="161" stroke="rgba(232,176,106,0.45)" stroke-width="1" />
             </g>
 
             <!-- 电刷 A、B -->
             <rect id="brushA" x="415" y="156" width="15" height="17" rx="3" fill="#caa25a" stroke="#8a6a30" stroke-width="1.5" />
             <rect id="brushB" x="470" y="152" width="15" height="17" rx="3" fill="#caa25a" stroke="#8a6a30" stroke-width="1.5" />
-            <text x="421" y="186" fill="#ffd9a0" font-size="11" font-weight="800">A</text>
-            <text x="474" y="146" fill="#ffd9a0" font-size="11" font-weight="800">B</text>
+            <text x="421" y="186" fill="var(--bb-amber)" font-size="11" font-weight="800">A</text>
+            <text x="474" y="146" fill="var(--bb-amber)" font-size="11" font-weight="800">B</text>
 
             <!-- 电 路：导线 + 电源 + 开关 -->
             <g>
@@ -508,16 +508,16 @@ const verifyList = [
               <rect x="415" y="46" width="90" height="34" rx="6" fill="#1d2433" stroke="#3a4658" stroke-width="1.5" />
               <rect x="423" y="52" width="22" height="22" rx="2" fill="none" stroke="#4a5668" stroke-width="1.5" />
               <rect x="475" y="52" width="22" height="22" rx="2" fill="none" stroke="#4a5668" stroke-width="1.5" />
-              <text x="460" y="68" text-anchor="middle" fill="#7d8a9c" font-size="10" font-weight="700">电源</text>
-              <text id="battP" x="416" y="37" text-anchor="middle" fill="#ffd166" font-size="11" font-weight="800">+</text>
-              <text id="battN" x="504" y="37" text-anchor="middle" fill="#7fd0ff" font-size="11" font-weight="800">−</text>
+              <text x="460" y="68" text-anchor="middle" fill="var(--bb-fg-dim)" font-size="10" font-weight="700">电源</text>
+              <text id="battP" x="416" y="37" text-anchor="middle" fill="var(--bb-amber)" font-size="11" font-weight="800">+</text>
+              <text id="battN" x="504" y="37" text-anchor="middle" fill="var(--bb-cyan)" font-size="11" font-weight="800">−</text>
               <!-- 开关（缩小，串接在上方右侧水平回路） -->
               <circle cx="540" cy="24" r="3.5" fill="#cfd6e2" />
               <circle cx="572" cy="24" r="3.5" fill="#cfd6e2" />
               <g id="swBladeG">
                 <line x1="540" y1="24" x2="572" y2="24" stroke="#e6ebf2" stroke-width="3.5" stroke-linecap="round" />
               </g>
-              <text x="556" y="16" text-anchor="middle" fill="#7d8a9c" font-size="10" font-weight="700">开关</text>
+              <text x="556" y="16" text-anchor="middle" fill="var(--bb-fg-dim)" font-size="10" font-weight="700">开关</text>
               <rect x="520" y="8" width="72" height="28" fill="transparent" style="cursor:pointer" @click="togglePower">
                 <title>{{ powered ? '断开开关' : '闭合开关' }}</title>
               </rect>
@@ -534,14 +534,14 @@ const verifyList = [
             <g class="corner-lbl" id="labD"><circle r="8" /><text text-anchor="middle" dy="3.5">d</text></g>
 
             <!-- 受力箭头 -->
-            <g id="fRight" style="display:none"><line x1="0" y1="0" x2="58" y2="0" stroke="#ff5b6e" stroke-width="4" marker-end="url(#mF)" /><text y="-9" fill="#ff8090" font-size="13" font-weight="800">F</text></g>
-            <g id="fLeft" style="display:none"><line x1="0" y1="0" x2="58" y2="0" stroke="#ff5b6e" stroke-width="4" marker-end="url(#mF)" /><text y="-9" fill="#ff8090" font-size="13" font-weight="800">F</text></g>
-            <g id="fTop" style="display:none"><line x1="0" y1="0" x2="40" y2="0" stroke="#c586ff" stroke-width="4" marker-end="url(#mF2)" /><text y="-9" fill="#d5a8ff" font-size="13" font-weight="800">F</text></g>
-            <g id="fBot" style="display:none"><line x1="0" y1="0" x2="40" y2="0" stroke="#c586ff" stroke-width="4" marker-end="url(#mF2)" /><text y="-9" fill="#d5a8ff" font-size="13" font-weight="800">F</text></g>
+            <g id="fRight" style="display:none"><line x1="0" y1="0" x2="58" y2="0" stroke="#ff5b6e" stroke-width="4" marker-end="url(#mF)" /><text y="-9" fill="var(--bb-red)" font-size="13" font-weight="800">F</text></g>
+            <g id="fLeft" style="display:none"><line x1="0" y1="0" x2="58" y2="0" stroke="#ff5b6e" stroke-width="4" marker-end="url(#mF)" /><text y="-9" fill="var(--bb-red)" font-size="13" font-weight="800">F</text></g>
+            <g id="fTop" style="display:none"><line x1="0" y1="0" x2="40" y2="0" stroke="#c586ff" stroke-width="4" marker-end="url(#mF2)" /><text y="-9" fill="var(--bb-purple)" font-size="13" font-weight="800">F</text></g>
+            <g id="fBot" style="display:none"><line x1="0" y1="0" x2="40" y2="0" stroke="#c586ff" stroke-width="4" marker-end="url(#mF2)" /><text y="-9" fill="var(--bb-purple)" font-size="13" font-weight="800">F</text></g>
 
             <!-- 转动方向弧 -->
             <path id="rotArc" fill="none" stroke="#4dd8ff" stroke-width="2.6" opacity="0.9" marker-end="url(#mArc)" style="display:none" />
-            <text id="rotLbl" fill="#4dd8ff" font-size="12" font-weight="800" text-anchor="middle"></text>
+            <text id="rotLbl" fill="var(--bb-cyan)" font-size="12" font-weight="800" text-anchor="middle"></text>
           </svg>
 
           <!-- 缩放控制 -->
@@ -778,7 +778,7 @@ const verifyList = [
   top: 40px;
   left: 14px;
   font-size: 10px;
-  color: rgba(140, 180, 220, 0.75);
+  color: var(--bb-fg-dim);
   line-height: 2;
   z-index: 20;
 }
@@ -793,7 +793,7 @@ const verifyList = [
 @keyframes bflow { to { stroke-dashoffset: -48; } }
 /* 线圈角标 */
 .corner-lbl circle { fill: rgba(20, 26, 38, 0.75); stroke: #f0a852; stroke-width: 1.5; }
-.corner-lbl text { fill: #ffd9a0; font-size: 12px; font-weight: 800; }
+.corner-lbl text { fill: var(--bb-amber); font-size: 12px; font-weight: 800; }
 /* 右侧操作控制面板（原动画底部栏移至此处） */
 .control-panel .ctrl-body {
   display: flex;

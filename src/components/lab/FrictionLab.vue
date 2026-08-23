@@ -361,7 +361,7 @@ onBeforeUnmount(() => {
           </g>
 
           <!-- 物块上方的标注（始终显示在物块上方） -->
-          <text :x="blockLeft + blockW / 2" :y="blockTop - 10" text-anchor="middle" font-size="14" font-weight="800" fill="#f2f5f0" stroke="#0b0b0b" stroke-width="0.6" paint-order="stroke">物块</text>
+          <text :x="blockLeft + blockW / 2" :y="blockTop - 10" text-anchor="middle" font-size="14" font-weight="800" fill="var(--bb-fg)" stroke="#0b0b0b" stroke-width="0.6" paint-order="stroke">物块</text>
 
           <!-- 施加拉力指示器（弹簧上方，拖动时显示） -->
           <g v-if="dragging && !editMode">
@@ -374,29 +374,29 @@ onBeforeUnmount(() => {
               :width="Math.min(210, forceApplied * 210 / Math.max(0.01, fNum))"
               height="10"
               rx="5"
-              :fill="moving ? '#ff6b78' : '#ffd24d'"
+              :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'"
             />
             <!-- 摩擦力阈值线（条右端） -->
-            <line :x1="dynBodyX0 + 210" :y1="dynCY - 64" :x2="dynBodyX0 + 210" :y2="dynCY - 42" stroke="#ff6b78" stroke-width="2" />
+            <line :x1="dynBodyX0 + 210" :y1="dynCY - 64" :x2="dynBodyX0 + 210" :y2="dynCY - 42" stroke="var(--bb-red)" stroke-width="2" />
             <!-- 标签 -->
-            <text :x="dynBodyX0" :y="dynCY - 70" font-size="10" fill="#c7d0c8">施加拉力 F</text>
-            <text :x="dynBodyX0 + 210" :y="dynCY - 70" text-anchor="end" font-size="10" fill="#ff6b78">摩擦力 f</text>
+            <text :x="dynBodyX0" :y="dynCY - 70" font-size="10" fill="var(--bb-fg-dim)">施加拉力 F</text>
+            <text :x="dynBodyX0 + 210" :y="dynCY - 70" text-anchor="end" font-size="10" fill="var(--bb-red)">摩擦力 f</text>
             <!-- 数值 -->
-            <text :x="dynBodyX0 + 105" :y="dynCY - 42" text-anchor="middle" font-size="11" font-weight="800" :fill="moving ? '#ff6b78' : '#ffd24d'">F = {{ forceApplied.toFixed(2) }} N</text>
+            <text :x="dynBodyX0 + 105" :y="dynCY - 42" text-anchor="middle" font-size="11" font-weight="800" :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'">F = {{ forceApplied.toFixed(2) }} N</text>
             <!-- 状态提示 -->
-            <text :x="dynBodyX0 + 105" :y="dynCY + 76" text-anchor="middle" font-size="11" font-weight="700" :fill="moving ? '#ff6b78' : '#ffd24d'">
+            <text :x="dynBodyX0 + 105" :y="dynCY + 76" text-anchor="middle" font-size="11" font-weight="700" :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'">
               {{ moving ? '✓ 已克服摩擦，物块滑动' : (forceApplied > 0 ? '⚠ 拉力不足，物块保持原位' : '请向右拖动物块') }}
             </text>
           </g>
 
           <!-- 拉力方向箭头（向右，滑动时显示） -->
           <g v-if="moving">
-            <line :x1="blockLeft + blockW + 6" :y1="blockCenterY - 30" :x2="blockLeft + blockW + 58" :y2="blockCenterY - 30" stroke="#d92135" stroke-width="4" stroke-linecap="round" />
-            <path :d="`M ${blockLeft + blockW + 58} ${blockCenterY - 30} l-12 -7 l0 14 z`" fill="#d92135" />
+            <line :x1="blockLeft + blockW + 6" :y1="blockCenterY - 30" :x2="blockLeft + blockW + 58" :y2="blockCenterY - 30" stroke="var(--bb-red)" stroke-width="4" stroke-linecap="round" />
+            <path :d="`M ${blockLeft + blockW + 58} ${blockCenterY - 30} l-12 -7 l0 14 z`" fill="var(--bb-red)" />
           </g>
 
           <!-- 运动线（仅滑动时流动） -->
-          <g stroke="#3a6ea5" stroke-width="2" :opacity="moving ? 0.45 : 0.15" stroke-linecap="round">
+          <g stroke="var(--bb-blue)" stroke-width="2" :opacity="moving ? 0.45 : 0.15" stroke-linecap="round">
             <line
               v-for="(d, i) in motionLines"
               :key="'ml' + i"
@@ -409,11 +409,11 @@ onBeforeUnmount(() => {
 
           <!-- 标注 -->
           <g font-family="system-ui, sans-serif" font-weight="700">
-            <text x="20" y="30" font-size="14" fill="#f2f5f0">接触面：{{ SURF_LABEL[surface] }}（μ = {{ MU[surface] }}）</text>
-            <text x="20" y="52" font-size="12.5" fill="#c7d0c8">
+            <text x="20" y="30" font-size="14" fill="var(--bb-fg)">接触面：{{ SURF_LABEL[surface] }}（μ = {{ MU[surface] }}）</text>
+            <text x="20" y="52" font-size="12.5" fill="var(--bb-fg-dim)">
               压力 N = {{ N }} N ・ 接触面积：{{ wide ? '大（平放）' : '小（侧放）' }}
             </text>
-            <text x="20" y="504" font-size="14" font-weight="800" fill="#ff6b78">
+            <text x="20" y="504" font-size="14" font-weight="800" fill="var(--bb-red)">
               拖动物块：当施加拉力 F ≥ 摩擦力 f = μ・N = {{ fText }} N 时，物块才开始滑动、弹簧才会被拉伸
             </text>
           </g>
