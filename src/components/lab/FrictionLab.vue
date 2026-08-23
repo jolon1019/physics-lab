@@ -145,15 +145,19 @@ function resetLayout() {
 
 // ===== 互动：拖动测力计施加拉力（严格物理模型）=====
 const K_FORCE = 0.16 // px → N
-// 物块/测力计外壳最大行程（px）：拉长位移让滑动更明显；拉到终点即停（到达终点时读数不再增加）
-const MAX_SLIDE = 220
+// 不设终点：物块可一直向左拉动；唯一限制是画布左边界（物块左面最小 x 留白）
+const SLIDE_BOUND_X = 20 // 物块左面允许到达的最小 x（画布左边界留白）
+const maxSlideBound = computed(() => Math.max(0, layout.block.x - blockW.value / 2 - SLIDE_BOUND_X))
 const pullTarget = ref(0)
 const pullPx = ref(0)
 const slideOffset = ref(0)
 // motionState: 'idle' 未拉 | 'static' 拉力≤最大静摩擦(物体静止) | 'uniform' 滑动且 F=f 匀速 | 'accel' 滑动且 F>f 加速
 const motionState = ref('idle')
-const moving = computed(() => motionState.value === 'uniform' || motionState.value === 'accel')
+// 仅在拖动过程中才流动（匀速/加速动画）；松手后物体停住（不流动）
+const moving = computed(() => (motionState.value === 'uniform' || motionState.value === 'accel') && dragging.value)
 const dragging = ref(false)
+// 松手标志：松手后位移与读数保持，不复位
+const released = ref(false)
 
 const forceThreshold = computed(() => fNum.value / K_FORCE)
 const forceApplied = computed(() => Math.max(0, pullPx.value) * K_FORCE)
@@ -168,6 +172,8 @@ const FORCE_ARROW_SCALE = 18 // 每 N 对应 px
 
 // 物理状态文案：交代「F=f 时是否移动 / 何时匀速 / 何时加速」
 const statusText = computed(() => {
+  if (released.value && !dragging.value && slideOffset.value > 0.5)
+    return '已松手停止：物体停在当前位置，位移与读数保持（可继续向左拉动）'
   if (motionState.value === 'idle') return '请向左拉动测力计'
   if (motionState.value === 'static')
     return `F ≤ f_max：二力平衡，物体保持静止（拉力≠摩擦时本应加速，但已达最大静摩擦后仍为静平衡）`
@@ -200,10 +206,9 @@ function onPiecePointerDown(name, e) {
   } else {
     if (name !== 'block' && name !== 'dyn') return
     dragging.value = true
+    released.value = false
+    // 不重置 pullTarget / pullPx / slideOffset：松手后保留位移与读数，可继续向左累加拉动
     dragInfo = { mode: 'pull', lx: x, pull0: pullTarget.value }
-    pullTarget.value = 0
-    pullPx.value =
-      slideOffset.value = 0
   }
   window.addEventListener('pointermove', onWinPointerMove)
   window.addEventListener('pointerup', onWinPointerUp, { once: true })
@@ -219,18 +224,17 @@ function onWinPointerMove(e) {
     const dx = x - dragInfo.lx
     // 仅允许向左拖动产生拉力：向左位移(-dx>0)增加拉力；向右拖动无效（拉力保持不变）
     const leftPull = Math.max(0, -dx)
-    // 拉力上限：刚好把物块拉到终点（threshold + MAX_SLIDE/K_FORCE）即封顶，到达终点后读数不再增加
-    const maxPull = forceThreshold.value + MAX_SLIDE / K_FORCE
-    // 若物块已到终点（slideOffset 已达上限），则不再接受额外拉力（读数冻结）
-    if (slideOffset.value >= MAX_SLIDE - 0.01) return
+    // 拉力上限：受画布左边界限制（物块左面到 SLIDE_BOUND_X 为止），不设固定终点
+    const maxPull = forceThreshold.value + maxSlideBound.value / K_FORCE
     pullTarget.value = Math.max(0, Math.min(maxPull, dragInfo.pull0 + leftPull))
   }
 }
 function onWinPointerUp() {
   dragging.value = false
+  released.value = true
   dragInfo = null
   window.removeEventListener('pointermove', onWinPointerMove)
-  if (!editMode.value) pullTarget.value = 0
+  // 不复位：松手后物块停在当前位置，位移与读数保持；再次向左拉动可在此基础上继续
 }
 function onWheel(e) {
   if (!editMode.value || !selected.value) return
@@ -277,25 +281,25 @@ function tick(now) {
   lastT = now
   pullPx.value += (pullTarget.value - pullPx.value) * Math.min(1, dt * 10)
   const effectivePull = Math.max(0, pullPx.value)
-  const threshold = Math.max(0.001, forceThreshold.value)
   const F = forceApplied.value
   const f = fNum.value
-  if (effectivePull <= 0.001) {
+  if (released.value && !dragging.value) {
+    // 松手：保持当前位移与读数，物体停止（不流动）；不再重新计算 slideOffset
+    motionState.value = slideOffset.value > 0.5 ? 'static' : 'idle'
+  } else if (effectivePull <= 0.001) {
     // 未施加拉力
     slideOffset.value = 0
     motionState.value = 'idle'
   } else if (F <= f + 1e-6) {
     // 拉力 ≤ 最大静摩擦：物体静止（二力平衡），拉力再大也到 f 封顶
-    // 注：严格说 F<f 时物体不动；F=f 临界时仍静止（最大静摩擦平衡点）
     slideOffset.value = 0
     motionState.value = 'static'
   } else {
-    // 拉力 > 最大静摩擦：物体开始滑动
-    // 一旦滑动，动摩擦 f 恒定；若拉力维持在 f 附近（容差带内）→ 匀速；明显大于 f → 加速
-    slideOffset.value = Math.min(F - f, MAX_SLIDE)
-    if (slideOffset.value >= MAX_SLIDE - 0.01) {
-      // 已到终点：锁定位置，不再移动；读数不再增加（拖动逻辑已封顶）
-      motionState.value = 'uniform' // 到终点视为匀速抵达，不再加速
+    // 拉力 > 最大静摩擦：物体开始滑动（不设固定终点，最多到画布左边界）
+    // 动摩擦 f 恒定；拉力维持在 f 附近（容差带内）→ 匀速；明显大于 f → 加速
+    slideOffset.value = Math.min(F - f, maxSlideBound.value)
+    if (slideOffset.value >= maxSlideBound.value - 0.5) {
+      motionState.value = 'uniform' // 已抵画布左边界，视为匀速抵达终点
     } else if (F > f + 0.15) {
       motionState.value = 'accel' // F 明显大于 f → 合力向左 → 加速
     } else {
@@ -528,18 +532,18 @@ onBeforeUnmount(() => {
                 <path :d="`M ${Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE)} 0 l-9 -5 l0 10 z`" fill="var(--bb-blue)" />
                 <text :x="Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE) / 2" y="16" text-anchor="middle" font-size="10" font-weight="800" fill="var(--bb-blue)">f摩={{ frictionForce.toFixed(1) }}N</text>
               </g>
-              <!-- 加速状态：明确标出「合力向左 → 加速」 -->
-              <g v-if="motionState === 'accel'">
+              <!-- 加速状态：明确标出「合力向左 → 加速」（仅在拖动中显示物理结论） -->
+              <g v-if="dragging && motionState === 'accel'">
                 <text x="0" y="34" text-anchor="middle" font-size="10.5" font-weight="800" fill="var(--bb-red)">
                   F &gt; f，合力向左 → 加速
                 </text>
               </g>
-              <g v-else-if="motionState === 'uniform' && slideOffset < MAX_SLIDE - 0.5">
+              <g v-else-if="dragging && motionState === 'uniform'">
                 <text x="0" y="34" text-anchor="middle" font-size="10.5" font-weight="800" fill="var(--bb-green)">
                   F = f，合力为 0 → 匀速
                 </text>
               </g>
-              <g v-else-if="motionState === 'static'">
+              <g v-else-if="dragging && motionState === 'static'">
                 <text x="0" y="34" text-anchor="middle" font-size="10.5" font-weight="800" fill="var(--bb-amber)">
                   F = f_max，二力平衡 → 静止
                 </text>
