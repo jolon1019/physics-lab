@@ -54,6 +54,16 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="user-zone">
+        <!-- 移动端：展开/收起侧边栏目录抽屉（桌面端隐藏） -->
+        <button
+          class="nav-hamburger"
+          type="button"
+          :title="layout.navCollapsed ? '展开实验目录' : '收起实验目录'"
+          :aria-label="layout.navCollapsed ? '展开实验目录' : '收起实验目录'"
+          @click="layout.toggleNav()"
+        >
+          <span class="nav-toggle-icon">{{ layout.navCollapsed ? '☰' : '✕' }}</span>
+        </button>
         <button
           class="nav-toggle-top"
           type="button"

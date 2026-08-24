@@ -85,19 +85,14 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
 function setupCanvas() {
   const canvas = canvasRef.value
-  const rect = canvas.getBoundingClientRect()
-  const dpr = Math.min(window.devicePixelRatio || 1, 2)
-  canvas.width = Math.round(rect.width * dpr)
-  canvas.height = Math.round(rect.height * dpr)
   ctx = canvas.getContext('2d')
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-  return rect
+  canvas.width = 1800
+  canvas.height = 1040
+  ctx.setTransform(2, 0, 0, 2, 0, 0)
 }
 
 function dims() {
-  const canvas = canvasRef.value
-  const dpr = Math.min(window.devicePixelRatio || 1, 2)
-  return { W: canvas.width / dpr, H: canvas.height / dpr }
+  return { W: 900, H: 520 }
 }
 
 // 计算场景布局：底座三角形下面直角边 = 画布宽的 2/3（默认状态）
@@ -494,7 +489,7 @@ onBeforeUnmount(() => {
     <div class="lab-left">
       <div class="lab-panel" style="padding:0">
         <canvas
-          ref="canvasRef"
+          class="logic-canvas" ref="canvasRef"
           style="display:block;width:100%;height:520px;touch-action:none;border-radius:8px"
         ></canvas>
       </div>

@@ -293,6 +293,33 @@ p { margin: 0; }
   font-weight: 900;
 }
 
+/* 移动端汉堡按钮：展开/收起侧边栏目录抽屉（桌面端隐藏） */
+.nav-hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-h);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 3px 3px 0 #050505;
+  transition: all 0.12s ease;
+}
+.nav-hamburger:hover {
+  background: var(--accent-soft);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 #050505;
+}
+.nav-hamburger:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #050505;
+}
+
 /* 顶栏背景切换按钮（全局，置于页面最顶上） */
 .board-toggle {
   display: inline-flex;
@@ -1285,6 +1312,14 @@ p { margin: 0; }
   .lab-left .lab-actions { gap: 8px; }
 }
 
+/* 实验画布（固定逻辑分辨率 900x520 的组件）按容器宽度等比缩放显示：
+   任何屏幕尺寸下动画比例都与桌面一致，内容完整不裁剪、不变形 */
+.lab-left canvas.logic-canvas {
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 900 / 520;
+}
+
 /* ===== 页脚 ===== */
 .app-footer {
   margin-top: auto;
@@ -1340,6 +1375,11 @@ p { margin: 0; }
 
   .nav-toggle-top .nav-toggle-text {
     display: none;
+  }
+
+  /* 移动端显示汉堡按钮（展开侧边栏目录抽屉） */
+  .nav-hamburger {
+    display: inline-flex;
   }
 }
 

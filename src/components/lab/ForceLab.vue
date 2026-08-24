@@ -68,15 +68,13 @@ const dpr = () => Math.min(window.devicePixelRatio || 1, 2)
 
 function setupCanvas() {
   const canvas = canvasRef.value
-  const rect = canvas.getBoundingClientRect()
-  canvas.width = Math.round(rect.width * dpr())
-  canvas.height = Math.round(rect.height * dpr())
   ctx = canvas.getContext('2d')
-  ctx.setTransform(dpr(), 0, 0, dpr(), 0, 0)
+  canvas.width = 1800
+  canvas.height = 1040
+  ctx.setTransform(2, 0, 0, 2, 0, 0)
 }
 function dims() {
-  const canvas = canvasRef.value
-  return { W: canvas.width / dpr(), H: canvas.height / dpr() }
+  return { W: 900, H: 520 }
 }
 
 function drawSpring(topX, topY, len, coils, color) {
@@ -277,7 +275,7 @@ onBeforeUnmount(() => {
     <div class="lab-left">
       <div class="lab-panel" style="padding: 0">
         <canvas
-          ref="canvasRef"
+          class="logic-canvas" ref="canvasRef"
           style="display: block; width: 100%; height: 520px; background: transparent; border-radius: 8px"
         ></canvas>
       </div>

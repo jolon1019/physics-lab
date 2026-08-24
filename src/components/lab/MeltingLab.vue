@@ -199,15 +199,13 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
 function setupCanvas() {
   const canvas = canvasRef.value
-  const rect = canvas.getBoundingClientRect()
-  canvas.width = Math.round(rect.width * dpr())
-  canvas.height = Math.round(rect.height * dpr())
   ctx = canvas.getContext('2d')
-  ctx.setTransform(dpr(), 0, 0, dpr(), 0, 0)
+  canvas.width = 1800
+  canvas.height = 1040
+  ctx.setTransform(2, 0, 0, 2, 0, 0)
 }
 function dims() {
-  const canvas = canvasRef.value
-  return { W: canvas.width / dpr(), H: canvas.height / dpr() }
+  return { W: 900, H: 520 }
 }
 function rr(x, y, w, h, r) {
   if (ctx.roundRect) {
@@ -376,7 +374,9 @@ let dragStart = null
 
 function toLogical(e) {
   const rect = canvasRef.value.getBoundingClientRect()
-  return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  const { W, H } = dims()
+  // 画布为固定逻辑分辨率 + CSS 等比缩放：把显示坐标映射回逻辑坐标
+  return { x: (e.clientX - rect.left) * (W / rect.width), y: (e.clientY - rect.top) * (H / rect.height) }
 }
 function onPiecePointerDown(name, e) {
   if (!editMode.value) return
@@ -533,7 +533,7 @@ onBeforeUnmount(() => {
     <div class="lab-left">
       <div class="lab-panel" style="padding:0;position:relative">
         <canvas
-          ref="canvasRef"
+          class="logic-canvas" ref="canvasRef"
           style="display:block;width:100%;height:520px;touch-action:none;border-radius:8px"
         ></canvas>
 

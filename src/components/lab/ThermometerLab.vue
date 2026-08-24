@@ -40,15 +40,13 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
 function setupCanvas() {
   const canvas = canvasRef.value
-  const rect = canvas.getBoundingClientRect()
-  canvas.width = Math.round(rect.width * dpr())
-  canvas.height = Math.round(rect.height * dpr())
   ctx = canvas.getContext('2d')
-  ctx.setTransform(dpr(), 0, 0, dpr(), 0, 0)
+  canvas.width = 1800
+  canvas.height = 1040
+  ctx.setTransform(2, 0, 0, 2, 0, 0)
 }
 function dims() {
-  const canvas = canvasRef.value
-  return { W: canvas.width / dpr(), H: canvas.height / dpr() }
+  return { W: 900, H: 520 }
 }
 function rr(x, y, w, h, r) {
   if (ctx.roundRect) {
@@ -376,9 +374,11 @@ function resizeCanvas() {
 
 function onCanvasClick(e) {
   const rect = canvasRef.value.getBoundingClientRect()
-  const x = e.clientX - rect.left
-  const y = e.clientY - rect.top
-  const rects = beakerRects(rect.width, rect.height)
+  const { W, H } = dims()
+  // 画布为固定逻辑分辨率 + CSS 等比缩放：把显示坐标映射回逻辑坐标
+  const x = (e.clientX - rect.left) * (W / rect.width)
+  const y = (e.clientY - rect.top) * (H / rect.height)
+  const rects = beakerRects(W, H)
   for (let i = 0; i < rects.length; i++) {
     const r = rects[i]
     if (x >= r.x - 6 && x <= r.x + r.w + 6 && y >= r.y - 24 && y <= r.y + r.h + 24) {
@@ -441,7 +441,7 @@ onBeforeUnmount(() => {
     <div class="lab-left">
       <div class="lab-panel" style="padding:0">
         <canvas
-          ref="canvasRef"
+          class="logic-canvas" ref="canvasRef"
           style="display:block;width:100%;height:520px;touch-action:none;border-radius:8px;cursor:pointer"
           @click="onCanvasClick"
         ></canvas>
