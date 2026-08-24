@@ -71,12 +71,82 @@ function render() {
   ctx.lineTo(cx, supportY + 6)
   ctx.stroke()
 
-  // 弹簧（超过弹性限度变红）
-  const springColor = overLimit.value ? '#d23b3b' : '#3a6ea5'
-  const len = L0 + x.value
-  const botY = drawSpring(cx, supportY + 6, len, 12, springColor)
+  // ===== 弹簧测力计：外壳 + 刻度窗(0~8N 每 0.5N) + 红色指针 + 挂钩 + 重物 =====
+  const DYN_W = 56                     // 外壳宽
+  const shellTop = supportY + 6        // 外壳顶（挂支架）
+  const y0 = shellTop + 24             // 0 N 刻度线 y
+  const shellBot = y0 + FMAX * PX_PER_N + 22 // 外壳底（连弹簧）
+  const winX = cx - DYN_W / 2 + 10     // 刻度窗左缘
+  const winW = DYN_W - 26              // 刻度窗宽（留数字位）
 
-  // 挂钩与重物
+  // 外壳（圆筒）
+  ctx.fillStyle = '#f7f4ec'
+  ctx.strokeStyle = '#2b3a4a'
+  ctx.lineWidth = 2.5
+  ctx.beginPath()
+  ctx.roundRect(cx - DYN_W / 2, shellTop, DYN_W, shellBot - shellTop, 10)
+  ctx.fill(); ctx.stroke()
+  // 顶部固定端盖（挂支架）
+  ctx.fillStyle = '#2b3a4a'
+  ctx.fillRect(cx - DYN_W / 2, shellTop, DYN_W, 12)
+  // 底部端盖（连弹簧）
+  ctx.fillStyle = '#1f2c39'
+  ctx.fillRect(cx - DYN_W / 2, shellBot - 10, DYN_W, 10)
+
+  // 刻度窗（白底，精确刻度 0~8N 每 0.5N 一格）
+  ctx.fillStyle = '#f6fafd'
+  ctx.fillRect(winX, y0 - 14, winW + 10, FMAX * PX_PER_N + 26)
+  ctx.font = '600 11px system-ui, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  for (let n = 0; n <= FMAX; n++) {
+    for (let h = 0; h < 2; h++) {
+      const v = n + h * 0.5
+      if (v > FMAX) continue
+      const y = y0 + v * PX_PER_N
+      const major = h === 0
+      ctx.strokeStyle = major ? '#2b3a4a' : '#7d8a9a'
+      ctx.lineWidth = major ? 1.6 : 0.9
+      ctx.beginPath()
+      ctx.moveTo(winX + 3, y)
+      ctx.lineTo(winX + 3 + (major ? 12 : 6), y)
+      ctx.stroke()
+      if (major) {
+        ctx.fillStyle = boardText(ctx.canvas)
+        ctx.fillText(String(v), winX + 20, y)
+      }
+    }
+  }
+  // 弹性限度虚线（8N）
+  const ylim = y0 + FMAX * PX_PER_N
+  ctx.strokeStyle = '#d23b3b'
+  ctx.setLineDash([4, 3])
+  ctx.beginPath()
+  ctx.moveTo(winX - 2, ylim)
+  ctx.lineTo(winX + winW + 14, ylim)
+  ctx.stroke()
+  ctx.setLineDash([])
+  ctx.fillStyle = '#d23b3b'
+  ctx.font = '600 10px system-ui, sans-serif'
+  ctx.fillText('弹性限度', winX + winW + 18, ylim)
+
+  // 红色指针（随读数移动，超限顶格）
+  const py = y0 + Math.min(F.value, FMAX) * PX_PER_N
+  ctx.strokeStyle = '#d92135'
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.moveTo(winX - 4, py)
+  ctx.lineTo(winX + winW + 6, py)
+  ctx.stroke()
+
+  // 弹簧（外壳下方：顶部连外壳底，随拉力伸长）
+  const springColor = overLimit.value ? '#d23b3b' : '#3a6ea5'
+  const springTopY = shellBot + 6
+  const springLen = L0 + x.value
+  drawSpring(cx, springTopY, springLen, 12, springColor)
+
+  // 挂钩与重物（随弹簧伸长下移）
+  const botY = springTopY + springLen
   ctx.strokeStyle = springColor
   ctx.beginPath()
   ctx.moveTo(cx, botY)
@@ -87,58 +157,21 @@ function render() {
   ctx.beginPath()
   ctx.arc(cx, botY + 10 + wR, wR, 0, Math.PI * 2)
   ctx.fill()
+  ctx.strokeStyle = '#5a4030'
+  ctx.lineWidth = 2
+  ctx.stroke()
   ctx.fillStyle = '#fff'
   ctx.font = '700 12px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(`${F.value.toFixed(1)} N`, cx, botY + 10 + wR)
 
-  // 右侧刻度尺（弹簧测力计刻度，每 1N = PX_PER_N px）
-  const rulerX = W * 0.72
-  ctx.strokeStyle = '#3a3026'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(rulerX, supportY + 6)
-  ctx.lineTo(rulerX, supportY + 6 + L0 + FMAX * PX_PER_N + 20)
-  ctx.stroke()
-  ctx.font = '600 11px system-ui, sans-serif'
-  ctx.fillStyle = boardText(ctx.canvas)
+  // 读数标注（指针右侧）
+  ctx.fillStyle = '#d92135'
+  ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
-  for (let i = 0; i <= 10; i++) {
-    const y = supportY + 6 + L0 + i * PX_PER_N
-    const major = i % 2 === 0
-    ctx.lineWidth = major ? 1.4 : 0.8
-    ctx.beginPath()
-    ctx.moveTo(rulerX, y)
-    ctx.lineTo(rulerX + (major ? 12 : 7), y)
-    ctx.stroke()
-    if (major) ctx.fillText(String(i), rulerX + 16, y)
-  }
-  // 弹性限度标记
-  const ylim = supportY + 6 + L0 + FMAX * PX_PER_N
-  ctx.strokeStyle = '#d23b3b'
-  ctx.setLineDash([4, 3])
-  ctx.beginPath()
-  ctx.moveTo(rulerX - 4, ylim)
-  ctx.lineTo(rulerX + 20, ylim)
-  ctx.stroke()
-  ctx.setLineDash([])
-  ctx.fillStyle = '#d23b3b'
-  ctx.font = '600 10px system-ui, sans-serif'
-  ctx.fillText('弹性限度', rulerX + 24, ylim)
-
-  // 指针（随重物底部对齐）
-  const py = botY + 10 + wR
-  ctx.fillStyle = '#d23b3b'
-  ctx.beginPath()
-  ctx.moveTo(rulerX - 2, py)
-  ctx.lineTo(rulerX - 12, py)
-  ctx.lineTo(rulerX - 2, py - 5)
-  ctx.closePath()
-  ctx.fill()
-  ctx.textAlign = 'right'
-  ctx.fillText(`读数 ${F.value.toFixed(1)} N`, rulerX - 14, py)
+  ctx.fillText(`读数 ${F.value.toFixed(1)} N`, winX + winW + 22, Math.min(py + 8, ylim + 12))
 
   if (overLimit.value) {
     ctx.fillStyle = '#d23b3b'
