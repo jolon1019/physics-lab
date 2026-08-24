@@ -1,12 +1,10 @@
 <script setup>
 import { GRADES } from '../data/experiments'
 
-const totalExps = GRADES.reduce((s, g) => s + g.chapters.reduce((x, c) => x + c.experiments.length, 0), 0)
+const totalExps = GRADES.reduce((s, g) => s + g.experiments.length, 0)
 const totalGrades = GRADES.length
 
-const allExps = GRADES.flatMap((g) =>
-  g.chapters.flatMap((c) => c.experiments.map((e) => ({ ...e, grade: g.label, chapter: c.title })))
-)
+const allExps = GRADES.flatMap((g) => g.experiments.map((e) => ({ ...e, grade: g.label })))
 const coreCount = allExps.filter((e) => e.level === '核心').length
 const featured = allExps.filter((e) => e.level === '核心').slice(0, 9)
 
@@ -160,7 +158,7 @@ const steps = [
             <span :class="['tag', e.level === '核心' ? 'tag-core' : 'tag-basic']">{{ e.level }}</span>
           </div>
           <h3 class="hp-exp-title">{{ e.title }}</h3>
-          <p class="hp-exp-meta">{{ e.grade }} · {{ e.chapter }}</p>
+          <p class="hp-exp-meta">{{ e.grade }}</p>
           <span class="hp-exp-go">进入实验 →</span>
         </RouterLink>
       </div>

@@ -112,7 +112,7 @@ function nextQuiz() {
     <section class="panel exp-detail">
       <header class="exp-detail-head">
         <div>
-          <p class="eyebrow">{{ info.chapter.title }} · {{ info.grade.label }} · {{ info.type }}实验</p>
+          <p class="eyebrow">{{ info.grade.label }} · {{ info.type }}实验</p>
           <h2>{{ detail ? detail.title : info.exp.title }}</h2>
           <p class="page-sub">{{ detail ? detail.summary : '实验正在建设中' }}</p>
         </div>

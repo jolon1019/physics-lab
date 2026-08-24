@@ -10,20 +10,9 @@ const progress = useProgressStore()
 const layout = useLayoutStore()
 
 const openGrades = ref(new Set())
-const openChapters = ref(new Set())
 
 function totalCount() {
-  return GRADES.reduce(
-    (s, g) => s + g.chapters.reduce((x, c) => x + c.experiments.length, 0),
-    0
-  )
-}
-
-function locateGradeOfChapter(chapterId) {
-  for (const g of GRADES) {
-    if (g.chapters.some((c) => c.id === chapterId)) return g.grade
-  }
-  return null
+  return GRADES.reduce((s, g) => s + g.experiments.length, 0)
 }
 
 function syncOpen() {
@@ -31,13 +20,10 @@ function syncOpen() {
   const hit = id ? findExperiment(id) : null
   if (hit) {
     openGrades.value.add(hit.grade.grade)
-    openChapters.value.add(hit.chapter.id)
   } else {
     openGrades.value.add(GRADES[0].grade)
-    openChapters.value.add(GRADES[0].chapters[0].id)
   }
   openGrades.value = new Set(openGrades.value)
-  openChapters.value = new Set(openChapters.value)
 }
 
 function toggleGrade(gradeId) {
@@ -50,12 +36,6 @@ function toggleGrade(gradeId) {
 function expandTo(g) {
   layout.setNav(false)
   if (!openGrades.value.has(g.grade)) toggleGrade(g.grade)
-}
-
-function toggleChapter(chapterId) {
-  const s = new Set(openChapters.value)
-  s.has(chapterId) ? s.delete(chapterId) : s.add(chapterId)
-  openChapters.value = s
 }
 
 function isActive(expId) {
@@ -101,26 +81,17 @@ onMounted(syncOpen)
           <span class="nav-caret">{{ openGrades.has(g.grade) ? '−' : '+' }}</span>
         </button>
 
-        <div v-if="openGrades.has(g.grade)" class="nav-chapters">
-          <div v-for="c in g.chapters" :key="c.id">
-            <button class="nav-chapter-btn" :class="{ open: openChapters.has(c.id) }" @click="toggleChapter(c.id)">
-              <span class="nav-chapter-label">{{ c.title }}</span>
-              <span class="nav-caret">{{ openChapters.has(c.id) ? '−' : '+' }}</span>
-            </button>
-
-            <div v-if="openChapters.has(c.id)" class="nav-exps">
-              <RouterLink
-                v-for="e in c.experiments"
-                :key="e.id"
-                :to="`/experiment/${e.id}`"
-                class="nav-exp"
-                :class="{ active: isActive(e.id) }"
-              >
-                <span class="nav-exp-state">{{ isDone(e.id) ? '✓' : '' }}</span>
-                <span class="nav-exp-title">{{ e.title }}</span>
-              </RouterLink>
-            </div>
-          </div>
+        <div v-if="openGrades.has(g.grade)" class="nav-exps">
+          <RouterLink
+            v-for="e in g.experiments"
+            :key="e.id"
+            :to="`/experiment/${e.id}`"
+            class="nav-exp"
+            :class="{ active: isActive(e.id) }"
+          >
+            <span class="nav-exp-state">{{ isDone(e.id) ? '✓' : '' }}</span>
+            <span class="nav-exp-title">{{ e.title }}</span>
+          </RouterLink>
         </div>
       </div>
 
