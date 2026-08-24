@@ -65,14 +65,14 @@ function rr(x, y, w, h, r) {
   ctx.closePath()
 }
 
-// 布局：烧杯底坐在桌面线上
+// 布局：烧杯整体居中，底坐在桌面线上
 function beakerRects(W, H) {
   const n = cups.length
   const baseY = H - 52
   const areaW = W * 0.62
-  const bx = W * 0.05
-  const bw = Math.min(118, (areaW - bx - (n - 1) * 32) / n)
-  const gap = (areaW - bx - bw * n) / (n - 1)
+  const bw = Math.min(118, (areaW - (n - 1) * 32) / n)
+  const gap = (areaW - bw * n) / (n - 1)
+  const bx = (W - (bw * n + gap * (n - 1))) / 2
   const bh = 150
   const top = baseY - bh
   return cups.map((_, i) => ({ x: bx + i * (bw + gap), y: top, w: bw, h: bh, baseY }))
@@ -105,12 +105,12 @@ function drawBeaker(L, r, idx, now) {
   tg.addColorStop(0, 'rgba(122,94,64,0.42)')
   tg.addColorStop(1, 'rgba(80,60,40,0.56)')
   ctx.fillStyle = tg
-  ctx.fillRect(0, baseY, L.W * 0.66, L.H - baseY)
+  ctx.fillRect(0, baseY, L.W, L.H - baseY)
   ctx.strokeStyle = 'rgba(58,44,30,0.65)'
   ctx.lineWidth = 2
   ctx.beginPath()
   ctx.moveTo(0, baseY)
-  ctx.lineTo(L.W * 0.66, baseY)
+  ctx.lineTo(L.W, baseY)
   ctx.stroke()
   ctx.restore()
   // 烧杯投影
@@ -202,46 +202,37 @@ function drawBeaker(L, r, idx, now) {
 }
 
 function drawThermometer(L) {
-  const tx = L.W - 78
-  const topY = 88
-  const baseY = L.H - 52
-  const bulbY = baseY - 42
-  const tubeTop = topY
-  const tubeBot = bulbY - 16
+  // 温度计插入选中的杯子：刻度段在杯口上方，球部浸入水中
+  const r = beakerRects(L.W, L.H)[selected.value]
+  const cx = r.x + r.w / 2
+  const topY = r.y - 150 // 刻度段顶端
+  const rimY = r.y - 14 // 刻度段底端（杯口上方）
+  const wy0 = r.y + r.h * 0.4 // 水面
+  const bulbY = wy0 + 26 // 球部中心（水中，不碰杯底）
   const tubeW = 16
+  const tx = cx - tubeW / 2
+  const mx = cx
   const frac = tempToFrac(mercury.value)
-  const mercuryTopY = tubeBot - (tubeBot - tubeTop) * frac
-  const mx = tx + tubeW / 2
+  const mercuryTopY = rimY - (rimY - topY) * frac
 
-  // 选中杯到温度计的虚线引导
-  const br = beakerRects(L.W, L.H)[selected.value]
-  ctx.strokeStyle = 'rgba(59,111,212,0.4)'
-  ctx.lineWidth = 1.5
-  ctx.setLineDash([6, 5])
-  ctx.beginPath()
-  ctx.moveTo(br.x + br.w / 2, br.y + 8)
-  ctx.lineTo(tx + tubeW / 2, bulbY - 26)
-  ctx.stroke()
-  ctx.setLineDash([])
-
-  // 玻璃管
+  // 玻璃管（刻度段 → 杯中 → 球部）
   const tubeGrad = ctx.createLinearGradient(tx, 0, tx + tubeW, 0)
   tubeGrad.addColorStop(0, 'rgba(255,255,255,0.95)')
   tubeGrad.addColorStop(0.5, 'rgba(240,246,250,0.85)')
   tubeGrad.addColorStop(1, 'rgba(220,230,238,0.9)')
   ctx.fillStyle = tubeGrad
-  rr(tx, tubeTop, tubeW, tubeBot - tubeTop + 42, tubeW / 2)
+  rr(tx, topY, tubeW, bulbY - topY + 22, tubeW / 2)
   ctx.fill()
   ctx.strokeStyle = 'rgba(90,90,100,0.6)'
   ctx.lineWidth = 1.5
-  rr(tx, tubeTop, tubeW, tubeBot - tubeTop + 42, tubeW / 2)
+  rr(tx, topY, tubeW, bulbY - topY + 22, tubeW / 2)
   ctx.stroke()
   // 管身左侧高光
   ctx.fillStyle = 'rgba(255,255,255,0.85)'
-  rr(tx + 2, tubeTop + 2, 3, tubeBot - tubeTop + 34, 1.5)
+  rr(tx + 2, topY + 2, 3, bulbY - topY + 14, 1.5)
   ctx.fill()
 
-  // 球部
+  // 球部（浸在水中）
   const bulbGrad = ctx.createRadialGradient(mx - 6, bulbY - 6, 2, mx, bulbY, 22)
   bulbGrad.addColorStop(0, 'rgba(255,255,255,0.95)')
   bulbGrad.addColorStop(0.6, 'rgba(240,246,250,0.9)')
@@ -254,7 +245,7 @@ function drawThermometer(L) {
   ctx.lineWidth = 1.5
   ctx.stroke()
 
-  // 汞柱（渐变 + 圆头）
+  // 汞柱（圆头，从刻度段延伸到球部）
   const hg = ctx.createLinearGradient(mx - 5, 0, mx + 5, 0)
   hg.addColorStop(0, '#f26a5a')
   hg.addColorStop(0.5, '#ff8a72')
@@ -277,14 +268,14 @@ function drawThermometer(L) {
   ctx.arc(mx, bulbY, 15, 0, Math.PI * 2)
   ctx.fill()
 
-  // 刻度尺（每 10℃ 标注，每 2℃ 一短线）
+  // 刻度尺（每 10℃ 标注，每 2℃ 一短线；全部在杯口上方）
   ctx.strokeStyle = 'rgba(60,60,70,0.65)'
   ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '600 11px system-ui, sans-serif'
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
   for (let t = T_MIN; t <= T_MAX; t += 2) {
-    const y = tubeBot - (tubeBot - tubeTop) * tempToFrac(t)
+    const y = rimY - (rimY - topY) * tempToFrac(t)
     const major = t % 10 === 0
     const x1 = tx - 4
     const x2 = tx - (major ? 15 : 9)
@@ -300,13 +291,13 @@ function drawThermometer(L) {
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
-  ctx.fillText('℃', tx - 20, tubeTop + 12)
+  ctx.fillText('℃', tx - 20, topY + 12)
 
-  // 大号温度数字屏
+  // 大号温度数字屏（杯口上方右侧）
   const dispW = 128
   const dispH = 36
-  const dx = tx - dispW - 14
-  const dy = tubeTop - 8
+  const dx = cx + tubeW / 2 + 14
+  const dy = topY - 8
   ctx.save()
   ctx.shadowColor = 'rgba(0,0,0,0.35)'
   ctx.shadowBlur = 10
@@ -325,28 +316,30 @@ function drawThermometer(L) {
   ctx.textBaseline = 'middle'
   ctx.fillText(`${mercury.value.toFixed(1)} ℃`, dx + dispW / 2, dy + dispH / 2 + 1)
 
-  // 视线标线（与汞柱上表面相平）
-  ctx.strokeStyle = '#3b6fd4'
-  ctx.lineWidth = 1.5
-  ctx.setLineDash([4, 4])
-  ctx.beginPath()
-  ctx.moveTo(tx - 22, mercuryTopY)
-  ctx.lineTo(tx + tubeW + 32, mercuryTopY)
-  ctx.stroke()
-  ctx.setLineDash([])
-  // 视线小三角（指向汞柱上表面）
-  ctx.fillStyle = '#3b6fd4'
-  ctx.beginPath()
-  ctx.moveTo(tx + tubeW + 6, mercuryTopY)
-  ctx.lineTo(tx + tubeW + 14, mercuryTopY - 5)
-  ctx.lineTo(tx + tubeW + 14, mercuryTopY + 5)
-  ctx.closePath()
-  ctx.fill()
-  ctx.fillStyle = '#3b6fd4'
-  ctx.font = '600 11px system-ui, sans-serif'
-  ctx.textAlign = 'left'
-  ctx.textBaseline = 'bottom'
-  ctx.fillText('视线相平', tx + tubeW + 18, mercuryTopY - 2)
+  // 视线标线（与汞柱上表面相平，只显示在杯口上方）
+  if (mercuryTopY >= topY) {
+    ctx.strokeStyle = '#3b6fd4'
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([4, 4])
+    ctx.beginPath()
+    ctx.moveTo(tx - 20, mercuryTopY)
+    ctx.lineTo(tx + tubeW + 34, mercuryTopY)
+    ctx.stroke()
+    ctx.setLineDash([])
+    // 视线小三角
+    ctx.fillStyle = '#3b6fd4'
+    ctx.beginPath()
+    ctx.moveTo(tx + tubeW + 8, mercuryTopY)
+    ctx.lineTo(tx + tubeW + 16, mercuryTopY - 5)
+    ctx.lineTo(tx + tubeW + 16, mercuryTopY + 5)
+    ctx.closePath()
+    ctx.fill()
+    ctx.fillStyle = '#3b6fd4'
+    ctx.font = '600 11px system-ui, sans-serif'
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'bottom'
+    ctx.fillText('视线相平', tx + tubeW + 20, mercuryTopY - 2)
+  }
 }
 
 function render(now) {
