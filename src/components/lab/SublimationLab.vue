@@ -86,68 +86,109 @@ function drawCrystal(x, y, size, alpha) {
   ctx.restore()
 }
 
-// 酒精灯（玻璃瓶身 + 内外焰 + 辉光）
+// 酒精灯（精细版：瓶颈+瓶口金属环+瓶内酒精液面+双高光+三层火焰）
 function drawLamp(cx, baseY, now, lit) {
   const lampX = cx - 18
   const lampY = baseY - 42 // 火焰顶恰好够到管底
+  const bodyY = lampY + 10 // 瓶身顶（颈部之下）
   // 投影
   ctx.save()
-  ctx.fillStyle = 'rgba(0,0,0,0.20)'
+  ctx.fillStyle = 'rgba(0,0,0,0.22)'
   ctx.beginPath()
-  ctx.ellipse(cx, baseY + 3, 28, 6, 0, 0, Math.PI * 2)
+  ctx.ellipse(cx, baseY + 3, 31, 7, 0, 0, Math.PI * 2)
   ctx.fill()
   ctx.restore()
-  // 玻璃瓶身
-  const bodyGrad = ctx.createLinearGradient(lampX, 0, lampX + 36, 0)
-  bodyGrad.addColorStop(0, 'rgba(196,116,58,0.55)')
-  bodyGrad.addColorStop(0.5, 'rgba(232,172,112,0.82)')
-  bodyGrad.addColorStop(1, 'rgba(168,88,44,0.55)')
-  ctx.fillStyle = bodyGrad
-  rr(lampX, lampY, 36, 30, 7)
+  // 瓶颈（收窄）
+  ctx.fillStyle = 'rgba(214,160,100,0.85)'
+  rr(lampX + 10, lampY, 16, 10, 3)
   ctx.fill()
   ctx.strokeStyle = 'rgba(120,70,35,0.5)'
   ctx.lineWidth = 1
-  rr(lampX, lampY, 36, 30, 7)
+  rr(lampX + 10, lampY, 16, 10, 3)
   ctx.stroke()
-  // 高光
-  ctx.fillStyle = 'rgba(255,255,255,0.28)'
-  rr(lampX + 5, lampY + 4, 6, 22, 3)
+  // 瓶身主体
+  const bodyGrad = ctx.createLinearGradient(lampX, 0, lampX + 36, 0)
+  bodyGrad.addColorStop(0, 'rgba(196,116,58,0.6)')
+  bodyGrad.addColorStop(0.5, 'rgba(236,180,118,0.88)')
+  bodyGrad.addColorStop(1, 'rgba(160,82,40,0.6)')
+  ctx.fillStyle = bodyGrad
+  rr(lampX, bodyY, 36, baseY - bodyY - 4, 8)
   ctx.fill()
-  // 烛芯
-  ctx.strokeStyle = '#2a2a2a'
+  ctx.strokeStyle = 'rgba(120,70,35,0.55)'
+  ctx.lineWidth = 1.5
+  rr(lampX, bodyY, 36, baseY - bodyY - 4, 8)
+  ctx.stroke()
+  // 瓶内酒精液面
+  const liqY = bodyY + (baseY - bodyY - 4) * 0.45
+  ctx.save()
+  rr(lampX + 2, liqY, 32, baseY - bodyY - 4 - liqY + 2, 6)
+  ctx.clip()
+  ctx.fillStyle = 'rgba(235,190,120,0.45)'
+  ctx.fillRect(lampX, liqY, 36, baseY - liqY)
+  ctx.strokeStyle = 'rgba(190,140,80,0.65)'
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.moveTo(lampX + 2, liqY)
+  ctx.lineTo(lampX + 34, liqY)
+  ctx.stroke()
+  ctx.restore()
+  // 双高光
+  ctx.fillStyle = 'rgba(255,255,255,0.34)'
+  rr(lampX + 4, bodyY + 3, 4, baseY - bodyY - 12, 2)
+  ctx.fill()
+  ctx.fillStyle = 'rgba(255,255,255,0.16)'
+  rr(lampX + 9, bodyY + 3, 2, baseY - bodyY - 12, 1)
+  ctx.fill()
+  // 瓶口金属环
+  ctx.strokeStyle = 'rgba(90,90,95,0.8)'
   ctx.lineWidth = 2
   ctx.beginPath()
-  ctx.moveTo(cx, lampY)
-  ctx.lineTo(cx, lampY - 9)
+  ctx.moveTo(lampX + 10, lampY + 2)
+  ctx.lineTo(lampX + 26, lampY + 2)
   ctx.stroke()
+  // 烛芯
+  ctx.strokeStyle = '#2a2a2a'
+  ctx.lineWidth = 2.2
+  ctx.beginPath()
+  ctx.moveTo(cx, lampY)
+  ctx.lineTo(cx, lampY - 7)
+  ctx.stroke()
+  // 火焰（三层 + 辉光）
   if (lit) {
-    const fl = Math.sin(now * 0.012) * 1.6 + Math.sin(now * 0.023) * 1.0
-    const fy = lampY - 9
-    const glow = ctx.createRadialGradient(cx, fy - 12, 2, cx, fy - 12, 34)
-    glow.addColorStop(0, 'rgba(255,184,82,0.55)')
-    glow.addColorStop(1, 'rgba(255,184,82,0)')
+    const fl = Math.sin(now * 0.012) * 1.7 + Math.sin(now * 0.023) * 1.1
+    const fy = lampY - 7
+    const glow = ctx.createRadialGradient(cx, fy - 14, 2, cx, fy - 14, 40)
+    glow.addColorStop(0, 'rgba(255,190,90,0.6)')
+    glow.addColorStop(1, 'rgba(255,190,90,0)')
     ctx.fillStyle = glow
     ctx.beginPath()
-    ctx.arc(cx, fy - 12, 34, 0, Math.PI * 2)
+    ctx.arc(cx, fy - 14, 40, 0, Math.PI * 2)
     ctx.fill()
     // 外焰
-    ctx.fillStyle = '#ff9a2e'
+    ctx.fillStyle = 'rgba(255,140,40,0.95)'
     ctx.beginPath()
-    ctx.moveTo(cx, fy - 31 + fl)
-    ctx.quadraticCurveTo(cx + 9, fy - 16, cx, fy)
-    ctx.quadraticCurveTo(cx - 9, fy - 16, cx, fy - 31 + fl)
+    ctx.moveTo(cx, fy - 38 + fl)
+    ctx.quadraticCurveTo(cx + 11, fy - 18, cx, fy)
+    ctx.quadraticCurveTo(cx - 11, fy - 18, cx, fy - 38 + fl)
+    ctx.fill()
+    // 中焰
+    ctx.fillStyle = 'rgba(255,196,90,0.95)'
+    ctx.beginPath()
+    ctx.moveTo(cx, fy - 28 + fl * 0.7)
+    ctx.quadraticCurveTo(cx + 6, fy - 14, cx, fy - 2)
+    ctx.quadraticCurveTo(cx - 6, fy - 14, cx, fy - 28 + fl * 0.7)
     ctx.fill()
     // 内焰
-    ctx.fillStyle = '#ffe27a'
+    ctx.fillStyle = '#fff3c4'
     ctx.beginPath()
-    ctx.moveTo(cx, fy - 19 + fl * 0.6)
-    ctx.quadraticCurveTo(cx + 4, fy - 10, cx, fy - 2)
-    ctx.quadraticCurveTo(cx - 4, fy - 10, cx, fy - 19 + fl * 0.6)
+    ctx.moveTo(cx, fy - 16 + fl * 0.4)
+    ctx.quadraticCurveTo(cx + 3, fy - 8, cx, fy - 1)
+    ctx.quadraticCurveTo(cx - 3, fy - 8, cx, fy - 16 + fl * 0.4)
     ctx.fill()
     // 焰底蓝
-    ctx.fillStyle = 'rgba(120,160,255,0.7)'
+    ctx.fillStyle = 'rgba(120,160,255,0.75)'
     ctx.beginPath()
-    ctx.ellipse(cx, fy - 2, 4, 5, 0, 0, Math.PI * 2)
+    ctx.ellipse(cx, fy - 2, 4.5, 5, 0, 0, Math.PI * 2)
     ctx.fill()
   }
 }
@@ -157,14 +198,34 @@ function drawApparatus(L, now) {
   const baseY = L.H - 68
   const running = state.value === 'running' || state.value === 'done'
 
-  // 桌面带
+  // 桌面带（精细：渐变顶面 + 木纹 + 边缘高光 + 桌沿暗线）
   ctx.save()
   const tg = ctx.createLinearGradient(0, baseY, 0, L.H)
-  tg.addColorStop(0, 'rgba(122,94,64,0.42)')
-  tg.addColorStop(1, 'rgba(80,60,40,0.56)')
+  tg.addColorStop(0, 'rgba(140,106,72,0.55)')
+  tg.addColorStop(0.35, 'rgba(120,90,60,0.5)')
+  tg.addColorStop(1, 'rgba(76,56,38,0.6)')
   ctx.fillStyle = tg
   ctx.fillRect(0, baseY, L.W * 0.56, L.H - baseY)
-  ctx.strokeStyle = 'rgba(58,44,30,0.65)'
+  // 木纹
+  ctx.strokeStyle = 'rgba(90,60,36,0.28)'
+  ctx.lineWidth = 1.5
+  for (let i = 0; i < 5; i++) {
+    const y = baseY + 10 + i * 14
+    ctx.beginPath()
+    ctx.moveTo(0, y)
+    ctx.quadraticCurveTo(L.W * 0.14, y - 3, L.W * 0.28, y)
+    ctx.quadraticCurveTo(L.W * 0.42, y + 3, L.W * 0.56, y)
+    ctx.stroke()
+  }
+  // 桌沿暗线
+  ctx.strokeStyle = 'rgba(50,36,22,0.7)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(0, baseY + 2)
+  ctx.lineTo(L.W * 0.56, baseY + 2)
+  ctx.stroke()
+  // 桌面边缘高光
+  ctx.strokeStyle = 'rgba(255,235,200,0.5)'
   ctx.lineWidth = 2
   ctx.beginPath()
   ctx.moveTo(0, baseY)
@@ -174,12 +235,12 @@ function drawApparatus(L, now) {
 
   // ===== 加热源 =====
   if (isBath.value) {
-    // 热水浴：玻璃烧杯 + 渐变水 + 波动水面 + 气泡 + 蒸汽
+    // 热水浴：玻璃烧杯 + 渐变水 + 波动水面 + 气泡 + 蒸汽（管底浸入水中 18px）
     const bx = g.cx - 74
-    const by = baseY - 96
+    const wy0 = g.bot - 18 // 水面在管底上方（管底浸水）
+    const by = wy0 - 26 // 杯口
     const bw = 148
-    const bh = 96
-    const wy0 = g.bot + 12 // 水面（管底浸在水中 12px）
+    const bh = baseY - by
     // 投影
     ctx.save()
     ctx.fillStyle = 'rgba(0,0,0,0.15)'
@@ -389,16 +450,18 @@ function drawCompare(L) {
   ctx.shadowColor = 'rgba(0,0,0,0.22)'
   ctx.shadowBlur = 12
   ctx.shadowOffsetY = 4
-  ctx.fillStyle = 'rgba(255,255,255,0.82)'
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'
   rr(x, y, w, 118, 12)
   ctx.fill()
   ctx.restore()
-  ctx.strokeStyle = 'rgba(90,100,120,0.3)'
+  ctx.strokeStyle = 'rgba(90,100,120,0.35)'
   ctx.lineWidth = 1
   rr(x, y, w, 118, 12)
   ctx.stroke()
 
-  ctx.fillStyle = boardText(ctx.canvas)
+  // 卡片为白底：内部文字一律用深色，避免黑板模式下浅色字看不见
+  const DARK = '#2b3342'
+  ctx.fillStyle = DARK
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
@@ -407,7 +470,7 @@ function drawCompare(L) {
   const rowY = (label, temp, color, yy) => {
     ctx.fillStyle = color
     ctx.fillRect(x + 12, yy + 2, 10, 10)
-    ctx.fillStyle = boardText(ctx.canvas)
+    ctx.fillStyle = DARK
     ctx.font = '600 12px system-ui, sans-serif'
     ctx.fillText(`${label} ≈ ${temp}℃`, x + 28, yy)
   }
