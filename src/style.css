@@ -1414,7 +1414,9 @@ p { margin: 0; }
 .lab-stage.is-fullscreen .lab-left {
   position: static; /* 抵消移动端 sticky 吸顶 */
   height: 100%;
+  max-height: none; /* 关键：清除普通模式下的 max-height 上限，否则全屏左列被截断在约 3/4 屏高 */
   min-height: 0;
+  overflow: hidden; /* 取消普通模式的 overflow-y:auto，避免左列内部出现滚动条 */
   grid-template-rows: minmax(0, 1fr) auto;
 }
 /* 动画容器撑满左侧列：canvas 内联 height（520px 等）用 !important 覆盖 */
