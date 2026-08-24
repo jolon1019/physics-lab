@@ -302,10 +302,12 @@ const DYN_H = 34          // 测力计外壳高度
 const dynBodyX0 = computed(() => layout.dyn.x - DYN_W / 2)
 const dynBodyX1 = computed(() => layout.dyn.x + DYN_W / 2)
 const dynCY = computed(() => layout.dyn.baseline)
-// 测力计整体随拖动 1:1 左移（dynShift = dragDx），弹簧在壳内拉伸（springStretch）
+// 测力计整体随拖动 1:1 左移（dynShift = dragDx）；弹簧在测力计底部（壳外），连接物块
 const dynDrawX0 = computed(() => dynBodyX0.value - dynShift.value) // 左端（挂钩端）
 const dynDrawX1 = computed(() => dynBodyX1.value - dynShift.value) // 右端（提环端）
 const hookX = computed(() => dynDrawX1.value) // 测力计在左，挂钩（连物块）在右端
+// 弹簧水平线：位于测力计外壳底部下方（不在刻度窗内）
+const springY = computed(() => dynCY.value + DYN_H / 2 + 6)
 const blockLeft = computed(() => layout.block.x - blockW.value / 2 - blockShift.value) // 物块左面，随滑动左移
 const blockTop = computed(() => layout.block.baseline - blockH.value)
 const blockCenterY = computed(() => blockTop.value + blockH.value / 2)
@@ -449,13 +451,6 @@ onBeforeUnmount(() => {
             <!-- 刻度端点文字 -->
             <text :x="dynDrawX0 + 20" :y="dynCY + 21" font-size="8" fill="#5b6b7a">0</text>
             <text :x="dynDrawX0 + DYN_W - 20" :y="dynCY + 21" text-anchor="end" font-size="8" fill="#5b6b7a">5N</text>
-            <path
-              :d="`M ${dynDrawX0 + 12} ${dynCY}
-                ${Array.from({length:10},(_,i)=>{const xx=(dynDrawX0+12)+(springStretch/10)*(i+0.5);const yy=dynCY+(i%2?5:-5);return `L ${xx.toFixed(1)} ${yy.toFixed(1)}`}).join(' ')}
-                L ${dynDrawX0 + 12 + springStretch} ${dynCY}`"
-              fill="none" :stroke="springStretch > 0 ? '#5b6b7a' : '#7d8a9a'" :stroke-width="springStretch > 0 ? 2.4 : 2"
-              :opacity="springStretch > 0 ? 1 : 0.7"
-            />
             <!-- 左端挂钩（连物块） -->
             <circle :cx="hookX" :cy="dynCY" r="4.5" fill="none" stroke="#2b3a4a" stroke-width="2.6" />
             <!-- 数值读数 -->
@@ -463,8 +458,23 @@ onBeforeUnmount(() => {
             <text :x="(dynDrawX0 + dynDrawX1) / 2" :y="dynCY + DYN_H / 2 + 29" text-anchor="middle" font-size="9" font-weight="700" fill="#555">N</text>
           </g>
 
-          <!-- 拉杆（测力计挂钩 → 物块左面） -->
-          <line :x1="hookX" :y1="dynCY" :x2="blockLeft" :y2="blockCenterY" stroke="#3a6ea5" stroke-width="4" stroke-linecap="round" />
+          <!-- 底部连接弹簧（测力计底部下方 → 物块左面）：弹簧在壳体外，不在刻度窗内。
+               弹簧总长 = 挂钩端到物块左面距离：静摩擦阶段被拉长（读数 0→f），滑动阶段恒定。 -->
+          <g>
+            <!-- 挂钩垂线（测力计挂钩 → 弹簧起点） -->
+            <line :x1="hookX" :y1="dynCY" :x2="hookX" :y2="springY" stroke="#3a6ea5" stroke-width="2.5" stroke-linecap="round" />
+            <!-- 弹簧锯齿（水平，14 段，长度随测力计与物块间距伸缩） -->
+            <path
+              :d="`M ${hookX} ${springY}
+                ${Array.from({length:14},(_,i)=>{const xx=hookX+(blockLeft-hookX)*(i+0.5)/14;const yy=springY+(i%2?6:-6);return `L ${xx.toFixed(1)} ${yy.toFixed(1)}`}).join(' ')}
+                L ${blockLeft} ${springY}`"
+              fill="none" :stroke="springStretch > 0 ? '#3a6ea5' : '#7d8a9a'" :stroke-width="springStretch > 0 ? 2.6 : 2"
+              :opacity="springStretch > 0 ? 1 : 0.7"
+              stroke-linecap="round"
+            />
+            <!-- 连接物块的小挂钩 -->
+            <circle :cx="blockLeft" :cy="springY" r="4" fill="none" stroke="#3a6ea5" stroke-width="2.4" />
+          </g>
 
           <!-- 物块（可拖动）+ 钩码（平底平铺） -->
           <g
