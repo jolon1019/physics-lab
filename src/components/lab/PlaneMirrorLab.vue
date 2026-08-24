@@ -157,27 +157,29 @@ function render(t) {
   ctx.stroke()
   ctx.restore()
 
-  // 沿玻璃板在纸上画的“平面镜位置”线
+  // 沿玻璃板在纸上画的“平面镜位置”线（标签移到纸面内顶部，避免被深色背景吞掉）
+  const mirrorTop = paperY + 30
   ctx.strokeStyle = 'rgba(90,140,200,0.9)'
   ctx.lineWidth = 2
   ctx.setLineDash([7, 4])
   ctx.beginPath()
-  ctx.moveTo(mx, topY + 4)
+  ctx.moveTo(mx, mirrorTop)
   ctx.lineTo(mx, baseY + 4)
   ctx.stroke()
   ctx.setLineDash([])
+  // 标签：纸面内、深蓝描边文字，清晰可读
   ctx.fillStyle = '#2b3a66'
   ctx.font = '700 12px system-ui, sans-serif'
   ctx.textAlign = 'center'
-  ctx.textBaseline = 'bottom'
-  ctx.fillText('平面镜位置（玻璃板）', mx, topY - 2)
+  ctx.textBaseline = 'top'
+  ctx.fillText('平面镜位置（玻璃板）', mx, paperY + 12)
 
   // 玻璃板（半透明竖板）
   ctx.fillStyle = 'rgba(150,200,230,0.22)'
-  ctx.fillRect(mx - 3, topY + 4, 6, baseY - topY)
+  ctx.fillRect(mx - 3, mirrorTop, 6, baseY - mirrorTop + 4)
   ctx.strokeStyle = 'rgba(90,140,200,0.7)'
   ctx.lineWidth = 1.5
-  ctx.strokeRect(mx - 3, topY + 4, 6, baseY - topY)
+  ctx.strokeRect(mx - 3, mirrorTop, 6, baseY - mirrorTop + 4)
 
   // 物—像 对称连线（虚线，辅助理解轴对称）
   ctx.strokeStyle = 'rgba(150,150,160,0.45)'
