@@ -171,16 +171,6 @@ const moving = computed(() => motionState.value === 'uniform' && !released.value
 // 力箭头长度映射（N → px）
 const FORCE_ARROW_SCALE = 18 // 每 N 对应 px
 
-// 物理状态文案：交代「何时静止 / 何时匀速」（加速见底部说明）
-const statusText = computed(() => {
-  if (released.value && !dragging.value && dragDx.value > 0.5)
-    return '已松手停止：木块停在当前位置，位移与读数保持（可继续向左拉动）'
-  if (motionState.value === 'idle') return '请向左拉动测力计'
-  if (motionState.value === 'static')
-    return `拉力 F < f（最大静摩擦），二力平衡，木块静止`
-  return `F = f（动摩擦），二力平衡 → 木块匀速直线运动`
-})
-
 // 重置实验互动状态：拉力/位移/读数归零，物块回到原位（不影响已记录的数据表）
 function resetExperiment() {
   dragDx.value = 0
@@ -537,17 +527,6 @@ onBeforeUnmount(() => {
                 <path :d="`M ${Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE)} 0 l-9 -5 l0 10 z`" fill="var(--bb-blue)" />
                 <text :x="Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE) / 2" y="16" text-anchor="middle" font-size="10" font-weight="800" fill="#ffffff" stroke="#0c3a7a" stroke-width="0.9" paint-order="stroke">f摩={{ frictionForce.toFixed(1) }}N</text>
               </g>
-              <!-- 物块受力结论（仅在拖动中显示，避免松手误导） -->
-              <g v-if="dragging && motionState === 'uniform'">
-                <text x="0" y="34" text-anchor="middle" font-size="10.5" font-weight="800" fill="#ffffff" stroke="#0f5a3a" stroke-width="0.9" paint-order="stroke">
-                  F = f（动摩擦），二力平衡 → 匀速
-                </text>
-              </g>
-              <g v-else-if="dragging && motionState === 'static'">
-                <text x="0" y="34" text-anchor="middle" font-size="10.5" font-weight="800" fill="#ffffff" stroke="#7a4a10" stroke-width="0.9" paint-order="stroke">
-                  F &lt; f（最大静摩擦），二力平衡 → 静止
-                </text>
-              </g>
             </g>
           </g>
 
@@ -574,11 +553,6 @@ onBeforeUnmount(() => {
             <line :x1="dynDrawX0 + 170" :y1="dynCY - 83" :x2="dynDrawX0 + 170" :y2="dynCY - 64" stroke="var(--bb-red)" stroke-width="2" />
             <!-- 读数（进度条下方，隔开距离避免重叠） -->
             <text :x="dynDrawX0 + 85" :y="dynCY - 60" text-anchor="middle" font-size="11" font-weight="800" :fill="moving ? 'var(--bb-red)' : 'var(--bb-amber)'">F = {{ forceApplied.toFixed(2) }} N</text>
-            <!-- 状态（测力计下方，远离进度条）——交代物理：F=f 不动/匀速、F>f 加速 -->
-            <text :x="dynDrawX0 + 85" :y="dynCY + 78" text-anchor="middle" font-size="11" font-weight="700"
-              :fill="motionState === 'uniform' ? 'var(--bb-green)' : (motionState === 'static' ? 'var(--bb-amber)' : 'var(--bb-fg-dim)')">
-              {{ statusText }}
-            </text>
           </g>
 
           <!-- 拉力方向箭头（物块受拉向左，滑动时显示在物块左侧） -->
@@ -605,10 +579,10 @@ onBeforeUnmount(() => {
             <text x="20" y="52" font-size="12.5" fill="var(--bb-fg-dim)">
               压力 N = {{ N }} N（木块自重 {{ BLOCK_G }} N{{ weights > 0 ? ` + ${weights} 个钩码 × ${HOOK_G} N` : '' }}）・ 接触面积：{{ wide ? '大（平放）' : '小（侧放）' }}
             </text>
-            <text x="20" y="486" font-size="13" font-weight="800" fill="var(--bb-fg)">
+            <text x="20" y="76" font-size="13" font-weight="800" fill="var(--bb-red)">
               受力与运动：F &lt; f → 静止（二力平衡）；F = f → 匀速；F &gt; f → 向左加速（滑动后 F 恒 = f）
             </text>
-            <text x="20" y="504" font-size="14" font-weight="800" fill="var(--bb-red)">
+            <text x="20" y="500" font-size="14" font-weight="800" fill="var(--bb-red)">
               匀速拉动时：测力计示数 = 滑动摩擦力 f = μ・N = {{ fText }} N
             </text>
           </g>
