@@ -292,15 +292,17 @@ const DYN_W = 96          // 测力计外壳长度
 const DYN_H = 34          // 测力计外壳高度
 const dynBodyX0 = computed(() => layout.dyn.x - DYN_W / 2)
 const dynBodyX1 = computed(() => layout.dyn.x + DYN_W / 2)
-const dynCY = computed(() => layout.dyn.baseline)
-// 测力计整体随拖动 1:1 左移（dynShift = dragDx）；弹簧在测力计底部（壳外），连接物块
-const dynDrawX0 = computed(() => dynBodyX0.value - dynShift.value) // 左端（挂钩端）
-const dynDrawX1 = computed(() => dynBodyX1.value - dynShift.value) // 右端（提环端）
-const hookX = computed(() => dynDrawX1.value) // 测力计在左，挂钩（连物块）在右端
 const blockLeft = computed(() => layout.block.x - blockW.value / 2 - blockShift.value) // 物块左面，随滑动左移
 const blockTop = computed(() => layout.block.baseline - blockH.value)
 const blockCenterY = computed(() => blockTop.value + blockH.value / 2)
-// 弹簧水平线：位于测力计中心与物块中心的中间高度（向上居中，与两者对齐）
+// 测力计中心跟随物块中心：wide 平放=348 不变；narrow 侧放时物块中心上移(309)，
+// 测力计随之上移到弹簧所在高度，测力计/弹簧/物块三者同一水平线
+const dynCY = computed(() => blockCenterY.value)
+// 测力计整体随拖动 1:1 左移（dynShift = dragDx）；弹簧连接测力计与物块
+const dynDrawX0 = computed(() => dynBodyX0.value - dynShift.value) // 左端（挂钩端）
+const dynDrawX1 = computed(() => dynBodyX1.value - dynShift.value) // 右端（提环端）
+const hookX = computed(() => dynDrawX1.value) // 测力计在左，挂钩（连物块）在右端
+// 弹簧水平线：测力计中心与物块中心同线（dynCY = blockCenterY），弹簧位于其中
 const springY = computed(() => (dynCY.value + blockCenterY.value) / 2)
 
 // 钩码：平底砝码，平铺叠放在物块顶部（不再悬浮），自下而上堆叠
