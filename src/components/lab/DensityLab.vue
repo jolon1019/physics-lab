@@ -43,82 +43,98 @@ function dims() {
   return { W: canvas.width / dpr(), H: canvas.height / dpr() }
 }
 
-function drawBalance(W, H, label) {
-  const bx = W * 0.27
-  const beamY = H * 0.32
-  const postTop = beamY
-  const postBot = H * 0.6
-  // 底座
-  ctx.fillStyle = '#9aa0a8'
+function roundRect(x, y, w, h, r) {
   ctx.beginPath()
-  ctx.moveTo(bx - 46, postBot)
-  ctx.lineTo(bx + 46, postBot)
-  ctx.lineTo(bx + 30, postBot - 14)
-  ctx.lineTo(bx - 30, postBot - 14)
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y, x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x, y + h, r)
+  ctx.arcTo(x, y + h, x, y, r)
+  ctx.arcTo(x, y, x + w, y, r)
+  ctx.closePath()
+}
+
+// 不规则石块（棕色）—— 电子秤上与量筒乙中保持一致
+function drawStone(cx, baseY) {
+  ctx.fillStyle = '#a87248'
+  ctx.strokeStyle = '#6b4022'
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.moveTo(cx - 14, baseY)
+  ctx.lineTo(cx - 18, baseY - 10)
+  ctx.lineTo(cx - 6, baseY - 16)
+  ctx.lineTo(cx + 8, baseY - 12)
+  ctx.lineTo(cx + 16, baseY - 6)
+  ctx.lineTo(cx + 12, baseY + 2)
+  ctx.closePath()
+  ctx.fill(); ctx.stroke()
+  // 高光
+  ctx.fillStyle = 'rgba(255,255,255,0.35)'
+  ctx.beginPath()
+  ctx.moveTo(cx - 8, baseY - 12)
+  ctx.lineTo(cx - 4, baseY - 14)
+  ctx.lineTo(cx, baseY - 12)
+  ctx.lineTo(cx - 4, baseY - 10)
   ctx.closePath()
   ctx.fill()
-  // 立柱
+}
+
+// 烧杯（液体模式下放在秤上，与量筒液体模式一致）
+function drawBeakerOnScale(cx, baseY) {
+  ctx.fillStyle = 'rgba(150,200,230,0.35)'
+  ctx.strokeStyle = 'rgba(90,140,200,0.85)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.rect(cx - 20, baseY - 26, 40, 26)
+  ctx.fill(); ctx.stroke()
+  if (m1.value > m0.value) {
+    ctx.fillStyle = 'rgba(120,170,120,0.6)'
+    ctx.fillRect(cx - 16, baseY - 12, 32, 10)
+  }
+}
+
+// 电子秤：LCD 显示质量，秤上物体与量筒中的物体一致
+function drawScale(W, H, label) {
+  const sx = W * 0.18
+  const baseW = 110
+  const baseH = 48
+  const baseTop = H * 0.5
+  const baseBot = baseTop + baseH
+  // 秤体
+  ctx.fillStyle = '#d3d8de'
   ctx.strokeStyle = '#6b7078'
-  ctx.lineWidth = 4
-  ctx.beginPath()
-  ctx.moveTo(bx, postBot - 14)
-  ctx.lineTo(bx, postTop)
-  ctx.stroke()
-  // 横梁
-  ctx.lineWidth = 4
-  ctx.beginPath()
-  ctx.moveTo(bx - 80, beamY)
-  ctx.lineTo(bx + 80, beamY)
-  ctx.stroke()
-  // 指针
-  ctx.beginPath()
-  ctx.moveTo(bx, beamY)
-  ctx.lineTo(bx, beamY + 22)
-  ctx.stroke()
-  // 吊盘
-  for (const s of [-1, 1]) {
-    const px = bx + s * 80
-    ctx.strokeStyle = '#6b7078'
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.moveTo(px, beamY)
-    ctx.lineTo(px, beamY + 26)
-    ctx.stroke()
-    ctx.fillStyle = 'rgba(150,200,230,0.25)'
-    ctx.strokeStyle = 'rgba(90,140,200,0.8)'
-    ctx.beginPath()
-    ctx.ellipse(px, beamY + 32, 34, 9, 0, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.stroke()
-  }
-  // 左盘上的物体
-  if (mode.value === 'solid') {
-    ctx.fillStyle = '#b0795a'
-    ctx.beginPath()
-    ctx.moveTo(bx - 80, beamY + 26)
-    ctx.lineTo(bx - 80 - 18, beamY + 50)
-    ctx.lineTo(bx - 80 + 18, beamY + 50)
-    ctx.closePath()
-    ctx.fill()
-  } else {
-    // 烧杯
-    ctx.fillStyle = 'rgba(150,200,230,0.35)'
-    ctx.strokeStyle = 'rgba(90,140,200,0.85)'
-    ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.rect(bx - 80 - 20, beamY + 26, 40, 26)
-    ctx.fill()
-    ctx.stroke()
-    if (m1.value > m0.value) {
-      ctx.fillStyle = 'rgba(120,170,120,0.6)'
-      ctx.fillRect(bx - 80 - 16, beamY + 40, 32, 10)
-    }
-  }
+  ctx.lineWidth = 2.5
+  roundRect(sx - baseW / 2, baseTop, baseW, baseH, 9)
+  ctx.fill(); ctx.stroke()
+  // 秤盘
+  ctx.fillStyle = '#eef1f4'
+  roundRect(sx - baseW / 2 + 8, baseTop - 6, baseW - 16, 8, 4)
+  ctx.fill(); ctx.stroke()
+  // LCD 显示屏
+  const lcdW = 78, lcdH = 24
+  const lcdX = sx - lcdW / 2
+  const lcdY = baseTop + 12
+  ctx.fillStyle = '#10210f'
+  ctx.fillRect(lcdX, lcdY, lcdW, lcdH)
+  ctx.strokeStyle = '#0a140a'
+  ctx.lineWidth = 1
+  ctx.strokeRect(lcdX, lcdY, lcdW, lcdH)
+  // 数字（绿色 LCD）
+  ctx.fillStyle = '#39ff6a'
+  ctx.font = '700 17px "Courier New", monospace'
+  ctx.textAlign = 'right'
+  ctx.textBaseline = 'middle'
+  const massVal = mode.value === 'solid' ? m.value : m1.value
+  ctx.fillText(`${massVal.toFixed(1)} g`, lcdX + lcdW - 6, lcdY + lcdH / 2 + 1)
+  // 秤上物体
+  const objBaseY = baseTop - 6
+  if (mode.value === 'solid') drawStone(sx, objBaseY)
+  else drawBeakerOnScale(sx, objBaseY)
+  // 标注
   ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 14px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
-  ctx.fillText(label, bx, postBot + 8)
+  ctx.fillText(label, sx, baseBot + 8)
 }
 
 // 固体模式：两个量筒（甲、乙）并排展示排水法
@@ -187,30 +203,9 @@ function drawCylindersSolid(W, H) {
   ctx.beginPath()
   ctx.ellipse(cxs[1], wyB, (cw - 4) / 2, 3.5, 0, 0, Math.PI * 2)
   ctx.fill()
-  // 石块（不规则，棕色，沉在乙筒底部）
+  // 石块（不规则，棕色，沉在乙筒底部，与电子秤上一致）
   if (v2.value > v1.value) {
-    ctx.fillStyle = '#a87248'
-    ctx.strokeStyle = '#6b4022'
-    ctx.lineWidth = 1.5
-    ctx.beginPath()
-    const sx = cxs[1], sy = bot - 8
-    ctx.moveTo(sx - 14, sy)
-    ctx.lineTo(sx - 18, sy - 10)
-    ctx.lineTo(sx - 6, sy - 16)
-    ctx.lineTo(sx + 8, sy - 12)
-    ctx.lineTo(sx + 16, sy - 6)
-    ctx.lineTo(sx + 12, sy + 2)
-    ctx.closePath()
-    ctx.fill(); ctx.stroke()
-    // 高光
-    ctx.fillStyle = 'rgba(255,255,255,0.35)'
-    ctx.beginPath()
-    ctx.moveTo(sx - 8, sy - 12)
-    ctx.lineTo(sx - 4, sy - 14)
-    ctx.lineTo(sx, sy - 12)
-    ctx.lineTo(sx - 4, sy - 10)
-    ctx.closePath()
-    ctx.fill()
+    drawStone(cxs[1], bot - 8)
   }
   // V1 / V2 数值标注（各筒上方，红色）
   ctx.fillStyle = '#d92135'
@@ -278,7 +273,7 @@ function render() {
   if (!ctx) return
   const { W, H } = dims()
   paintBoard(ctx, W, H, 'chalk')
-  drawBalance(W, H, mode.value === 'solid' ? `固体质量 m = ${m.value} g` : `烧杯+液 m1 = ${m1.value} g`)
+  drawScale(W, H, mode.value === 'solid' ? `固体质量 m = ${m.value} g` : `烧杯+液 m1 = ${m1.value} g`)
   if (mode.value === 'solid') drawCylindersSolid(W, H)
   else drawCylinderLiquid(W, H)
 }
@@ -294,7 +289,7 @@ function resizeCanvas() {
 }
 function setMode(to) {
   mode.value = to
-  note.value = to === 'solid' ? '用天平测固体质量，量筒排水法测体积，ρ = m / V' : '测空杯质量与杯+液质量之差得液体质量，再量体积，ρ = m / V'
+  note.value = to === 'solid' ? '用电子秤测固体质量，量筒排水法测体积，ρ = m / V' : '测空杯质量与杯+液质量之差得液体质量，再量体积，ρ = m / V'
   if (!completed) {
     completed = true
     emit('complete')
@@ -307,7 +302,7 @@ function resetAll() {
   m0.value = 20
   m1.value = 68
   vL.value = 48
-  note.value = '先测质量，再用量筒排水法测体积，最后计算密度'
+  note.value = '先用电子秤测质量，再用量筒排水法测体积，最后计算密度'
 }
 
 watch([m, v1, v2, m0, m1, vL], () => {
