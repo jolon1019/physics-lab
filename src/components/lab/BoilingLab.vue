@@ -28,7 +28,10 @@ const points = ref([])
 let completed = false
 const hint = ref('点击「开始加热」，观察水沸腾前后气泡与温度的变化')
 const startBtn = ref('开始加热')
+
 const bubbles = ref([])
+const steam = ref([])
+const rings = ref([])
 
 const isBoiling = computed(() => state.value === 'boiling' || state.value === 'done')
 
@@ -89,86 +92,246 @@ function rr(x, y, w, h, r) {
   ctx.closePath()
 }
 
-function spawnBubble(cx, by, bh, surfaceY) {
-  bubbles.value.push({
-    x: cx + rand(-30, 30),
-    y: by + bh - rand(2, 10),
-    r: isBoiling.value ? rand(3, 7) : rand(1.5, 3),
-    vy: isBoiling.value ? rand(40, 70) : rand(20, 35),
-    surfaceY
-  })
-}
-
-function drawSetup(L) {
+/* 装置 + 粒子：cx 烧杯中心、baseY 桌面线 */
+function drawSetup(L, now) {
   const cx = L.W * 0.27
-  const baseY = L.H - 64
-  // 酒精灯
-  const lampX = cx - 17
-  const lampY = baseY + 4
-  ctx.fillStyle = '#c4453d'
-  rr(lampX, lampY, 34, 28, 6)
+  const baseY = L.H - 72
+
+  // 桌面（装置在左半区）
+  ctx.save()
+  const tg = ctx.createLinearGradient(0, baseY, 0, L.H)
+  tg.addColorStop(0, 'rgba(120,92,62,0.40)')
+  tg.addColorStop(1, 'rgba(78,58,38,0.55)')
+  ctx.fillStyle = tg
+  ctx.fillRect(0, baseY, L.W * 0.5, L.H - baseY)
+  ctx.strokeStyle = 'rgba(56,42,28,0.65)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(0, baseY)
+  ctx.lineTo(L.W * 0.5, baseY)
+  ctx.stroke()
+  ctx.restore()
+
+  // 酒精灯（玻璃瓶身 + 烛芯 + 跳动火焰 + 辉光）
+  const lampX = cx - 18
+  const lampY = baseY + 6
+  // 投影
+  ctx.save()
+  ctx.fillStyle = 'rgba(0,0,0,0.20)'
+  ctx.beginPath()
+  ctx.ellipse(cx, baseY + 3, 30, 7, 0, 0, Math.PI * 2)
   ctx.fill()
-  ctx.fillStyle = '#7a7a7a'
-  rr(lampX + 12, lampY - 8, 10, 8, 3)
+  ctx.restore()
+  // 玻璃瓶身
+  const bodyGrad = ctx.createLinearGradient(lampX, 0, lampX + 36, 0)
+  bodyGrad.addColorStop(0, 'rgba(196,116,58,0.55)')
+  bodyGrad.addColorStop(0.5, 'rgba(232,172,112,0.82)')
+  bodyGrad.addColorStop(1, 'rgba(168,88,44,0.55)')
+  ctx.fillStyle = bodyGrad
+  rr(lampX, lampY, 36, 30, 7)
   ctx.fill()
+  ctx.strokeStyle = 'rgba(120,70,35,0.5)'
+  ctx.lineWidth = 1
+  rr(lampX, lampY, 36, 30, 7)
+  ctx.stroke()
+  // 高光
+  ctx.fillStyle = 'rgba(255,255,255,0.28)'
+  rr(lampX + 5, lampY + 4, 6, 22, 3)
+  ctx.fill()
+  // 烛芯
+  ctx.strokeStyle = '#2a2a2a'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(cx, lampY)
+  ctx.lineTo(cx, lampY - 9)
+  ctx.stroke()
+  // 火焰
   if (state.value === 'heating' || isBoiling.value) {
-    ctx.fillStyle = '#f5a623'
+    const fl = Math.sin(now * 0.012) * 1.6 + Math.sin(now * 0.023) * 1.0
+    const fy = lampY - 9
+    const glow = ctx.createRadialGradient(cx, fy - 12, 2, cx, fy - 12, 36)
+    glow.addColorStop(0, 'rgba(255,184,82,0.55)')
+    glow.addColorStop(1, 'rgba(255,184,82,0)')
+    ctx.fillStyle = glow
     ctx.beginPath()
-    ctx.moveTo(cx, lampY - 8)
-    ctx.quadraticCurveTo(cx + 9, lampY - 26, cx, lampY - 34)
-    ctx.quadraticCurveTo(cx - 9, lampY - 26, cx, lampY - 8)
+    ctx.arc(cx, fy - 12, 36, 0, Math.PI * 2)
+    ctx.fill()
+    // 外焰
+    ctx.fillStyle = '#ff9a2e'
+    ctx.beginPath()
+    ctx.moveTo(cx, fy - 31 + fl)
+    ctx.quadraticCurveTo(cx + 9, fy - 16, cx, fy)
+    ctx.quadraticCurveTo(cx - 9, fy - 16, cx, fy - 31 + fl)
+    ctx.fill()
+    // 内焰
+    ctx.fillStyle = '#ffe27a'
+    ctx.beginPath()
+    ctx.moveTo(cx, fy - 19 + fl * 0.6)
+    ctx.quadraticCurveTo(cx + 4, fy - 10, cx, fy - 2)
+    ctx.quadraticCurveTo(cx - 4, fy - 10, cx, fy - 19 + fl * 0.6)
+    ctx.fill()
+    // 焰底蓝
+    ctx.fillStyle = 'rgba(120,160,255,0.7)'
+    ctx.beginPath()
+    ctx.ellipse(cx, fy - 2, 4, 5, 0, 0, Math.PI * 2)
     ctx.fill()
   }
+
   // 石棉网
-  ctx.fillStyle = '#5a5a5a'
-  ctx.fillRect(cx - 36, lampY - 44, 72, 6)
-  // 烧杯
-  const bw = 110
-  const bx = cx - bw / 2
-  const by = lampY - 130
-  const bh = 84
-  ctx.fillStyle = 'rgba(255,255,255,0.6)'
-  rr(bx, by, bw, bh, 8)
-  ctx.fill()
-  // 水
-  const wf = 0.66
-  const wy = by + bh * (1 - wf)
-  ctx.save()
-  rr(bx + 3, wy, bw - 6, by + bh - wy - 3, 6)
-  ctx.clip()
-  const grad = ctx.createLinearGradient(0, wy, 0, by + bh)
-  grad.addColorStop(0, '#bfe0f0')
-  grad.addColorStop(1, '#7fb8d8')
-  ctx.fillStyle = grad
-  ctx.fillRect(bx, wy, bw, bh)
-  // 气泡
-  ctx.fillStyle = 'rgba(255,255,255,0.85)'
-  for (const b of bubbles.value) {
+  const netY = lampY - 46
+  ctx.fillStyle = 'rgba(92,92,98,0.92)'
+  ctx.fillRect(cx - 40, netY, 80, 5)
+  ctx.strokeStyle = 'rgba(165,165,170,0.5)'
+  ctx.lineWidth = 1
+  for (let i = -36; i <= 36; i += 8) {
     ctx.beginPath()
-    ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2)
+    ctx.moveTo(cx + i, netY)
+    ctx.lineTo(cx + i, netY + 5)
+    ctx.stroke()
+  }
+
+  // 烧杯（玻璃高光 + 刻度 + 水 + 气泡 + 蒸汽）
+  const bh = 86
+  const by = netY - bh
+  const bw = 112
+  const bx = cx - bw / 2
+  // 投影
+  ctx.save()
+  ctx.fillStyle = 'rgba(0,0,0,0.13)'
+  ctx.beginPath()
+  ctx.ellipse(cx, baseY + 2, bw * 0.62, 6, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+
+  // 波动水面几何
+  const wf = 0.62
+  const waterH = bh * wf
+  const wy0 = by + bh - waterH
+  const amp = isBoiling.value ? 3 : 1.2
+  const surfY = (x) => wy0 + Math.sin(x * 0.06 + now * 0.005) * amp
+
+  // 水（裁剪在烧杯内）
+  ctx.save()
+  rr(bx + 3, by + 3, bw - 6, bh - 6, 7)
+  ctx.clip()
+  const wg = ctx.createLinearGradient(0, wy0, 0, by + bh)
+  wg.addColorStop(0, '#cdeaf6')
+  wg.addColorStop(1, '#7fb8d8')
+  ctx.fillStyle = wg
+  ctx.beginPath()
+  ctx.moveTo(bx + 3, by + bh - 3)
+  ctx.lineTo(bx + 3, surfY(bx + 3))
+  for (let x = bx + 3; x <= bx + bw - 3; x += 6) ctx.lineTo(x, surfY(x))
+  ctx.lineTo(bx + bw - 3, by + bh - 3)
+  ctx.closePath()
+  ctx.fill()
+  // 水面亮线
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)'
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  for (let x = bx + 3; x <= bx + bw - 3; x += 6) {
+    const y = surfY(x)
+    x === bx + 3 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+  }
+  ctx.stroke()
+  // 气泡
+  for (const b of bubbles.value) {
+    const bxp = b.x + Math.sin(now * 0.005 + b.phase) * 1.6
+    const g = ctx.createRadialGradient(bxp - b.r * 0.3, b.y - b.r * 0.3, 0.5, bxp, b.y, b.r)
+    g.addColorStop(0, 'rgba(255,255,255,0.95)')
+    g.addColorStop(1, 'rgba(200,230,245,0.5)')
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(bxp, b.y, b.r, 0, Math.PI * 2)
     ctx.fill()
   }
   ctx.restore()
-  ctx.strokeStyle = 'rgba(80,90,110,0.7)'
+
+  // 玻璃杯身（半透明 + 竖向高光）
+  const glassGrad = ctx.createLinearGradient(bx, 0, bx + bw, 0)
+  glassGrad.addColorStop(0, 'rgba(255,255,255,0.16)')
+  glassGrad.addColorStop(0.5, 'rgba(210,230,240,0.08)')
+  glassGrad.addColorStop(1, 'rgba(255,255,255,0.22)')
+  ctx.fillStyle = glassGrad
+  rr(bx, by, bw, bh, 9)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(90,110,135,0.7)'
   ctx.lineWidth = 2
-  rr(bx, by, bw, bh, 8)
+  rr(bx, by, bw, bh, 9)
   ctx.stroke()
+  // 杯口
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(bx, by + 4)
+  ctx.lineTo(bx + 8, by)
+  ctx.lineTo(bx + bw - 8, by)
+  ctx.lineTo(bx + bw, by + 4)
+  ctx.stroke()
+  // 刻度
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)'
+  ctx.lineWidth = 1
+  for (let i = 1; i <= 4; i++) {
+    const gy = by + bh - (bh - 10) * (i / 5)
+    ctx.beginPath()
+    ctx.moveTo(bx + 4, gy)
+    ctx.lineTo(bx + 13, gy)
+    ctx.stroke()
+  }
+
+  // 水面破裂涟漪
+  for (const r of rings.value) {
+    ctx.strokeStyle = `rgba(255,255,255,${0.5 * r.life})`
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    ctx.ellipse(r.x, r.y, r.r, r.r * 0.4, 0, 0, Math.PI * 2)
+    ctx.stroke()
+  }
+  // 蒸汽
+  for (const s of steam.value) {
+    ctx.fillStyle = `rgba(240,245,250,${s.alpha})`
+    ctx.beginPath()
+    ctx.arc(s.x + Math.sin(now * 0.003 + s.phase) * 7, s.y, s.r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
   // 温度计
-  const tgx = bx + bw - 14
-  ctx.strokeStyle = 'rgba(80,90,110,0.7)'
-  ctx.lineWidth = 4
-  ctx.beginPath()
-  ctx.moveTo(tgx, by - 44)
-  ctx.lineTo(tgx, by + bh - 20)
+  const tgx = bx + bw - 16
+  const top = by - 48
+  const bot = by + bh - 16
+  ctx.fillStyle = 'rgba(255,255,255,0.22)'
+  rr(tgx - 3, top, 6, bot - top, 3)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(70,82,102,0.7)'
+  ctx.lineWidth = 1.5
+  rr(tgx - 3, top, 6, bot - top, 3)
   ctx.stroke()
+  // 刻度
+  ctx.strokeStyle = 'rgba(70,82,102,0.6)'
+  ctx.lineWidth = 1
+  for (let T = 20; T <= 100; T += 20) {
+    const ty = bot - (bot - top) * ((T - Tmin) / (Tmax - Tmin))
+    ctx.beginPath()
+    ctx.moveTo(tgx + 3, ty)
+    ctx.lineTo(tgx + 7, ty)
+    ctx.stroke()
+  }
+  // 红色液柱
   const f = clamp((temp.value - Tmin) / (Tmax - Tmin), 0, 1)
-  const my = by + bh - 20 - (by + bh - 20 - (by - 44)) * f
-  ctx.strokeStyle = '#e0584f'
-  ctx.lineWidth = 2
+  const lvl = bot - (bot - top) * f
+  ctx.fillStyle = '#e0584f'
+  rr(tgx - 1.4, lvl, 2.8, bot - lvl + 6, 1.4)
+  ctx.fill()
   ctx.beginPath()
-  ctx.moveTo(tgx, my)
-  ctx.lineTo(tgx, by + bh - 20)
-  ctx.stroke()
+  ctx.arc(tgx, bot + 5, 4.6, 0, Math.PI * 2)
+  ctx.fill()
+  // 温度读数
+  ctx.fillStyle = '#e0584f'
+  ctx.font = '700 12px system-ui, sans-serif'
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'bottom'
+  ctx.fillText(`${temp.value.toFixed(0)}℃`, tgx + 9, top + 4)
+
   // 标签
   ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 13px system-ui, sans-serif'
@@ -176,32 +339,69 @@ function drawSetup(L) {
   ctx.textBaseline = 'top'
   ctx.fillText(`水 · 沸点 ${boilingPoint.value.toFixed(0)}℃`, cx, baseY + 14)
 
-  // 更新气泡
+  // ===== 粒子更新 =====
   if (state.value === 'heating' || isBoiling.value) {
     for (const b of bubbles.value) {
       b.y -= b.vy * 0.016
-      // 沸腾前上升变小，沸腾时保持变大
-      if (!isBoiling.value) b.r = Math.max(0.8, b.r - 0.02)
+      if (isBoiling.value) b.r = Math.min(b.r + 0.05, 9)
+      else b.r = Math.max(0.8, b.r - 0.03)
     }
-    bubbles.value = bubbles.value.filter((b) => b.y > by + 8)
-    if (Math.random() < (isBoiling.value ? 0.6 : 0.3)) spawnBubble(cx, by, bh, wy)
+    bubbles.value = bubbles.value.filter((b) => {
+      if (b.y <= wy0 + 3) {
+        rings.value.push({ x: b.x, y: wy0, r: 2, life: 1 })
+        if (isBoiling.value)
+          steam.value.push({ x: b.x, y: wy0 - 4, r: rand(3, 6), vy: rand(16, 26), phase: rand(0, 6), alpha: 0.5 })
+        return false
+      }
+      return true
+    })
+    const rate = isBoiling.value ? 0.7 : 0.28
+    if (Math.random() < rate) {
+      bubbles.value.push({
+        x: cx + rand(-34, 34),
+        y: by + bh - 8,
+        r: isBoiling.value ? rand(3, 6) : rand(1.5, 3),
+        vy: isBoiling.value ? rand(45, 75) : rand(22, 38),
+        phase: rand(0, 6)
+      })
+    }
+    if (bubbles.value.length > 160) bubbles.value.splice(0, bubbles.value.length - 160)
   }
+  for (const s of steam.value) {
+    s.y -= s.vy * 0.016
+    s.r += 0.15
+    s.alpha -= 0.006
+  }
+  steam.value = steam.value.filter((s) => s.alpha > 0 && s.y > by - 60)
+  if (steam.value.length > 40) steam.value.splice(0, steam.value.length - 40)
+  for (const r of rings.value) {
+    r.r += 0.6
+    r.life -= 0.05
+  }
+  rings.value = rings.value.filter((r) => r.life > 0)
 }
 
-function drawGraph(L) {
+function drawGraph(L, now) {
   const gx = L.W * 0.52
   const gy = 70
   const gw = L.W * 0.42
   const gh = L.H - 160
-  ctx.fillStyle = 'rgba(255,255,255,0.7)'
-  rr(gx, gy, gw, gh, 8)
+  // 卡片阴影
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.25)'
+  ctx.shadowBlur = 16
+  ctx.shadowOffsetY = 6
+  ctx.fillStyle = 'rgba(255,255,255,0.78)'
+  rr(gx, gy, gw, gh, 10)
   ctx.fill()
-  ctx.strokeStyle = 'rgba(90,100,120,0.4)'
+  ctx.restore()
+  ctx.strokeStyle = 'rgba(90,100,120,0.35)'
   ctx.lineWidth = 1.5
-  rr(gx, gy, gw, gh, 8)
+  rr(gx, gy, gw, gh, 10)
   ctx.stroke()
-  const padL = 38
-  const padB = 28
+
+  const padL = 40
+  const padB = 30
   const px0 = gx + padL
   const py0 = gy + gh - padB
   const px1 = gx + gw - 12
@@ -209,13 +409,46 @@ function drawGraph(L) {
   const DUR = 13
   const X = (t) => px0 + (t / DUR) * (px1 - px0)
   const Y = (T) => py0 - ((T - Tmin) / (Tmax - Tmin)) * (py0 - py1)
-  ctx.strokeStyle = 'rgba(70,70,80,0.8)'
+
+  // 网格
+  ctx.strokeStyle = 'rgba(120,120,135,0.12)'
+  ctx.lineWidth = 1
+  for (let T = Tmin; T <= Tmax; T += 20) {
+    ctx.beginPath()
+    ctx.moveTo(px0, Y(T))
+    ctx.lineTo(px1, Y(T))
+    ctx.stroke()
+  }
+  for (let t = 2; t <= DUR; t += 2) {
+    ctx.beginPath()
+    ctx.moveTo(X(t), py0)
+    ctx.lineTo(X(t), py1)
+    ctx.stroke()
+  }
+  // 坐标轴
+  ctx.strokeStyle = 'rgba(70,70,82,0.85)'
   ctx.lineWidth = 2
   ctx.beginPath()
   ctx.moveTo(px0, py1)
   ctx.lineTo(px0, py0)
   ctx.lineTo(px1, py0)
   ctx.stroke()
+  // 箭头
+  ctx.fillStyle = 'rgba(70,70,82,0.85)'
+  ctx.beginPath()
+  ctx.moveTo(px0, py1)
+  ctx.lineTo(px0 - 4, py1 + 7)
+  ctx.lineTo(px0 + 4, py1 + 7)
+  ctx.closePath()
+  ctx.fill()
+  ctx.beginPath()
+  ctx.moveTo(px1, py0)
+  ctx.lineTo(px1 - 7, py0 - 4)
+  ctx.lineTo(px1 - 7, py0 + 4)
+  ctx.closePath()
+  ctx.fill()
+
+  // 刻度文字
   ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '600 11px system-ui, sans-serif'
   ctx.textAlign = 'center'
@@ -223,27 +456,20 @@ function drawGraph(L) {
   for (let t = 0; t <= DUR; t += 2) ctx.fillText(String(t), X(t), py0 + 6)
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
-  for (let T = Tmin; T <= Tmax; T += 20) {
-    ctx.fillText(String(T), px0 - 6, Y(T))
-    ctx.strokeStyle = 'rgba(120,120,130,0.15)'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.moveTo(px0, Y(T))
-    ctx.lineTo(px1, Y(T))
-    ctx.stroke()
-  }
+  for (let T = Tmin; T <= Tmax; T += 20) ctx.fillText(String(T), px0 - 6, Y(T))
   ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '600 12px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
   ctx.fillText('时间 t / s', (px0 + px1) / 2, py0 + 14)
   ctx.save()
-  ctx.translate(gx + 12, (py0 + py1) / 2)
+  ctx.translate(gx + 13, (py0 + py1) / 2)
   ctx.rotate(-Math.PI / 2)
   ctx.fillText('温度 T / ℃', 0, 0)
   ctx.restore()
+
   // 沸点参考线
-  ctx.strokeStyle = 'rgba(224,88,79,0.5)'
+  ctx.strokeStyle = 'rgba(224,88,79,0.55)'
   ctx.lineWidth = 1.5
   ctx.setLineDash([5, 4])
   ctx.beginPath()
@@ -255,47 +481,70 @@ function drawGraph(L) {
   ctx.textAlign = 'left'
   ctx.textBaseline = 'bottom'
   ctx.fillText(`沸点 ${boilingPoint.value.toFixed(0)}℃`, px0 + 4, Y(boilingPoint.value) - 2)
-  // 曲线
+
+  // 曲线 + 渐变填充 + 辉光端点
   if (points.value.length > 1) {
+    const last = points.value[points.value.length - 1]
+    ctx.beginPath()
+    points.value.forEach((p, i) => {
+      const xx = X(p.t)
+      const yy = Y(p.T)
+      i === 0 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy)
+    })
+    ctx.lineTo(X(last.t), py0)
+    ctx.lineTo(X(points.value[0].t), py0)
+    ctx.closePath()
+    const fg = ctx.createLinearGradient(0, py1, 0, py0)
+    fg.addColorStop(0, 'rgba(224,88,79,0.30)')
+    fg.addColorStop(1, 'rgba(224,88,79,0.02)')
+    ctx.fillStyle = fg
+    ctx.fill()
+
     ctx.strokeStyle = '#e0584f'
     ctx.lineWidth = 2.5
     ctx.beginPath()
     points.value.forEach((p, i) => {
       const xx = X(p.t)
       const yy = Y(p.T)
-      if (i === 0) ctx.moveTo(xx, yy)
-      else ctx.lineTo(xx, yy)
+      i === 0 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy)
     })
     ctx.stroke()
-    const last = points.value[points.value.length - 1]
+
+    ctx.save()
+    ctx.shadowColor = '#e0584f'
+    ctx.shadowBlur = 10
     ctx.fillStyle = '#e0584f'
     ctx.beginPath()
     ctx.arc(X(last.t), Y(last.T), 4, 0, Math.PI * 2)
     ctx.fill()
+    ctx.restore()
   }
+
   ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
-  ctx.fillText('水沸腾 T–t 图像', gx + 10, gy + 8)
+  ctx.fillText('水沸腾 T–t 图像', gx + 12, gy + 10)
 }
 
-function render() {
+function render(now) {
   if (!ctx) return
   const L = dims()
   paintBoard(ctx, L.W, L.H, 'chalk')
-  drawSetup(L)
-  drawGraph(L)
+  drawSetup(L, now)
+  drawGraph(L, now)
 }
 
 // ===== 控制 =====
 function startRun() {
-  if (state.value === 'running' || state.value === 'heating') return
+  if (state.value === 'heating' || state.value === 'boiling') return
   state.value = 'heating'
   tNow.value = 0
   temp.value = T_START
   points.value = []
   bubbles.value = []
+  steam.value = []
+  rings.value = []
   completed = false
   startBtn.value = '重新加热'
   lastT = performance.now()
@@ -319,6 +568,8 @@ function resetAll() {
   temp.value = T_START
   points.value = []
   bubbles.value = []
+  steam.value = []
+  rings.value = []
   completed = false
   startBtn.value = '开始加热'
   hint.value = '点击「开始加热」，观察水沸腾前后气泡与温度的变化'
@@ -329,33 +580,34 @@ function loop(now) {
   const dt = Math.min((now - lastT) / 1000, 0.05)
   lastT = now
   if (state.value === 'heating' || isBoiling.value) {
-    tNow.value += dt * SLOWMO
-    const Tb = boilingPoint.value
-    const heatTime = 9
-    const f = Math.min(tNow.value / heatTime, 1)
-    if (f < 1) {
-      temp.value = T_START + (Tb - T_START) * f
-      state.value = 'heating'
-    } else {
-      temp.value = Tb
-      if (state.value !== 'boiling' && state.value !== 'done') {
-        state.value = 'boiling'
-        hint.value = '沸腾了！气泡变大上升到水面破裂，温度保持在沸点。'
+    if (state.value !== 'done') {
+      tNow.value += dt * SLOWMO
+      const Tb = boilingPoint.value
+      // 加热功率越高，到达沸点越快
+      const heatTime = 4 + ((100 - heatRate.value) / 100) * 9
+      const f = Math.min(tNow.value / heatTime, 1)
+      if (f < 1) {
+        temp.value = T_START + (Tb - T_START) * f
+        state.value = 'heating'
+      } else {
+        temp.value = Tb
+        if (state.value !== 'boiling') {
+          state.value = 'boiling'
+          hint.value = '沸腾了！气泡变大上升到水面破裂，温度保持在沸点。'
+        }
       }
-    }
-    points.value.push({ t: Math.min(tNow.value, 13), T: temp.value })
-    if (tNow.value >= 13) {
-      stopRun()
+      points.value.push({ t: Math.min(tNow.value, 13), T: temp.value })
+      if (tNow.value >= 13) stopRun()
     }
   }
-  render()
+  render(now)
   raf = requestAnimationFrame(loop)
 }
 
 function resizeCanvas() {
   if (!canvasRef.value) return
   setupCanvas()
-  render()
+  render(performance.now())
 }
 
 watch(altitude, () => {
@@ -365,7 +617,7 @@ watch(altitude, () => {
 let resizeObs = null
 onMounted(() => {
   setupCanvas()
-  render()
+  render(performance.now())
   if (window.ResizeObserver) {
     resizeObs = new ResizeObserver(resizeCanvas)
     resizeObs.observe(canvasRef.value.parentElement)
@@ -405,7 +657,7 @@ onBeforeUnmount(() => {
         </div>
         <div class="lab-params">
           <ParamSlider v-model="altitude" :min="0" :max="3000" :step="100" label="海拔高度" unit=" m" hint="海拔越高、气压越低，沸点越低" />
-          <ParamSlider v-model="heatRate" :min="20" :max="100" :step="5" label="加热功率" unit="%" hint="仅影响动画节奏" />
+          <ParamSlider v-model="heatRate" :min="20" :max="100" :step="5" label="加热功率" unit="%" hint="功率越大，升温越快、越早沸腾" />
         </div>
       </div>
 
