@@ -121,7 +121,123 @@ function drawBalance(W, H, label) {
   ctx.fillText(label, bx, postBot + 8)
 }
 
-function drawCylinder(W, H) {
+// 固体模式：两个量筒（甲、乙）并排展示排水法
+function drawCylindersSolid(W, H) {
+  const cw = 62
+  const top = H * 0.18
+  const bot = H * 0.82
+  const vMax = 120
+  const volToY = (v) => bot - ((bot - top) * v) / vMax
+  // 两个量筒中心（甲、乙）
+  const cxs = [W * 0.36, W * 0.66]
+  const labels = ['甲', '乙']
+  const vols = [v1.value, v2.value]
+  // 先画两个筒身
+  for (const cx of cxs) {
+    const x = cx - cw / 2
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'
+    ctx.fillRect(x, top, cw, bot - top)
+    ctx.strokeStyle = '#7a828c'
+    ctx.lineWidth = 2
+    ctx.strokeRect(x, top, cw, bot - top)
+    // 刻度（mL，每 20 mL 一条线+数字，10 mL 小线）
+    ctx.strokeStyle = 'rgba(90,90,100,0.55)'
+    ctx.fillStyle = boardText(ctx.canvas)
+    ctx.font = '600 10px system-ui, sans-serif'
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    for (let v = 0; v <= vMax; v += 10) {
+      const y = volToY(v)
+      const major = v % 20 === 0
+      ctx.lineWidth = major ? 1.3 : 0.7
+      ctx.beginPath()
+      ctx.moveTo(x + 2, y)
+      ctx.lineTo(x + 2 + (major ? 10 : 5), y)
+      ctx.stroke()
+      if (major) ctx.fillText(String(v), x + 14, y)
+    }
+    // 筒底画椭圆
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'
+    ctx.beginPath()
+    ctx.ellipse(cx, bot, cw / 2, 5, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = '#7a828c'
+    ctx.lineWidth = 2
+    ctx.stroke()
+    // 筒名（甲/乙）顶部
+    ctx.fillStyle = boardText(ctx.canvas)
+    ctx.font = '700 13px system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'bottom'
+    ctx.fillText(labels[cxs.indexOf(cx)], cx, top - 4)
+  }
+  // 甲筒：只装水到 V1
+  const xA = cxs[0] - cw / 2
+  const wyA = volToY(v1.value)
+  ctx.fillStyle = 'rgba(120,170,210,0.55)'
+  ctx.fillRect(xA + 2, wyA, cw - 4, bot - wyA - 2)
+  ctx.beginPath()
+  ctx.ellipse(cxs[0], wyA, (cw - 4) / 2, 3.5, 0, 0, Math.PI * 2)
+  ctx.fill()
+  // 乙筒：装水到 V2 + 石块沉底
+  const xB = cxs[1] - cw / 2
+  const wyB = volToY(v2.value)
+  ctx.fillStyle = 'rgba(120,170,210,0.55)'
+  ctx.fillRect(xB + 2, wyB, cw - 4, bot - wyB - 2)
+  ctx.beginPath()
+  ctx.ellipse(cxs[1], wyB, (cw - 4) / 2, 3.5, 0, 0, Math.PI * 2)
+  ctx.fill()
+  // 石块（不规则，棕色，沉在乙筒底部）
+  if (v2.value > v1.value) {
+    ctx.fillStyle = '#a87248'
+    ctx.strokeStyle = '#6b4022'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    const sx = cxs[1], sy = bot - 8
+    ctx.moveTo(sx - 14, sy)
+    ctx.lineTo(sx - 18, sy - 10)
+    ctx.lineTo(sx - 6, sy - 16)
+    ctx.lineTo(sx + 8, sy - 12)
+    ctx.lineTo(sx + 16, sy - 6)
+    ctx.lineTo(sx + 12, sy + 2)
+    ctx.closePath()
+    ctx.fill(); ctx.stroke()
+    // 高光
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'
+    ctx.beginPath()
+    ctx.moveTo(sx - 8, sy - 12)
+    ctx.lineTo(sx - 4, sy - 14)
+    ctx.lineTo(sx, sy - 12)
+    ctx.lineTo(sx - 4, sy - 10)
+    ctx.closePath()
+    ctx.fill()
+  }
+  // V1 / V2 数值标注（各筒上方，红色）
+  ctx.fillStyle = '#d92135'
+  ctx.font = '700 14px system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  ctx.fillText(`V1 = ${v1.value} mL`, cxs[0], top + 4)
+  ctx.fillText(`V2 = ${v2.value} mL`, cxs[1], top + 4)
+  // 差值箭头 + 体积公式（两筒之间，教材式标注）
+  const ax = (cxs[0] + cxs[1]) / 2
+  ctx.strokeStyle = '#d92135'
+  ctx.lineWidth = 1.5
+  ctx.setLineDash([4, 3])
+  ctx.beginPath()
+  ctx.moveTo(cxs[0] + 16, wyA)
+  ctx.lineTo(cxs[1] - 16, wyB)
+  ctx.stroke()
+  ctx.setLineDash([])
+  ctx.fillStyle = '#d92135'
+  ctx.font = '700 13px system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(`V石 = V2 − V1 = ${vSolid.value} mL`, ax, (wyA + wyB) / 2 - 10)
+}
+
+// 液体模式：单量筒
+function drawCylinderLiquid(W, H) {
   const cx = W * 0.72
   const top = H * 0.16
   const bot = H * 0.84
@@ -129,13 +245,11 @@ function drawCylinder(W, H) {
   const x = cx - cw / 2
   const vMax = 120
   const volToY = (v) => bot - ((bot - top) * v) / vMax
-  // 筒身
   ctx.fillStyle = 'rgba(255,255,255,0.6)'
   ctx.fillRect(x, top, cw, bot - top)
   ctx.strokeStyle = '#7a828c'
   ctx.lineWidth = 2
   ctx.strokeRect(x, top, cw, bot - top)
-  // 刻度
   ctx.strokeStyle = 'rgba(90,90,100,0.5)'
   ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '600 10px system-ui, sans-serif'
@@ -150,35 +264,14 @@ function drawCylinder(W, H) {
     ctx.stroke()
     if (v % 50 === 0) ctx.fillText(String(v), x + 16, y)
   }
-  if (mode.value === 'solid') {
-    // 水（初始）
-    const wy = volToY(v1.value)
-    ctx.fillStyle = 'rgba(120,170,210,0.55)'
-    ctx.fillRect(x + 2, wy, cw - 4, bot - wy - 2)
-    // 石块（排水后）
-    const sy = volToY(v2.value)
-    ctx.fillStyle = '#b0795a'
-    ctx.beginPath()
-    ctx.moveTo(cx, sy)
-    ctx.lineTo(cx - 16, bot - 4)
-    ctx.lineTo(cx + 16, bot - 4)
-    ctx.closePath()
-    ctx.fill()
-    ctx.fillStyle = boardText(ctx.canvas)
-    ctx.font = '700 13px system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'bottom'
-    ctx.fillText(`V1=${v1.value}  V2=${v2.value}`, cx, top - 8)
-  } else {
-    const ly = volToY(vL.value)
-    ctx.fillStyle = 'rgba(120,170,120,0.6)'
-    ctx.fillRect(x + 2, ly, cw - 4, bot - ly - 2)
-    ctx.fillStyle = boardText(ctx.canvas)
-    ctx.font = '700 13px system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'bottom'
-    ctx.fillText(`V液=${vL.value}`, cx, top - 8)
-  }
+  const ly = volToY(vL.value)
+  ctx.fillStyle = 'rgba(120,170,120,0.6)'
+  ctx.fillRect(x + 2, ly, cw - 4, bot - ly - 2)
+  ctx.fillStyle = boardText(ctx.canvas)
+  ctx.font = '700 13px system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'bottom'
+  ctx.fillText(`V液=${vL.value} mL`, cx, top - 8)
 }
 
 function render() {
@@ -186,7 +279,8 @@ function render() {
   const { W, H } = dims()
   paintBoard(ctx, W, H, 'chalk')
   drawBalance(W, H, mode.value === 'solid' ? `固体质量 m = ${m.value} g` : `烧杯+液 m1 = ${m1.value} g`)
-  drawCylinder(W, H)
+  if (mode.value === 'solid') drawCylindersSolid(W, H)
+  else drawCylinderLiquid(W, H)
 }
 
 function loop() {
