@@ -1312,12 +1312,15 @@ p { margin: 0; }
   .lab-left .lab-actions { gap: 8px; }
 }
 
-/* 实验画布（固定逻辑分辨率 900x520 的组件）按容器宽度等比缩放显示：
-   任何屏幕尺寸下动画比例都与桌面一致，内容完整不裁剪、不变形 */
-.lab-left canvas.logic-canvas {
-  width: 100% !important;
-  height: auto !important;
-  aspect-ratio: 900 / 520;
+/* 实验画布统一显示策略（全系统通用）：
+   桌面保持组件自带尺寸；≤1180px（手机/平板）时按视口宽度等比 900:520
+   给出明确高度（不依赖 aspect-ratio 对 canvas 的兼容性），所有 canvas
+   实验通用——动画比例不变、内容完整，不再出现长条背景或只显示左上角 */
+@media (max-width: 1180px) {
+  .lab-left canvas {
+    width: 100% !important;
+    height: calc(100vw * 520 / 900) !important;
+  }
 }
 
 /* ===== 页脚 ===== */
