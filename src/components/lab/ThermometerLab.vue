@@ -9,9 +9,9 @@ const emit = defineEmits(['complete'])
 
 // ===== 三个水杯（冷/温/热水，固定真实温度便于读数练习）=====
 const cups = [
-  { name: '冷水', temp: 18, color: '#a9d4e8', steam: false },
-  { name: '温水', temp: 53, color: '#f1caa0', steam: false },
-  { name: '热水', temp: 87, color: '#e79a86', steam: true }
+  { name: '冷水', temp: 18, color: '#9ccee8', deep: '#6fa8cc', steam: false },
+  { name: '温水', temp: 53, color: '#f3cc9f', deep: '#d8a56e', steam: false },
+  { name: '热水', temp: 87, color: '#e79a86', deep: '#cf6f58', steam: true }
 ]
 const selected = ref(0)
 const readings = reactive([null, null, null])
@@ -65,79 +65,153 @@ function rr(x, y, w, h, r) {
   ctx.closePath()
 }
 
+// 布局：烧杯底坐在桌面线上
 function beakerRects(W, H) {
   const n = cups.length
-  const areaW = W * 0.6
-  const bx = W * 0.06
-  const bw = Math.min(110, (areaW - (n - 1) * 30) / n)
+  const baseY = H - 52
+  const areaW = W * 0.62
+  const bx = W * 0.05
+  const bw = Math.min(118, (areaW - bx - (n - 1) * 32) / n)
   const gap = (areaW - bx - bw * n) / (n - 1)
-  const top = H - 200
-  const bh = 140
-  return cups.map((_, i) => ({ x: bx + i * (bw + gap), y: top, w: bw, h: bh }))
+  const bh = 150
+  const top = baseY - bh
+  return cups.map((_, i) => ({ x: bx + i * (bw + gap), y: top, w: bw, h: bh, baseY }))
 }
 
-function drawBeaker(L, r, idx) {
+// 热水杯的上升蒸汽团
+function drawSteam(cx, topY, now) {
+  for (let i = 0; i < 4; i++) {
+    const ph = i * 1.7
+    const cycle = (now * 0.018 + ph * 30) % 72
+    const yy = topY - 10 - cycle
+    const xx = cx + Math.sin(now * 0.003 + ph) * 8 + (i - 1.5) * 9
+    const r = 6 + (i % 3)
+    const a = Math.max(0, 0.32 * (1 - cycle / 72))
+    ctx.fillStyle = `rgba(238,243,248,${a.toFixed(3)})`
+    ctx.beginPath()
+    ctx.arc(xx, yy, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+}
+
+function drawBeaker(L, r, idx, now) {
   const cup = cups[idx]
   const sel = idx === selected.value
-  // 烧杯玻璃
-  ctx.fillStyle = sel ? 'rgba(90,140,200,0.10)' : 'rgba(120,120,130,0.08)'
-  rr(r.x, r.y, r.w, r.h, 10)
-  ctx.fill()
-  // 水
-  const fillFrac = 0.62
-  const wy = r.y + r.h * (1 - fillFrac)
+  const cx = r.x + r.w / 2
+  const baseY = r.baseY
+  // 桌面
   ctx.save()
-  rr(r.x + 3, wy, r.w - 6, r.y + r.h - wy - 3, 8)
-  ctx.clip()
-  const grad = ctx.createLinearGradient(0, wy, 0, r.y + r.h)
-  grad.addColorStop(0, cup.color)
-  grad.addColorStop(1, cup.color)
-  ctx.fillStyle = cup.color
-  ctx.fillRect(r.x, wy, r.w, r.h)
-  ctx.restore()
-  // 杯壁
-  ctx.strokeStyle = sel ? '#3b6fd4' : 'rgba(80,80,90,0.5)'
-  ctx.lineWidth = sel ? 3 : 2
-  rr(r.x, r.y, r.w, r.h, 10)
+  const tg = ctx.createLinearGradient(0, baseY, 0, L.H)
+  tg.addColorStop(0, 'rgba(122,94,64,0.42)')
+  tg.addColorStop(1, 'rgba(80,60,40,0.56)')
+  ctx.fillStyle = tg
+  ctx.fillRect(0, baseY, L.W * 0.66, L.H - baseY)
+  ctx.strokeStyle = 'rgba(58,44,30,0.65)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(0, baseY)
+  ctx.lineTo(L.W * 0.66, baseY)
   ctx.stroke()
-  // 热气（热水）
-  if (cup.steam) {
-    ctx.strokeStyle = 'rgba(180,180,190,0.5)'
-    ctx.lineWidth = 2
-    for (let k = 0; k < 3; k++) {
-      const sx = r.x + r.w * (0.3 + k * 0.2)
-      ctx.beginPath()
-      for (let s = 0; s <= 18; s++) {
-        const yy = r.y - 6 - s * 2.2
-        const xx = sx + Math.sin(s * 0.6 + performance.now() / 400 + k) * 4
-        if (s === 0) ctx.moveTo(xx, yy)
-        else ctx.lineTo(xx, yy)
-      }
-      ctx.stroke()
-    }
+  ctx.restore()
+  // 烧杯投影
+  ctx.save()
+  ctx.fillStyle = 'rgba(0,0,0,0.16)'
+  ctx.beginPath()
+  ctx.ellipse(cx, baseY + 3, r.w * 0.62, 6, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+
+  // 玻璃杯身（半透明 + 高光）
+  const glassGrad = ctx.createLinearGradient(r.x, 0, r.x + r.w, 0)
+  glassGrad.addColorStop(0, 'rgba(255,255,255,0.18)')
+  glassGrad.addColorStop(0.5, 'rgba(220,235,245,0.07)')
+  glassGrad.addColorStop(1, 'rgba(255,255,255,0.24)')
+  ctx.fillStyle = glassGrad
+  rr(r.x, r.y, r.w, r.h, 12)
+  ctx.fill()
+
+  // 水（渐变 + 波动水面）
+  const fillFrac = 0.6
+  const wy0 = r.y + r.h * (1 - fillFrac)
+  const surfY = (x) => wy0 + Math.sin(x * 0.09 + now * 0.004) * 1.3
+  ctx.save()
+  rr(r.x + 3, r.y + 3, r.w - 6, r.h - 6, 10)
+  ctx.clip()
+  const grad = ctx.createLinearGradient(0, wy0, 0, r.y + r.h)
+  grad.addColorStop(0, cup.color)
+  grad.addColorStop(1, cup.deep)
+  ctx.fillStyle = grad
+  ctx.beginPath()
+  ctx.moveTo(r.x + 3, r.y + r.h - 3)
+  ctx.lineTo(r.x + 3, surfY(r.x + 3))
+  for (let x = r.x + 3; x <= r.x + r.w - 3; x += 6) ctx.lineTo(x, surfY(x))
+  ctx.lineTo(r.x + r.w - 3, r.y + r.h - 3)
+  ctx.closePath()
+  ctx.fill()
+  // 水面亮线
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)'
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  for (let x = r.x + 3; x <= r.x + r.w - 3; x += 6) {
+    const y = surfY(x)
+    x === r.x + 3 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
   }
+  ctx.stroke()
+  ctx.restore()
+
+  // 杯口
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(r.x, r.y + 5)
+  ctx.lineTo(r.x + 7, r.y)
+  ctx.lineTo(r.x + r.w - 7, r.y)
+  ctx.lineTo(r.x + r.w, r.y + 5)
+  ctx.stroke()
+
+  // 杯壁描边（选中发光）
+  ctx.save()
+  if (sel) {
+    ctx.shadowColor = '#3b6fd4'
+    ctx.shadowBlur = 14
+    ctx.strokeStyle = '#3b6fd4'
+    ctx.lineWidth = 3
+  } else {
+    ctx.strokeStyle = 'rgba(80,80,90,0.55)'
+    ctx.lineWidth = 2
+  }
+  rr(r.x, r.y, r.w, r.h, 12)
+  ctx.stroke()
+  ctx.restore()
+
+  // 蒸汽（热水）
+  if (cup.steam) drawSteam(cx, r.y, now)
+
   // 名称
   ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 14px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
-  ctx.fillText(cup.name, r.x + r.w / 2, r.y + r.h + 8)
+  ctx.fillText(cup.name, cx, baseY + 8)
   if (sel) {
+    // 测量指示
     ctx.fillStyle = '#3b6fd4'
     ctx.font = '600 12px system-ui, sans-serif'
-    ctx.fillText('▼ 正在测量', r.x + r.w / 2, r.y - 18)
+    ctx.fillText('▼ 正在测量', cx, r.y - 24)
   }
 }
 
 function drawThermometer(L) {
   const tx = L.W - 78
-  const topY = 70
-  const bulbY = L.H - 130
+  const topY = 88
+  const baseY = L.H - 52
+  const bulbY = baseY - 42
   const tubeTop = topY
-  const tubeBot = bulbY - 18
+  const tubeBot = bulbY - 16
   const tubeW = 16
   const frac = tempToFrac(mercury.value)
   const mercuryTopY = tubeBot - (tubeBot - tubeTop) * frac
+  const mx = tx + tubeW / 2
 
   // 选中杯到温度计的虚线引导
   const br = beakerRects(L.W, L.H)[selected.value]
@@ -145,39 +219,66 @@ function drawThermometer(L) {
   ctx.lineWidth = 1.5
   ctx.setLineDash([6, 5])
   ctx.beginPath()
-  ctx.moveTo(br.x + br.w / 2, br.y + 6)
-  ctx.lineTo(tx + tubeW / 2, bulbY - 30)
+  ctx.moveTo(br.x + br.w / 2, br.y + 8)
+  ctx.lineTo(tx + tubeW / 2, bulbY - 26)
   ctx.stroke()
   ctx.setLineDash([])
 
   // 玻璃管
-  ctx.fillStyle = 'rgba(255,255,255,0.9)'
-  rr(tx, tubeTop, tubeW, tubeBot - tubeTop + 40, tubeW / 2)
+  const tubeGrad = ctx.createLinearGradient(tx, 0, tx + tubeW, 0)
+  tubeGrad.addColorStop(0, 'rgba(255,255,255,0.95)')
+  tubeGrad.addColorStop(0.5, 'rgba(240,246,250,0.85)')
+  tubeGrad.addColorStop(1, 'rgba(220,230,238,0.9)')
+  ctx.fillStyle = tubeGrad
+  rr(tx, tubeTop, tubeW, tubeBot - tubeTop + 42, tubeW / 2)
   ctx.fill()
-  ctx.strokeStyle = 'rgba(90,90,100,0.7)'
-  ctx.lineWidth = 2
-  rr(tx, tubeTop, tubeW, tubeBot - tubeTop + 40, tubeW / 2)
+  ctx.strokeStyle = 'rgba(90,90,100,0.6)'
+  ctx.lineWidth = 1.5
+  rr(tx, tubeTop, tubeW, tubeBot - tubeTop + 42, tubeW / 2)
   ctx.stroke()
-  // 球部
-  ctx.beginPath()
-  ctx.arc(tx + tubeW / 2, bulbY, 20, 0, Math.PI * 2)
-  ctx.fillStyle = 'rgba(255,255,255,0.9)'
+  // 管身左侧高光
+  ctx.fillStyle = 'rgba(255,255,255,0.85)'
+  rr(tx + 2, tubeTop + 2, 3, tubeBot - tubeTop + 34, 1.5)
   ctx.fill()
+
+  // 球部
+  const bulbGrad = ctx.createRadialGradient(mx - 6, bulbY - 6, 2, mx, bulbY, 22)
+  bulbGrad.addColorStop(0, 'rgba(255,255,255,0.95)')
+  bulbGrad.addColorStop(0.6, 'rgba(240,246,250,0.9)')
+  bulbGrad.addColorStop(1, 'rgba(210,222,232,0.9)')
+  ctx.fillStyle = bulbGrad
+  ctx.beginPath()
+  ctx.arc(mx, bulbY, 20, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(90,90,100,0.6)'
+  ctx.lineWidth = 1.5
   ctx.stroke()
 
-  // 汞柱
-  const mx = tx + tubeW / 2
-  ctx.fillStyle = '#e0584f'
-  rr(mx - 5, mercuryTopY, 10, bulbY - mercuryTopY + 18, 5)
+  // 汞柱（渐变 + 圆头）
+  const hg = ctx.createLinearGradient(mx - 5, 0, mx + 5, 0)
+  hg.addColorStop(0, '#f26a5a')
+  hg.addColorStop(0.5, '#ff8a72')
+  hg.addColorStop(1, '#e0483c')
+  ctx.fillStyle = hg
+  ctx.beginPath()
+  ctx.moveTo(mx - 5, mercuryTopY + 5)
+  ctx.quadraticCurveTo(mx - 5, mercuryTopY, mx, mercuryTopY)
+  ctx.quadraticCurveTo(mx + 5, mercuryTopY, mx + 5, mercuryTopY + 5)
+  ctx.lineTo(mx + 5, bulbY + 14)
+  ctx.lineTo(mx - 5, bulbY + 14)
+  ctx.closePath()
   ctx.fill()
   // 球内汞
+  const bulbHg = ctx.createRadialGradient(mx - 4, bulbY - 4, 1, mx, bulbY, 16)
+  bulbHg.addColorStop(0, '#ff8a72')
+  bulbHg.addColorStop(1, '#e0483c')
+  ctx.fillStyle = bulbHg
   ctx.beginPath()
   ctx.arc(mx, bulbY, 15, 0, Math.PI * 2)
-  ctx.fillStyle = '#e0584f'
   ctx.fill()
 
   // 刻度尺（每 10℃ 标注，每 2℃ 一短线）
-  ctx.strokeStyle = 'rgba(60,60,70,0.6)'
+  ctx.strokeStyle = 'rgba(60,60,70,0.65)'
   ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '600 11px system-ui, sans-serif'
   ctx.textAlign = 'right'
@@ -186,37 +287,80 @@ function drawThermometer(L) {
     const y = tubeBot - (tubeBot - tubeTop) * tempToFrac(t)
     const major = t % 10 === 0
     const x1 = tx - 4
-    const x2 = tx - (major ? 14 : 9)
+    const x2 = tx - (major ? 15 : 9)
     ctx.lineWidth = major ? 1.6 : 1
     ctx.beginPath()
     ctx.moveTo(x1, y)
     ctx.lineTo(x2, y)
     ctx.stroke()
-    if (major) ctx.fillText(String(t), x2 - 3, y)
+    if (major) ctx.fillText(String(t), x2 - 4, y)
   }
+  // 单位
+  ctx.fillStyle = boardText(ctx.canvas)
+  ctx.font = '700 13px system-ui, sans-serif'
+  ctx.textAlign = 'right'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('℃', tx - 20, tubeTop + 12)
 
-  // 视线（与汞柱上表面相平）
+  // 大号温度数字屏
+  const dispW = 128
+  const dispH = 36
+  const dx = tx - dispW - 14
+  const dy = tubeTop - 8
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.35)'
+  ctx.shadowBlur = 10
+  ctx.shadowOffsetY = 3
+  ctx.fillStyle = 'rgba(18,22,32,0.88)'
+  rr(dx, dy, dispW, dispH, 9)
+  ctx.fill()
+  ctx.restore()
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)'
+  ctx.lineWidth = 1
+  rr(dx, dy, dispW, dispH, 9)
+  ctx.stroke()
+  ctx.fillStyle = '#ff5a48'
+  ctx.font = '700 20px ui-monospace, Consolas, monospace'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(`${mercury.value.toFixed(1)} ℃`, dx + dispW / 2, dy + dispH / 2 + 1)
+
+  // 视线标线（与汞柱上表面相平）
   ctx.strokeStyle = '#3b6fd4'
   ctx.lineWidth = 1.5
   ctx.setLineDash([4, 4])
   ctx.beginPath()
   ctx.moveTo(tx - 22, mercuryTopY)
-  ctx.lineTo(tx + tubeW + 30, mercuryTopY)
+  ctx.lineTo(tx + tubeW + 32, mercuryTopY)
   ctx.stroke()
   ctx.setLineDash([])
+  // 视线小三角（指向汞柱上表面）
+  ctx.fillStyle = '#3b6fd4'
+  ctx.beginPath()
+  ctx.moveTo(tx + tubeW + 6, mercuryTopY)
+  ctx.lineTo(tx + tubeW + 14, mercuryTopY - 5)
+  ctx.lineTo(tx + tubeW + 14, mercuryTopY + 5)
+  ctx.closePath()
+  ctx.fill()
   ctx.fillStyle = '#3b6fd4'
   ctx.font = '600 11px system-ui, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'bottom'
-  ctx.fillText('视线相平', tx + tubeW + 4, mercuryTopY - 2)
+  ctx.fillText('视线相平', tx + tubeW + 18, mercuryTopY - 2)
 }
 
-function render() {
+function render(now) {
   if (!ctx) return
   const L = dims()
   paintBoard(ctx, L.W, L.H, 'chalk')
+  // 标题
+  ctx.fillStyle = boardText(ctx.canvas)
+  ctx.font = '700 15px system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  ctx.fillText('温度计的读数练习', L.W / 2, 18)
   const rects = beakerRects(L.W, L.H)
-  rects.forEach((r, i) => drawBeaker(L, r, i))
+  rects.forEach((r, i) => drawBeaker(L, r, i, now))
   drawThermometer(L)
 }
 
@@ -227,14 +371,14 @@ function loop(now) {
   // 汞柱平滑过渡到所选水温
   const target = cups[selected.value].temp
   mercury.value += (target - mercury.value) * Math.min(1, dt * 4)
-  render()
+  render(now)
   raf = requestAnimationFrame(loop)
 }
 
 function resizeCanvas() {
   if (!canvasRef.value) return
   setupCanvas()
-  render()
+  render(performance.now())
 }
 
 function onCanvasClick(e) {
@@ -286,7 +430,7 @@ const allFilled = computed(() => readings.every((r) => r !== null && r !== ''))
 let resizeObs = null
 onMounted(() => {
   setupCanvas()
-  render()
+  render(performance.now())
   if (window.ResizeObserver) {
     resizeObs = new ResizeObserver(resizeCanvas)
     resizeObs.observe(canvasRef.value.parentElement)
