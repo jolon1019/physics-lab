@@ -137,6 +137,20 @@ function drawScale(W, H, label) {
   ctx.fillText(label, sx, baseBot + 8)
 }
 
+// 竖向双箭头（标注液面差的高度）
+function drawDoubleVArrow(x, yTop, yBot) {
+  ctx.strokeStyle = '#d92135'
+  ctx.lineWidth = 1.5
+  ctx.beginPath(); ctx.moveTo(x, yTop); ctx.lineTo(x, yBot); ctx.stroke()
+  ctx.fillStyle = '#d92135'
+  ctx.beginPath()
+  ctx.moveTo(x, yTop); ctx.lineTo(x - 4, yTop + 9); ctx.lineTo(x + 4, yTop + 9)
+  ctx.closePath(); ctx.fill()
+  ctx.beginPath()
+  ctx.moveTo(x, yBot); ctx.lineTo(x - 4, yBot - 9); ctx.lineTo(x + 4, yBot - 9)
+  ctx.closePath(); ctx.fill()
+}
+
 // 固体模式：两个量筒（甲、乙）并排展示排水法
 function drawCylindersSolid(W, H) {
   const cw = 62
@@ -207,28 +221,37 @@ function drawCylindersSolid(W, H) {
   if (v2.value > v1.value) {
     drawStone(cxs[1], bot - 8)
   }
-  // V1 / V2 数值标注（各筒上方，红色）
+  // V1 / V2 读数移到两个量筒外侧（不直接标在量筒本体上）
   ctx.fillStyle = '#d92135'
-  ctx.font = '700 14px system-ui, sans-serif'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'top'
-  ctx.fillText(`V1 = ${v1.value} mL`, cxs[0], top + 4)
-  ctx.fillText(`V2 = ${v2.value} mL`, cxs[1], top + 4)
-  // 差值箭头 + 体积公式（两筒之间，教材式标注）
-  const ax = (cxs[0] + cxs[1]) / 2
+  ctx.font = '700 13px system-ui, sans-serif'
+  ctx.textBaseline = 'middle'
+  ctx.textAlign = 'right'
+  ctx.fillText(`V1 = ${v1.value} mL`, xA - 8, wyA)
+  ctx.textAlign = 'left'
+  ctx.fillText(`V2 = ${v2.value} mL`, xB + cw + 8, wyB)
+  // 差值：两侧水平平行延展到中间，再用竖向双箭头表示 V石
+  const gapL = cxs[0] + cw / 2 + 6
+  const gapR = cxs[1] - cw / 2 - 6
+  const mgx = (cxs[0] + cxs[1]) / 2
   ctx.strokeStyle = '#d92135'
   ctx.lineWidth = 1.5
   ctx.setLineDash([4, 3])
-  ctx.beginPath()
-  ctx.moveTo(cxs[0] + 16, wyA)
-  ctx.lineTo(cxs[1] - 16, wyB)
-  ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(gapL, wyA); ctx.lineTo(mgx, wyA); ctx.stroke()
+  ctx.beginPath(); ctx.moveTo(gapR, wyB); ctx.lineTo(mgx, wyB); ctx.stroke()
   ctx.setLineDash([])
-  ctx.fillStyle = '#d92135'
+  drawDoubleVArrow(mgx, Math.min(wyA, wyB), Math.max(wyA, wyB))
+  // 差值文字（带白底，居中于中间列）
+  const midY = (wyA + wyB) / 2
+  const dtxt = `V石 = V2 − V1 = ${vSolid.value} mL`
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText(`V石 = V2 − V1 = ${vSolid.value} mL`, ax, (wyA + wyB) / 2 - 10)
+  const dtw = ctx.measureText(dtxt).width
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'
+  roundRect(mgx - dtw / 2 - 7, midY - 11, dtw + 14, 22, 6)
+  ctx.fill()
+  ctx.fillStyle = '#d92135'
+  ctx.fillText(dtxt, mgx, midY)
 }
 
 // 液体模式：单量筒
