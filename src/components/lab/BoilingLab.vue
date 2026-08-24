@@ -112,9 +112,9 @@ function drawSetup(L, now) {
   ctx.stroke()
   ctx.restore()
 
-  // 酒精灯（玻璃瓶身 + 烛芯 + 跳动火焰 + 辉光）
+  // 酒精灯（玻璃瓶身 + 烛芯 + 跳动火焰 + 辉光）——瓶身坐在桌面上，不被桌面带覆盖
   const lampX = cx - 18
-  const lampY = baseY + 6
+  const lampY = baseY - 30
   // 投影
   ctx.save()
   ctx.fillStyle = 'rgba(0,0,0,0.20)'
@@ -156,12 +156,12 @@ function drawSetup(L, now) {
     ctx.beginPath()
     ctx.arc(cx, fy - 12, 36, 0, Math.PI * 2)
     ctx.fill()
-    // 外焰
+    // 外焰（加高，够到石棉网）
     ctx.fillStyle = '#ff9a2e'
     ctx.beginPath()
-    ctx.moveTo(cx, fy - 31 + fl)
+    ctx.moveTo(cx, fy - 36 + fl)
     ctx.quadraticCurveTo(cx + 9, fy - 16, cx, fy)
-    ctx.quadraticCurveTo(cx - 9, fy - 16, cx, fy - 31 + fl)
+    ctx.quadraticCurveTo(cx - 9, fy - 16, cx, fy - 36 + fl)
     ctx.fill()
     // 内焰
     ctx.fillStyle = '#ffe27a'
