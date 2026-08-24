@@ -63,7 +63,7 @@ export const GRADES = [
         id: 'ch7',
         title: '力',
         experiments: [
-          { id: 'e-force', title: '探究弹簧测力计的测量原理', slug: 'spring-dynamometer', type: '探究', level: '基础' }
+          { id: 'e-force', title: '探究重力的大小跟质量的关系', slug: 'spring-dynamometer', type: '探究', level: '基础' }
         ]
       },
       {
