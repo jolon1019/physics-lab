@@ -188,6 +188,8 @@ function resetExperiment() {
   dragging.value = false
   dragInfo = null
   motionState.value = 'idle'
+  dispReadout.value = 0
+  vib.amp = 0
   hint.value = '已重置：物块归位，可重新向左拉动测力计'
 }
 
@@ -284,6 +286,9 @@ function onKey(e) {
 let raf = null
 let lastT = 0
 const phase = ref(0)
+// 视觉动画状态（不参与物理计算，仅用于动画表现）
+const dispReadout = ref(0) // 指针平滑显示读数（物理读数仍用 readout，指针动画用这个平滑逼近）
+const vib = reactive({ amp: 0, ph: 0 }) // 弹簧振动：拖动受力时增强（波浪流动感），松手衰减
 function tick(now) {
   const dt = Math.min(((now - lastT) || 16) / 1000, 0.05)
   lastT = now
@@ -291,6 +296,15 @@ function tick(now) {
   if (dragDx.value <= 0.001) motionState.value = 'idle'
   else if (dragDx.value <= STATIC_STROKE) motionState.value = 'static'
   else motionState.value = 'uniform'
+  // 指针平滑动画：平滑逼近真实读数（猛拖时指针不会瞬跳）
+  dispReadout.value += (readout.value - dispReadout.value) * Math.min(1, dt * 12)
+  // 弹簧振动动画：受力拉伸中持续波浪流动，松手后衰减归零
+  if (dragging.value && readout.value > 0.01) {
+    vib.amp = Math.min(3.5, vib.amp + dt * 12)
+    vib.ph += dt * 26
+  } else {
+    vib.amp *= Math.max(0, 1 - dt * 9)
+  }
   if (moving.value) phase.value += dt * 6
   else phase.value += dt * 0.6
   raf = requestAnimationFrame(tick)
@@ -436,14 +450,23 @@ onBeforeUnmount(() => {
             <rect :x="dynDrawX1 - 12" :y="dynCY - DYN_H / 2" width="12" :height="DYN_H" rx="5" fill="#1f2c39" />
             <!-- 顶部刻度窗 -->
             <rect :x="dynDrawX0 + 18" :y="dynCY - 11" :width="DYN_W - 36" height="22" rx="3" fill="#f6fafd" stroke="#9fb0c0" stroke-width="1.2" />
-            <!-- 刻度线（0~5N，5 大格） -->
+            <!-- 刻度线（0~5N，5 大格）：已读到的刻度线变红加粗，读数增长时红色推进（刻度动画） -->
             <g stroke="#5b6b7a" stroke-width="1">
-              <line v-for="i in 11" :key="'tk' + i" :x1="dynDrawX0 + 20 + (i - 1) * ((DYN_W - 40) / 10)" :y1="dynCY - 9" :x2="dynDrawX0 + 20 + (i - 1) * ((DYN_W - 40) / 10)" :y2="dynCY - 3" :stroke-width="i % 2 === 0 ? 1.6 : 0.8" />
+              <line
+                v-for="i in 11"
+                :key="'tk' + i"
+                :x1="dynDrawX0 + 20 + (i - 1) * ((DYN_W - 40) / 10)"
+                :y1="dynCY - 9"
+                :x2="dynDrawX0 + 20 + (i - 1) * ((DYN_W - 40) / 10)"
+                :y2="dynCY - 3"
+                :stroke="dispReadout > 0.01 && i - 1 <= Math.round(dispReadout / 5 * 10) ? '#d92135' : '#5b6b7a'"
+                :stroke-width="dispReadout > 0.01 && i - 1 <= Math.round(dispReadout / 5 * 10) ? 2.2 : (i % 2 === 0 ? 1.6 : 0.8)"
+              />
             </g>
-            <!-- 指针（随读数在 0~5N 间移动） -->
+            <!-- 指针（平滑动画跟随 dispReadout 在 0~5N 间移动，不瞬跳） -->
             <line
-              :x1="dynDrawX0 + 20 + Math.min(1, readout / 5) * (DYN_W - 40)"
-              :x2="dynDrawX0 + 20 + Math.min(1, readout / 5) * (DYN_W - 40)"
+              :x1="dynDrawX0 + 20 + Math.min(1, dispReadout / 5) * (DYN_W - 40)"
+              :x2="dynDrawX0 + 20 + Math.min(1, dispReadout / 5) * (DYN_W - 40)"
               :y1="dynCY - 10"
               :y2="dynCY + 10"
               stroke="#d92135" stroke-width="2.4"
@@ -459,21 +482,22 @@ onBeforeUnmount(() => {
           </g>
 
           <!-- 底部连接弹簧（测力计底部下方 → 物块左面）：弹簧在壳体外，不在刻度窗内。
-               弹簧总长 = 挂钩端到物块左面距离：静摩擦阶段被拉长（读数 0→f），滑动阶段恒定。 -->
+               弹簧总长 = 挂钩端到物块左面距离：静摩擦阶段被拉长（读数 0→f），滑动阶段恒定。
+               动画：受力拉伸时锯齿叠加波浪振动（vib.amp），松手衰减归零。 -->
           <g>
             <!-- 挂钩垂线（测力计挂钩 → 弹簧起点） -->
             <line :x1="hookX" :y1="dynCY" :x2="hookX" :y2="springY" stroke="#3a6ea5" stroke-width="2.5" stroke-linecap="round" />
-            <!-- 弹簧锯齿（水平，14 段，长度随测力计与物块间距伸缩） -->
+            <!-- 弹簧锯齿（水平，14 段，长度随测力计与物块间距伸缩；振动动画） -->
             <path
               :d="`M ${hookX} ${springY}
-                ${Array.from({length:14},(_,i)=>{const xx=hookX+(blockLeft-hookX)*(i+0.5)/14;const yy=springY+(i%2?6:-6);return `L ${xx.toFixed(1)} ${yy.toFixed(1)}`}).join(' ')}
+                ${Array.from({length:14},(_,i)=>{const xx=hookX+(blockLeft-hookX)*(i+0.5)/14;const yy=springY+(i%2?6:-6)+vib.amp*Math.sin(vib.ph+i*0.7);return `L ${xx.toFixed(1)} ${yy.toFixed(1)}`}).join(' ')}
                 L ${blockLeft} ${springY}`"
               fill="none" :stroke="springStretch > 0 ? '#3a6ea5' : '#7d8a9a'" :stroke-width="springStretch > 0 ? 2.6 : 2"
               :opacity="springStretch > 0 ? 1 : 0.7"
               stroke-linecap="round"
             />
-            <!-- 连接物块的小挂钩 -->
-            <circle :cx="blockLeft" :cy="springY" r="4" fill="none" stroke="#3a6ea5" stroke-width="2.4" />
+            <!-- 连接物块的小挂钩（随振动微微摆动） -->
+            <circle :cx="blockLeft" :cy="springY + vib.amp * 0.4 * Math.sin(vib.ph)" r="4" fill="none" stroke="#3a6ea5" stroke-width="2.4" />
           </g>
 
           <!-- 物块（可拖动）+ 钩码（平底平铺） -->
