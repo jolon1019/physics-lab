@@ -28,7 +28,7 @@ if not exist node_modules (
 
 REM ===== 是否同步实验更改到 FRP（移动端访问网址）=====
 echo [sync] ask user whether to sync experiments to FRP >> start-local.log
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$r=[System.Windows.Forms.MessageBox]::Show('是否将实验更改同步到 FRP（移动端访问网址）？' + [char]10 + '(选“是”将重新构建 dist，刷新 FRP 网址即可看到最新实验)', '同步实验到 FRP', 4, 64); if($r -eq 'Yes'){ exit 0 } else { exit 1 }" >nul 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Add-Type -AssemblyName System.Windows.Forms; $r=[System.Windows.Forms.MessageBox]::Show('是否将实验更改同步到 FRP（移动端访问网址）？' + [char]10 + '(选“是”将重新构建 dist，刷新 FRP 网址即可看到最新实验)', '同步实验到 FRP', 4, 64); if($r -eq 'Yes'){ exit 0 } else { exit 1 }" >nul 2>&1
 if errorlevel 1 goto :no_sync
 
 echo [sync] user chose YES, rebuilding dist... >> start-local.log
