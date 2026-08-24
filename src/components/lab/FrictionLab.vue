@@ -509,7 +509,7 @@ onBeforeUnmount(() => {
               <!-- 高光 -->
               <rect :x="-HOOK_W / 2 + 4" y="3" :width="HOOK_W - 8" height="3" rx="1.5" fill="rgba(255,255,255,0.55)" />
               <!-- 数值 -->
-              <text :x="0" :y="HOOK_H / 2 + 4" text-anchor="middle" font-size="11" font-weight="800" fill="#8a5d1a">{{ HOOK_G }}</text>
+              <text :x="0" :y="HOOK_H / 2 + 4" text-anchor="middle" font-size="11" font-weight="800" fill="#ffffff" stroke="#5a3d12" stroke-width="0.9" paint-order="stroke">{{ HOOK_G }}</text>
             </g>
 
             <rect :width="blockW" :height="blockH" rx="6" :fill="wide ? 'url(#fr-wood)' : 'url(#fr-wood-side)'" :stroke="SURF_TONE.wood.edge" stroke-width="2.5" />
@@ -529,22 +529,22 @@ onBeforeUnmount(() => {
               <g :transform="`translate(0 -10)`">
                 <line x1="0" y1="0" :x2="-Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE)" y2="0" stroke="var(--bb-red)" stroke-width="3.5" stroke-linecap="round" />
                 <path :d="`M ${-Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE)} 0 l9 -5 l0 10 z`" fill="var(--bb-red)" />
-                <text :x="-Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE) / 2" y="-16" text-anchor="middle" font-size="10" font-weight="800" fill="var(--bb-red)">F拉={{ forceApplied.toFixed(1) }}N</text>
+                <text :x="-Math.min(blockW / 2 - 4, forceApplied * FORCE_ARROW_SCALE) / 2" y="-16" text-anchor="middle" font-size="10" font-weight="800" fill="#ffffff" stroke="#7a1020" stroke-width="0.9" paint-order="stroke">F拉={{ forceApplied.toFixed(1) }}N</text>
               </g>
               <!-- 摩擦力 f：向右（蓝，阻碍向左运动），起点中心，长度 ∝ frictionForce -->
               <g :transform="`translate(0 12)`">
                 <line x1="0" y1="0" :x2="Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE)" y2="0" stroke="var(--bb-blue)" stroke-width="3.5" stroke-linecap="round" />
                 <path :d="`M ${Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE)} 0 l-9 -5 l0 10 z`" fill="var(--bb-blue)" />
-                <text :x="Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE) / 2" y="16" text-anchor="middle" font-size="10" font-weight="800" fill="var(--bb-blue)">f摩={{ frictionForce.toFixed(1) }}N</text>
+                <text :x="Math.min(blockW / 2 - 4, frictionForce * FORCE_ARROW_SCALE) / 2" y="16" text-anchor="middle" font-size="10" font-weight="800" fill="#ffffff" stroke="#0c3a7a" stroke-width="0.9" paint-order="stroke">f摩={{ frictionForce.toFixed(1) }}N</text>
               </g>
               <!-- 物块受力结论（仅在拖动中显示，避免松手误导） -->
               <g v-if="dragging && motionState === 'uniform'">
-                <text x="0" y="34" text-anchor="middle" font-size="10.5" font-weight="800" fill="var(--bb-green)">
+                <text x="0" y="34" text-anchor="middle" font-size="10.5" font-weight="800" fill="#ffffff" stroke="#0f5a3a" stroke-width="0.9" paint-order="stroke">
                   F = f（动摩擦），二力平衡 → 匀速
                 </text>
               </g>
               <g v-else-if="dragging && motionState === 'static'">
-                <text x="0" y="34" text-anchor="middle" font-size="10.5" font-weight="800" fill="var(--bb-amber)">
+                <text x="0" y="34" text-anchor="middle" font-size="10.5" font-weight="800" fill="#ffffff" stroke="#7a4a10" stroke-width="0.9" paint-order="stroke">
                   F &lt; f（最大静摩擦），二力平衡 → 静止
                 </text>
               </g>
