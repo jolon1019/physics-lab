@@ -149,10 +149,9 @@ function resetLayout() {
 //  ② 滑动阶段：F = f（动摩擦），木块与手同步匀速左移，弹簧保持恒定伸长（读数恒 = f）
 const STATIC_STROKE = 44         // 静摩擦阶段弹簧拉伸行程(px)：dragDx 0→44 内读数 0→f，木块不动
 const SLIDE_BOUND_X = 20         // 物块/测力计左端允许到达的最小 x（画布左边界留白）
-const dragDx = ref(0)            // 手向左拖动的累计距离(px)，松手后保持（不复位）
+const dragDx = ref(0)            // 手向左拖动的累计距离(px)
 const motionState = ref('idle')  // idle 未拉 | static 静摩擦(木块不动) | uniform 匀速滑动
 const dragging = ref(false)
-const released = ref(false)      // 松手标志：松手后位移与读数保持
 
 // 画布边界限制（测力计左端 / 物块左面均不越过 x=SLIDE_BOUND_X）
 const maxDynShift = computed(() => layout.dyn.x - DYN_W / 2 - SLIDE_BOUND_X)
@@ -167,14 +166,13 @@ const readout = computed(() => (springStretch.value / STATIC_STROKE) * fNum.valu
 const forceApplied = computed(() => readout.value)                                         // 拉力 = 测力计读数
 // 摩擦力：静止时静摩擦 = 拉力（随 F 增大到 f）；滑动时动摩擦恒 = f
 const frictionForce = computed(() => moving.value ? fNum.value : readout.value)
-const moving = computed(() => motionState.value === 'uniform' && !released.value)           // 仅拖动中匀速流动
+const moving = computed(() => motionState.value === 'uniform')                             // 匀速滑动中流动
 // 力箭头长度映射（N → px）
 const FORCE_ARROW_SCALE = 18 // 每 N 对应 px
 
 // 重置实验互动状态：拉力/位移/读数归零，物块回到原位（不影响已记录的数据表）
 function resetExperiment() {
   dragDx.value = 0
-  released.value = false
   dragging.value = false
   dragInfo = null
   motionState.value = 'idle'
@@ -206,8 +204,6 @@ function onPiecePointerDown(name, e) {
   } else {
     if (name !== 'block' && name !== 'dyn') return
     dragging.value = true
-    released.value = false
-    // 不重置 dragDx：松手后保留位移与读数，可继续向左累加拉动
     dragInfo = { mode: 'pull', lx: x, dx0: dragDx.value }
   }
   window.addEventListener('pointermove', onWinPointerMove)
@@ -230,10 +226,10 @@ function onWinPointerMove(e) {
 }
 function onWinPointerUp() {
   dragging.value = false
-  released.value = true
   dragInfo = null
   window.removeEventListener('pointermove', onWinPointerMove)
-  // 不复位：松手后物块停在当前位置，位移与读数保持；再次向左拉动可在此基础上继续
+  // 松手自动重置：物块/拉力/读数归位，回到初始状态
+  resetExperiment()
 }
 function onWheel(e) {
   if (!editMode.value || !selected.value) return
@@ -630,7 +626,6 @@ onBeforeUnmount(() => {
         <button class="btn" :class="{ 'btn-primary': wide }" @click="wide = true">接触面积大</button>
         <button class="btn" :class="{ 'btn-primary': !wide }" @click="wide = false">接触面积小</button>
         <button class="btn" :class="{ 'btn-primary': editMode }" @click="editMode = !editMode">{{ editMode ? '完成摆放' : '编辑摆放位置' }}</button>
-        <button class="btn" @click="resetExperiment">重置实验</button>
         <FullscreenBtn />
       </div>
     </div>
