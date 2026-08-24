@@ -311,11 +311,11 @@ const dynCY = computed(() => layout.dyn.baseline)
 const dynDrawX0 = computed(() => dynBodyX0.value - dynShift.value) // 左端（挂钩端）
 const dynDrawX1 = computed(() => dynBodyX1.value - dynShift.value) // 右端（提环端）
 const hookX = computed(() => dynDrawX1.value) // 测力计在左，挂钩（连物块）在右端
-// 弹簧水平线：位于测力计外壳底部下方（不在刻度窗内）
-const springY = computed(() => dynCY.value + DYN_H / 2 + 6)
 const blockLeft = computed(() => layout.block.x - blockW.value / 2 - blockShift.value) // 物块左面，随滑动左移
 const blockTop = computed(() => layout.block.baseline - blockH.value)
 const blockCenterY = computed(() => blockTop.value + blockH.value / 2)
+// 弹簧水平线：位于测力计中心与物块中心的中间高度（向上居中，与两者对齐）
+const springY = computed(() => (dynCY.value + blockCenterY.value) / 2)
 
 // 钩码：平底砝码，平铺叠放在物块顶部（不再悬浮），自下而上堆叠
 const HOOK_W = 64   // 砝码宽
@@ -472,7 +472,7 @@ onBeforeUnmount(() => {
             <text :x="(dynDrawX0 + dynDrawX1) / 2" :y="dynCY + DYN_H / 2 + 29" text-anchor="middle" font-size="9" font-weight="700" fill="#555">N</text>
           </g>
 
-          <!-- 底部连接弹簧（测力计底部下方 → 物块左面）：弹簧在壳体外，不在刻度窗内。
+          <!-- 连接弹簧（测力计挂钩 → 物块左面）：位于两者中心高度，向上居中对齐。
                弹簧总长 = 挂钩端到物块左面距离：静摩擦阶段被拉长（读数 0→f），滑动阶段恒定。
                动画 = 纯水平伸缩（锯齿形状固定，不上下颤抖）。 -->
           <g>
