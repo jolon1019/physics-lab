@@ -70,68 +70,251 @@ function rr(x, y, w, h, r) {
 // 玻璃管（碘锤）几何
 function tubeGeom(L) {
   const cx = L.W * 0.32
-  const top = 80
+  const top = 88
   const bot = L.H - 150
   const w = 56
   return { cx, top, bot, w, x: cx - w / 2 }
 }
 
-function drawApparatus(L) {
+// 小菱形晶体（碘的固态颗粒）
+function drawCrystal(x, y, size, alpha) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(Math.PI / 4)
+  ctx.fillStyle = `rgba(107,63,160,${alpha})`
+  ctx.fillRect(-size / 2, -size / 2, size, size)
+  ctx.restore()
+}
+
+// 酒精灯（玻璃瓶身 + 内外焰 + 辉光）
+function drawLamp(cx, baseY, now, lit) {
+  const lampX = cx - 18
+  const lampY = baseY - 42 // 火焰顶恰好够到管底
+  // 投影
+  ctx.save()
+  ctx.fillStyle = 'rgba(0,0,0,0.20)'
+  ctx.beginPath()
+  ctx.ellipse(cx, baseY + 3, 28, 6, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+  // 玻璃瓶身
+  const bodyGrad = ctx.createLinearGradient(lampX, 0, lampX + 36, 0)
+  bodyGrad.addColorStop(0, 'rgba(196,116,58,0.55)')
+  bodyGrad.addColorStop(0.5, 'rgba(232,172,112,0.82)')
+  bodyGrad.addColorStop(1, 'rgba(168,88,44,0.55)')
+  ctx.fillStyle = bodyGrad
+  rr(lampX, lampY, 36, 30, 7)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(120,70,35,0.5)'
+  ctx.lineWidth = 1
+  rr(lampX, lampY, 36, 30, 7)
+  ctx.stroke()
+  // 高光
+  ctx.fillStyle = 'rgba(255,255,255,0.28)'
+  rr(lampX + 5, lampY + 4, 6, 22, 3)
+  ctx.fill()
+  // 烛芯
+  ctx.strokeStyle = '#2a2a2a'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(cx, lampY)
+  ctx.lineTo(cx, lampY - 9)
+  ctx.stroke()
+  if (lit) {
+    const fl = Math.sin(now * 0.012) * 1.6 + Math.sin(now * 0.023) * 1.0
+    const fy = lampY - 9
+    const glow = ctx.createRadialGradient(cx, fy - 12, 2, cx, fy - 12, 34)
+    glow.addColorStop(0, 'rgba(255,184,82,0.55)')
+    glow.addColorStop(1, 'rgba(255,184,82,0)')
+    ctx.fillStyle = glow
+    ctx.beginPath()
+    ctx.arc(cx, fy - 12, 34, 0, Math.PI * 2)
+    ctx.fill()
+    // 外焰
+    ctx.fillStyle = '#ff9a2e'
+    ctx.beginPath()
+    ctx.moveTo(cx, fy - 31 + fl)
+    ctx.quadraticCurveTo(cx + 9, fy - 16, cx, fy)
+    ctx.quadraticCurveTo(cx - 9, fy - 16, cx, fy - 31 + fl)
+    ctx.fill()
+    // 内焰
+    ctx.fillStyle = '#ffe27a'
+    ctx.beginPath()
+    ctx.moveTo(cx, fy - 19 + fl * 0.6)
+    ctx.quadraticCurveTo(cx + 4, fy - 10, cx, fy - 2)
+    ctx.quadraticCurveTo(cx - 4, fy - 10, cx, fy - 19 + fl * 0.6)
+    ctx.fill()
+    // 焰底蓝
+    ctx.fillStyle = 'rgba(120,160,255,0.7)'
+    ctx.beginPath()
+    ctx.ellipse(cx, fy - 2, 4, 5, 0, 0, Math.PI * 2)
+    ctx.fill()
+  }
+}
+
+function drawApparatus(L, now) {
   const g = tubeGeom(L)
+  const baseY = L.H - 68
   const running = state.value === 'running' || state.value === 'done'
 
-  // 加热源：水浴 或 酒精灯
+  // 桌面带
+  ctx.save()
+  const tg = ctx.createLinearGradient(0, baseY, 0, L.H)
+  tg.addColorStop(0, 'rgba(122,94,64,0.42)')
+  tg.addColorStop(1, 'rgba(80,60,40,0.56)')
+  ctx.fillStyle = tg
+  ctx.fillRect(0, baseY, L.W * 0.56, L.H - baseY)
+  ctx.strokeStyle = 'rgba(58,44,30,0.65)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(0, baseY)
+  ctx.lineTo(L.W * 0.56, baseY)
+  ctx.stroke()
+  ctx.restore()
+
+  // ===== 加热源 =====
   if (isBath.value) {
-    const bx = g.cx - 70
-    const by = g.bot - 10
-    const bw = 140
+    // 热水浴：玻璃烧杯 + 渐变水 + 波动水面 + 气泡 + 蒸汽
+    const bx = g.cx - 74
+    const by = baseY - 96
+    const bw = 148
     const bh = 96
-    ctx.fillStyle = 'rgba(180,210,235,0.5)'
-    rr(bx, by, bw, bh, 8)
+    const wy0 = g.bot + 12 // 水面（管底浸在水中 12px）
+    // 投影
+    ctx.save()
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'
+    ctx.beginPath()
+    ctx.ellipse(g.cx, baseY + 3, bw * 0.62, 6, 0, 0, Math.PI * 2)
     ctx.fill()
-    ctx.strokeStyle = 'rgba(80,90,110,0.6)'
-    ctx.lineWidth = 2
-    rr(bx, by, bw, bh, 8)
-    ctx.stroke()
-    ctx.fillStyle = boardText(ctx.canvas)
-    ctx.font = '600 12px system-ui, sans-serif'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'top'
-    ctx.fillText(`热水 ≈ ${WATER_TEMP}℃`, g.cx, by + bh + 6)
-  } else {
-    const lampX = g.cx - 17
-    const lampY = g.bot + 24
-    ctx.fillStyle = '#c4453d'
-    rr(lampX, lampY, 34, 28, 6)
+    ctx.restore()
+    // 玻璃杯身
+    const glassGrad = ctx.createLinearGradient(bx, 0, bx + bw, 0)
+    glassGrad.addColorStop(0, 'rgba(255,255,255,0.18)')
+    glassGrad.addColorStop(0.5, 'rgba(220,235,245,0.07)')
+    glassGrad.addColorStop(1, 'rgba(255,255,255,0.24)')
+    ctx.fillStyle = glassGrad
+    rr(bx, by, bw, bh, 10)
     ctx.fill()
-    ctx.fillStyle = '#7a7a7a'
-    rr(lampX + 12, lampY - 8, 10, 8, 3)
+    // 水（半透明，便于看到管中碘）
+    ctx.save()
+    rr(bx + 3, by + 3, bw - 6, bh - 6, 8)
+    ctx.clip()
+    const surfY = (x) => wy0 + Math.sin(x * 0.09 + now * 0.004) * 1.2
+    const wg = ctx.createLinearGradient(0, wy0, 0, by + bh)
+    wg.addColorStop(0, 'rgba(150,205,235,0.82)')
+    wg.addColorStop(1, 'rgba(90,160,205,0.9)')
+    ctx.fillStyle = wg
+    ctx.beginPath()
+    ctx.moveTo(bx + 3, by + bh - 3)
+    ctx.lineTo(bx + 3, surfY(bx + 3))
+    for (let x = bx + 3; x <= bx + bw - 3; x += 6) ctx.lineTo(x, surfY(x))
+    ctx.lineTo(bx + bw - 3, by + bh - 3)
+    ctx.closePath()
     ctx.fill()
-    if (running) {
-      ctx.fillStyle = '#f5a623'
-      ctx.beginPath()
-      ctx.moveTo(g.cx, lampY - 8)
-      ctx.quadraticCurveTo(g.cx + 9, lampY - 26, g.cx, lampY - 34)
-      ctx.quadraticCurveTo(g.cx - 9, lampY - 26, g.cx, lampY - 8)
-      ctx.fill()
+    // 水面亮线
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'
+    ctx.lineWidth = 1.5
+    ctx.beginPath()
+    for (let x = bx + 3; x <= bx + bw - 3; x += 6) {
+      const y = surfY(x)
+      x === bx + 3 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
     }
+    ctx.stroke()
+    // 加热气泡（水中上升）
+    if (running) {
+      for (let i = 0; i < 7; i++) {
+        const ph = i * 2.1
+        const cyc = (now * 0.01 + ph) % 1
+        const byy = by + bh - 8 - cyc * (by + bh - 8 - wy0)
+        const bxx = bx + 16 + i * 17 + Math.sin(now * 0.003 + ph) * 3
+        ctx.fillStyle = 'rgba(255,255,255,0.55)'
+        ctx.beginPath()
+        ctx.arc(bxx, byy, 2.2 + (i % 3), 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+    ctx.restore()
+    // 杯壁
+    ctx.strokeStyle = 'rgba(90,110,135,0.7)'
+    ctx.lineWidth = 2
+    rr(bx, by, bw, bh, 10)
+    ctx.stroke()
+    // 杯口
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(bx, by + 4)
+    ctx.lineTo(bx + 7, by)
+    ctx.lineTo(bx + bw - 7, by)
+    ctx.lineTo(bx + bw, by + 4)
+    ctx.stroke()
+    // 蒸汽（杯口上）
+    if (running) {
+      for (let i = 0; i < 4; i++) {
+        const ph = i * 1.7
+        const cycle = (now * 0.018 + ph * 30) % 66
+        const yy = by - 8 - cycle
+        const xx = g.cx - 34 + i * 23 + Math.sin(now * 0.003 + ph) * 6
+        const a = Math.max(0, 0.30 * (1 - cycle / 66))
+        ctx.fillStyle = `rgba(238,243,248,${a.toFixed(3)})`
+        ctx.beginPath()
+        ctx.arc(xx, yy, 6 + (i % 3), 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+    // 标签
     ctx.fillStyle = boardText(ctx.canvas)
     ctx.font = '600 12px system-ui, sans-serif'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
-    ctx.fillText('酒精灯直火', g.cx, lampY + 34)
+    ctx.fillText(`热水浴 ≈ ${WATER_TEMP}℃`, g.cx, baseY + 8)
+  } else {
+    // 酒精灯直火
+    drawLamp(g.cx, baseY, now, running)
+    ctx.fillStyle = boardText(ctx.canvas)
+    ctx.font = '600 12px system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'top'
+    ctx.fillText('酒精灯直火', g.cx, baseY + 6)
   }
 
-  // 玻璃管
-  ctx.fillStyle = 'rgba(255,255,255,0.55)'
-  rr(g.x, g.top, g.w, g.bot - g.top, 10)
+  // ===== 碘锤（密封玻璃管）=====
+  // 管身玻璃
+  const tubeGrad = ctx.createLinearGradient(g.x, 0, g.x + g.w, 0)
+  tubeGrad.addColorStop(0, 'rgba(255,255,255,0.85)')
+  tubeGrad.addColorStop(0.5, 'rgba(240,246,250,0.55)')
+  tubeGrad.addColorStop(1, 'rgba(220,230,238,0.8)')
+  ctx.fillStyle = tubeGrad
+  rr(g.x, g.top, g.w, g.bot - g.top, 12)
   ctx.fill()
-  ctx.strokeStyle = 'rgba(80,90,110,0.7)'
+  ctx.strokeStyle = 'rgba(80,90,110,0.75)'
   ctx.lineWidth = 2.5
-  rr(g.x, g.top, g.w, g.bot - g.top, 10)
+  rr(g.x, g.top, g.w, g.bot - g.top, 12)
   ctx.stroke()
+  // 管身左侧高光
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'
+  rr(g.x + 4, g.top + 4, 4, g.bot - g.top - 8, 2)
+  ctx.fill()
 
-  // 底部固态碘（随实验消耗）
+  // 顶部密封塞
+  ctx.fillStyle = '#8a5a2b'
+  rr(g.x - 4, g.top - 10, g.w + 8, 14, 5)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(60,40,20,0.6)'
+  ctx.lineWidth = 1.5
+  rr(g.x - 4, g.top - 10, g.w + 8, 14, 5)
+  ctx.stroke()
+  // 塞子条纹
+  ctx.strokeStyle = 'rgba(60,40,20,0.35)'
+  ctx.lineWidth = 1
+  for (let sx = g.x - 2; sx <= g.x + g.w + 2; sx += 8) {
+    ctx.beginPath()
+    ctx.moveTo(sx, g.top - 8)
+    ctx.lineTo(sx, g.top + 2)
+    ctx.stroke()
+  }
+
+  // 管底固态碘（晶体簇，随实验消耗）
   const solidFrac = isBath.value
     ? clamp(1 - tNow.value / 8, 0.15, 1)
     : clamp(1 - tNow.value / 6, 0.2, 1)
@@ -139,6 +322,13 @@ function drawApparatus(L) {
   ctx.fillStyle = '#6b3fa0'
   rr(g.x + 8, g.bot - solidH - 4, g.w - 16, solidH, 4)
   ctx.fill()
+  // 晶体颗粒（底部固态碘）
+  const nC = Math.max(3, Math.round(7 * solidFrac))
+  for (let i = 0; i < nC; i++) {
+    const px = g.x + 14 + rand(0, g.w - 28)
+    const py = g.bot - 6 - rand(0, solidH - 4)
+    drawCrystal(px, py, rand(3, 5), 0.55)
+  }
 
   // 直火时：底部出现液态碘（紫红，已熔化）
   if (!isBath.value && running) {
@@ -146,26 +336,38 @@ function drawApparatus(L) {
     ctx.fillStyle = 'rgba(150,60,160,0.85)'
     rr(g.x + 10, g.bot - liqH - 2, g.w - 20, liqH, 6)
     ctx.fill()
+    // 液面高光
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(g.x + 14, g.bot - liqH - 2)
+    ctx.lineTo(g.x + g.w - 14, g.bot - liqH - 2)
+    ctx.stroke()
   }
 
-  // 顶部沉积的固态碘（凝华，仅水浴且冷却后明显）
+  // 顶部沉积的固态碘（凝华）
   if (isBath.value && state.value === 'done') {
-    ctx.fillStyle = '#6b3fa0'
-    rr(g.x + 8, g.top + 6, g.w - 16, 18, 4)
+    ctx.fillStyle = 'rgba(107,63,160,0.92)'
+    rr(g.x + 8, g.top + 6, g.w - 16, 16, 4)
     ctx.fill()
+    for (let i = 0; i < 6; i++) {
+      drawCrystal(g.x + 14 + i * ((g.w - 28) / 5), g.top + 12 + rand(-2, 2), rand(3, 5), 0.6)
+    }
   }
 
   // 紫色碘蒸气粒子
   for (const p of particles.value) {
     if (p.settled) {
-      ctx.fillStyle = '#6b3fa0'
-      ctx.beginPath()
-      ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2)
-      ctx.fill()
+      drawCrystal(p.x, p.y, p.r * 1.6, 0.65)
     } else {
-      ctx.fillStyle = 'rgba(120,60,170,0.7)'
+      const wob = Math.sin(now * 0.005 + (p.phase || 0)) * 1.5
+      const px = p.x + wob
+      const g2 = ctx.createRadialGradient(px - 1.5, p.y - 1.5, 0.5, px, p.y, p.r)
+      g2.addColorStop(0, 'rgba(200,150,240,0.95)')
+      g2.addColorStop(1, 'rgba(120,60,170,0.2)')
+      ctx.fillStyle = g2
       ctx.beginPath()
-      ctx.arc(p.x, p.y, 3, 0, Math.PI * 2)
+      ctx.arc(px, p.y, p.r, 0, Math.PI * 2)
       ctx.fill()
     }
   }
@@ -175,7 +377,7 @@ function drawApparatus(L) {
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
-  ctx.fillText('密封玻璃管（碘锤）', g.cx, g.bot + 44)
+  ctx.fillText('密封玻璃管（碘锤）', g.cx, g.top - 26)
 }
 
 function drawCompare(L) {
@@ -183,32 +385,77 @@ function drawCompare(L) {
   const x = L.W * 0.6
   const y = L.H - 150
   const w = L.W * 0.34
-  ctx.fillStyle = 'rgba(255,255,255,0.75)'
-  rr(x, y, w, 110, 10)
+  ctx.save()
+  ctx.shadowColor = 'rgba(0,0,0,0.22)'
+  ctx.shadowBlur = 12
+  ctx.shadowOffsetY = 4
+  ctx.fillStyle = 'rgba(255,255,255,0.82)'
+  rr(x, y, w, 118, 12)
   ctx.fill()
+  ctx.restore()
   ctx.strokeStyle = 'rgba(90,100,120,0.3)'
   ctx.lineWidth = 1
-  rr(x, y, w, 110, 10)
+  rr(x, y, w, 118, 12)
   ctx.stroke()
+
   ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 13px system-ui, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
   ctx.fillText('温度判据', x + 12, y + 10)
-  ctx.font = '600 12px system-ui, sans-serif'
-  ctx.fillText(`水浴温度 ≈ ${WATER_TEMP}℃`, x + 12, y + 36)
-  ctx.fillText(`碘熔点 ≈ ${IODINE_MELT}℃`, x + 12, y + 56)
+  // 色块标签
+  const rowY = (label, temp, color, yy) => {
+    ctx.fillStyle = color
+    ctx.fillRect(x + 12, yy + 2, 10, 10)
+    ctx.fillStyle = boardText(ctx.canvas)
+    ctx.font = '600 12px system-ui, sans-serif'
+    ctx.fillText(`${label} ≈ ${temp}℃`, x + 28, yy)
+  }
+  rowY('水浴温度', WATER_TEMP, '#4a90d9', y + 38)
+  rowY('碘熔点', IODINE_MELT, '#6b3fa0', y + 60)
+  // 温度对比条
+  const barX = x + 12
+  const barY = y + 88
+  const barW = w - 24
+  const t0 = 0
+  const tMax = 130
+  const pWater = ((WATER_TEMP - t0) / (tMax - t0)) * barW
+  const pMelt = ((IODINE_MELT - t0) / (tMax - t0)) * barW
+  ctx.fillStyle = 'rgba(120,120,130,0.25)'
+  rr(barX, barY, barW, 8, 4)
+  ctx.fill()
+  ctx.fillStyle = '#4a90d9'
+  rr(barX, barY, pWater, 8, 4)
+  ctx.fill()
+  ctx.fillStyle = '#6b3fa0'
+  rr(barX, barY, pMelt, 8, 4)
+  ctx.fill()
+  // 熔点在线上端加竖线
+  ctx.strokeStyle = '#6b3fa0'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(barX + pMelt, barY - 4)
+  ctx.lineTo(barX + pMelt, barY + 12)
+  ctx.stroke()
   const ok = WATER_TEMP < IODINE_MELT
   ctx.fillStyle = ok ? '#2faf6b' : '#e0584f'
-  ctx.font = '700 13px system-ui, sans-serif'
-  ctx.fillText(ok ? `${WATER_TEMP}℃ < ${IODINE_MELT}℃ → 升华` : `${WATER_TEMP}℃ > ${IODINE_MELT}℃ → 熔化`, x + 12, y + 82)
+  ctx.font = '700 12px system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  ctx.fillText(ok ? '100℃ < 113.5℃ → 升华' : '100℃ > 113.5℃ → 熔化', barX + barW / 2, barY + 14)
 }
 
-function render() {
+function render(now) {
   if (!ctx) return
   const L = dims()
   paintBoard(ctx, L.W, L.H, 'chalk')
-  drawApparatus(L)
+  // 标题
+  ctx.fillStyle = boardText(ctx.canvas)
+  ctx.font = '700 15px system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'top'
+  ctx.fillText('观察碘的升华和凝华', L.W / 2, 18)
+  drawApparatus(L, now)
   drawCompare(L)
 }
 
@@ -266,8 +513,10 @@ function loop(now) {
           x: g.cx + rand(-14, 14),
           y: g.bot - 30,
           vy: rand(30, 55),
+          r: rand(3, 4.5),
           settled: false,
-          targetY: rand(g.top + 10, g.top + 40)
+          phase: rand(0, 6),
+          targetY: rand(g.top + 10, g.top + 44)
         })
       }
     }
@@ -283,14 +532,14 @@ function loop(now) {
     }
     if (tNow.value >= 9) stopRun()
   }
-  render()
+  render(now)
   raf = requestAnimationFrame(loop)
 }
 
 function resizeCanvas() {
   if (!canvasRef.value) return
   setupCanvas()
-  render()
+  render(performance.now())
 }
 
 watch(method, () => {
@@ -300,7 +549,7 @@ watch(method, () => {
 let resizeObs = null
 onMounted(() => {
   setupCanvas()
-  render()
+  render(performance.now())
   if (window.ResizeObserver) {
     resizeObs = new ResizeObserver(resizeCanvas)
     resizeObs.observe(canvasRef.value.parentElement)
