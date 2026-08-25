@@ -236,7 +236,7 @@ onBeforeUnmount(() => {
           { label: '电压 U', value: U + ' V' }
         ]"
         :result="[{ label: '电流 I = U/R', value: IS.toFixed(2) + ' A' }]"
-        verify="串联电路电流处处相等：用一个电流表接在不同位置，示数都相同。"
+        :verify="['串联电路电流处处相等：用一个电流表接在不同位置，示数都相同。']"
       />
       <FormulaPanel
         v-else
@@ -247,7 +247,7 @@ onBeforeUnmount(() => {
           { label: '支路2电流 I₂ = U/R₂', value: I2.toFixed(2) + ' A' }
         ]"
         :result="[{ label: '干路电流 I = I₁+I₂', value: ITotal.toFixed(2) + ' A' }]"
-        verify="并联电路干路电流等于各支路电流之和；各支路两端电压都等于电源电压。"
+        :verify="['并联电路干路电流等于各支路电流之和；各支路两端电压都等于电源电压。']"
       />
     </aside>
   </div>

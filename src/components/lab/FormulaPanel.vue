@@ -1,12 +1,17 @@
 <script setup>
-defineProps({
+import { computed } from 'vue'
+const props = defineProps({
   title: { type: String, default: '公式与结果' },
   formula: { type: String, default: '' },
   desc: { type: String, default: '' },
   rows: { type: Array, default: () => [] },
   result: { type: Array, default: () => [] },
-  verify: { type: Array, default: () => [] }
+  verify: { type: [String, Array], default: () => [] }
 })
+// 兼容字符串：统一转为数组，避免 v-for 逐字拆开渲染
+const verifyList = computed(() =>
+  typeof props.verify === 'string' ? [props.verify] : props.verify
+)
 </script>
 
 <template>
@@ -48,10 +53,10 @@ defineProps({
     </div>
 
     <!-- 验证要点 -->
-    <div v-if="verify.length" style="border-top:1px solid var(--line);padding:10px 12px;background:var(--surface-3)">
+    <div v-if="verifyList.length" style="border-top:1px solid var(--line);padding:10px 12px;background:var(--surface-3)">
       <p style="font-size:12px;color:var(--success);font-weight:700;margin-bottom:6px">验证要点</p>
       <div
-        v-for="(v, i) in verify"
+        v-for="(v, i) in verifyList"
         :key="i"
         style="display:flex;gap:8px;font-size:12px;color:var(--text);padding:2px 0"
       >
