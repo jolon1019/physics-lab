@@ -43,7 +43,7 @@ function geom() {
   const baseY = H - 60 // 桌面线
   const tankX = 30
   const tankW = W * 0.5
-  const tankTop = 60
+  const tankTop = 80 // 水箱略低
   const tankBot = baseY
   const surfaceY = tankTop + 12 // 液面
   const probeX = tankX + tankW * 0.45
@@ -209,70 +209,90 @@ function drawProbe(g) {
   ctx.fill()
 }
 
-// U 形管压强计（玻璃管 + 红墨水液柱）
+// U 形管压强计（真实连通管：玻璃 U 形管道 + 红墨水沿内径流动，底部半圆弯管联通）
 function drawUTube(g) {
-  const tubeW = 16
+  const cx = g.ux + 3 // 两管中心
+  const gap = 22 // 两管中心距
+  const x1 = cx - gap / 2
+  const x2 = cx + gap / 2
+  const tubeW = 16 // 玻璃外径
+  const innerW = tubeW - 8 // 内径
+  const bendY = g.uBase - 12 // 底部弯管中心
+  const bendR = gap / 2 // 弯管半径
   // 投影
   ctx.save()
   ctx.fillStyle = 'rgba(0,0,0,0.15)'
   ctx.beginPath()
-  ctx.ellipse(g.ux + tubeW / 2 - 3, g.baseY + 3, tubeW + 10, 6, 0, 0, Math.PI * 2)
+  ctx.ellipse(cx, g.baseY + 3, gap / 2 + 14, 6, 0, 0, Math.PI * 2)
   ctx.fill()
   ctx.restore()
-  // 玻璃管身
-  const glassGrad = ctx.createLinearGradient(g.ux - tubeW, 0, g.ux + tubeW + 6, 0)
-  glassGrad.addColorStop(0, 'rgba(220,235,245,0.5)')
-  glassGrad.addColorStop(0.5, 'rgba(255,255,255,0.12)')
-  glassGrad.addColorStop(1, 'rgba(190,210,225,0.5)')
-  ctx.fillStyle = glassGrad
-  ctx.fillRect(g.ux - tubeW, g.uTop, tubeW, g.uBase - g.uTop)
-  ctx.fillRect(g.ux + 6, g.uTop, tubeW, g.uBase - g.uTop)
-  ctx.fillRect(g.ux - tubeW, g.uBase, tubeW * 2 + 6, 14)
-  // 管壁描边
-  ctx.strokeStyle = 'rgba(90,110,135,0.8)'
+  // U 形路径（左管→底部半圆→右管）
+  const uPath = () => {
+    ctx.beginPath()
+    ctx.moveTo(x1, g.uTop)
+    ctx.lineTo(x1, bendY)
+    ctx.arc(cx, bendY, bendR, Math.PI, 0, false)
+    ctx.lineTo(x2, g.uTop)
+  }
+  ctx.lineCap = 'round'
+  // 玻璃管体（外径描边）
+  uPath()
+  ctx.strokeStyle = 'rgba(190,212,228,0.9)'
+  ctx.lineWidth = tubeW
+  ctx.stroke()
+  // 管体内部提亮（形成壁厚）
+  uPath()
+  ctx.strokeStyle = 'rgba(235,245,252,0.55)'
+  ctx.lineWidth = tubeW - 4
+  ctx.stroke()
+  // 红墨水：按连通器对称浮动（左管降 dU/2、右管升 dU/2），内径描边不溢出
+  const baseLevel = g.uTop + 40
+  const leftLevel = baseLevel + dU.value / 2
+  const rightLevel = baseLevel - dU.value / 2
+  ctx.beginPath()
+  ctx.moveTo(x1, leftLevel)
+  ctx.lineTo(x1, bendY)
+  ctx.arc(cx, bendY, bendR, Math.PI, 0, false)
+  ctx.lineTo(x2, rightLevel)
+  ctx.strokeStyle = '#e0483c'
+  ctx.lineWidth = innerW
+  ctx.stroke()
+  // 液面高光（红墨水亮线）
+  ctx.beginPath()
+  ctx.moveTo(x1, leftLevel + 3)
+  ctx.lineTo(x1, bendY + 9)
+  ctx.arc(cx, bendY, bendR - 3, Math.PI * 0.85, 0.15, false)
+  ctx.lineTo(x2, rightLevel + 3)
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'
   ctx.lineWidth = 2
-  ctx.strokeRect(g.ux - tubeW, g.uTop, tubeW, g.uBase - g.uTop)
-  ctx.strokeRect(g.ux + 6, g.uTop, tubeW, g.uBase - g.uTop)
-  ctx.strokeRect(g.ux - tubeW, g.uBase, tubeW * 2 + 6, 14)
-  // 红墨水液柱
-  const leftLevel = g.uTop + 20
-  const rightLevel = leftLevel - dU.value
-  const redGrad = ctx.createLinearGradient(0, g.uTop, 0, g.uBase)
-  redGrad.addColorStop(0, '#f2655a')
-  redGrad.addColorStop(1, '#d0342a')
-  ctx.fillStyle = redGrad
-  ctx.fillRect(g.ux - tubeW + 2, leftLevel, tubeW - 4, g.uBase - leftLevel + 14)
-  ctx.fillRect(g.ux + 8, rightLevel, tubeW - 4, g.uBase - rightLevel + 14)
-  // 液面高光
-  ctx.fillStyle = 'rgba(255,255,255,0.55)'
-  ctx.fillRect(g.ux - tubeW + 2, leftLevel, tubeW - 4, 1.5)
-  ctx.fillRect(g.ux + 8, rightLevel, tubeW - 4, 1.5)
-  // 管壁高光
-  ctx.fillStyle = 'rgba(255,255,255,0.3)'
-  ctx.fillRect(g.ux - tubeW + 2, g.uTop, 2.5, g.uBase - g.uTop)
-  ctx.fillRect(g.ux + 8, g.uTop, 2.5, g.uBase - g.uTop)
-  // 液面差标注（虚线 + 文字）
-  ctx.strokeStyle = 'rgba(242,101,90,0.55)'
+  ctx.stroke()
+  // 玻璃外轮廓线
+  uPath()
+  ctx.strokeStyle = 'rgba(90,110,135,0.7)'
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+  // 液面差标注（虚线连两液面）
+  ctx.strokeStyle = 'rgba(242,101,90,0.6)'
   ctx.lineWidth = 1.5
   ctx.setLineDash([4, 3])
   ctx.beginPath()
-  ctx.moveTo(g.ux - tubeW - 4, leftLevel)
-  ctx.lineTo(g.ux + tubeW + 10, rightLevel)
+  ctx.moveTo(x1 - tubeW / 2 - 4, leftLevel)
+  ctx.lineTo(x2 + tubeW / 2 + 4, rightLevel)
   ctx.stroke()
   ctx.setLineDash([])
   ctx.fillStyle = '#f2655a'
   ctx.font = '700 12px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'bottom'
-  ctx.fillText(`Δh = ${dU.value.toFixed(0)} px`, g.ux + tubeW / 2 - 3, rightLevel - 4)
+  ctx.fillText(`Δh = ${dU.value.toFixed(0)} px`, cx, rightLevel - 6)
   // 标签
   ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 12px system-ui, sans-serif'
   ctx.textBaseline = 'top'
-  ctx.fillText('U 形管压强计', g.ux + tubeW / 2 - 3, g.uBase + 26)
+  ctx.fillText('U 形管压强计', cx, g.uBase + 26)
   ctx.fillStyle = '#f2655a'
   ctx.textBaseline = 'bottom'
-  ctx.fillText('液面差 ∝ p', g.ux + tubeW / 2 - 3, g.uTop - 8)
+  ctx.fillText('液面差 ∝ p', cx, g.uTop - 8)
 }
 
 function render(now) {

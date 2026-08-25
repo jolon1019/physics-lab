@@ -47,9 +47,9 @@ defineProps({
       </div>
     </div>
 
-    <!-- 求证方法 -->
+    <!-- 验证要点 -->
     <div v-if="verify.length" style="border-top:1px solid var(--line);padding:10px 12px;background:var(--surface-3)">
-      <p style="font-size:12px;color:var(--success);font-weight:700;margin-bottom:6px">🔎 求证方法</p>
+      <p style="font-size:12px;color:var(--success);font-weight:700;margin-bottom:6px">验证要点</p>
       <div
         v-for="(v, i) in verify"
         :key="i"
