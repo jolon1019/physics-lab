@@ -156,7 +156,8 @@ function drawProbe(g) {
   // 探头头（按方向旋转：橡皮膜红色圆头）
   ctx.save()
   ctx.translate(g.probeX, tipY)
-  const ang = dir.value === 'up' ? -Math.PI / 2 : dir.value === 'down' ? Math.PI / 2 : 0
+  // 膜默认在杆端下方（朝下）；up=翻转朝上，side=转向左（朝内）
+  const ang = dir.value === 'up' ? Math.PI : dir.value === 'side' ? Math.PI / 2 : 0
   ctx.rotate(ang)
   // 金属连接头
   ctx.fillStyle = '#8a8f98'
@@ -224,12 +225,12 @@ function drawUTube(g) {
   ctx.ellipse(cx, g.baseY + 3, gap / 2 + 14, 6, 0, 0, Math.PI * 2)
   ctx.fill()
   ctx.restore()
-  // U 形路径（左管→底部半圆→右管）
+  // U 形路径（左管→底部半圆弯管→右管，弧向下凸）
   const uPath = () => {
     ctx.beginPath()
     ctx.moveTo(x1, g.uTop)
     ctx.lineTo(x1, bendY)
-    ctx.arc(cx, bendY, bendR, Math.PI, 0, false)
+    ctx.arc(cx, bendY, bendR, Math.PI, 0, true) // 逆时针 π→0 经 π/2（下方），U 形弧向下
     ctx.lineTo(x2, g.uTop)
   }
   ctx.lineCap = 'round'
@@ -250,7 +251,7 @@ function drawUTube(g) {
   ctx.beginPath()
   ctx.moveTo(x1, leftLevel)
   ctx.lineTo(x1, bendY)
-  ctx.arc(cx, bendY, bendR, Math.PI, 0, false)
+  ctx.arc(cx, bendY, bendR, Math.PI, 0, true)
   ctx.lineTo(x2, rightLevel)
   ctx.strokeStyle = '#e0483c'
   ctx.lineWidth = innerW
@@ -259,7 +260,7 @@ function drawUTube(g) {
   ctx.beginPath()
   ctx.moveTo(x1, leftLevel + 3)
   ctx.lineTo(x1, bendY + 9)
-  ctx.arc(cx, bendY, bendR - 3, Math.PI * 0.85, 0.15, false)
+  ctx.arc(cx, bendY, bendR - 3, Math.PI * 0.85, 0.15, true)
   ctx.lineTo(x2, rightLevel + 3)
   ctx.strokeStyle = 'rgba(255,255,255,0.35)'
   ctx.lineWidth = 2
