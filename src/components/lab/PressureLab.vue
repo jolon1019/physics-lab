@@ -195,18 +195,16 @@ function drawProbe(g) {
   ctx.textAlign = 'right'
   ctx.textBaseline = 'middle'
   ctx.fillText(`h=${h.value}cm`, g.probeX - 44, hy)
-  // 软管（杆顶 → U 形管）
+  // 软管（杆顶 → U 形管左管管口，弧线连通）
+  const endX = g.ux - 8 // U 形管左管中心
+  const endY = g.uTop - 3
   ctx.strokeStyle = 'rgba(150,150,158,0.95)'
   ctx.lineWidth = 3.5
+  ctx.lineCap = 'round'
   ctx.beginPath()
   ctx.moveTo(g.probeX, g.tankTop - 16)
-  ctx.quadraticCurveTo(g.probeX + 60, g.tankTop - 46, g.W * 0.76, g.tankTop - 40)
+  ctx.quadraticCurveTo((g.probeX + endX) / 2, g.tankTop - 62, endX, endY)
   ctx.stroke()
-  // 软管接头（U 形管端）
-  ctx.fillStyle = '#9a9fa8'
-  ctx.beginPath()
-  ctx.arc(g.W * 0.76, g.tankTop - 40, 4, 0, Math.PI * 2)
-  ctx.fill()
 }
 
 // U 形管压强计（真实连通管：玻璃 U 形管道 + 红墨水沿内径流动，底部半圆弯管联通）
@@ -285,6 +283,18 @@ function drawUTube(g) {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'bottom'
   ctx.fillText(`Δh = ${dU.value.toFixed(0)} px`, cx, rightLevel - 6)
+  // 左管口软管接头（金属圈，与软管视觉连通）
+  ctx.fillStyle = '#b9bec6'
+  ctx.beginPath()
+  ctx.arc(x1, g.uTop - 4, 7, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(90,110,135,0.6)'
+  ctx.lineWidth = 1.5
+  ctx.stroke()
+  ctx.fillStyle = '#8a8f98'
+  ctx.beginPath()
+  ctx.arc(x1, g.uTop - 4, 3.5, 0, Math.PI * 2)
+  ctx.fill()
   // 标签
   ctx.fillStyle = boardText(ctx.canvas)
   ctx.font = '700 12px system-ui, sans-serif'
