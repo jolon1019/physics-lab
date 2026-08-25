@@ -192,37 +192,11 @@ function onBlockDown(e) {
   e.preventDefault()
 }
 
-// ---- F–浸入 曲线 ----
-const CH_W = 300
-const CH_H = 168
-const CH_PAD = 22
+// ---- 阿基米德验证条 ----
 const Fmax = computed(() => {
   const f = Math.max(G.value, RHO_LIQ[liquid.value] * G_CONST * vol.value * 1e-3) * 1.12
   return f > 0 ? f : 1
 })
-function linePath(fn) {
-  const pts = []
-  for (let i = 0; i <= 20; i++) {
-    const k = i / 20
-    const f = fn(k)
-    const x = CH_PAD + k * (CH_W - 2 * CH_PAD)
-    const y = CH_H - CH_PAD - (f / Fmax.value) * (CH_H - 2 * CH_PAD)
-    pts.push(`${x.toFixed(1)},${y.toFixed(1)}`)
-  }
-  return 'M' + pts.join(' L')
-}
-const fbPath = computed(() => linePath((k) => RHO_LIQ[liquid.value] * G_CONST * (k * vol.value) * 1e-3))
-const fpPath = computed(() =>
-  linePath((k) => Math.max(0, G.value - RHO_LIQ[liquid.value] * G_CONST * (k * vol.value) * 1e-3))
-)
-const fbArea = computed(() => fbPath.value + ` L ${CH_W - CH_PAD} ${CH_H - CH_PAD} L ${CH_PAD} ${CH_H - CH_PAD} Z`)
-const curX = computed(() => CH_PAD + kAnim.value * (CH_W - 2 * CH_PAD))
-const curFbY = computed(() => CH_H - CH_PAD - (Fb.value / Fmax.value) * (CH_H - 2 * CH_PAD))
-const curFpY = computed(() => CH_H - CH_PAD - (Fpull.value / Fmax.value) * (CH_H - 2 * CH_PAD))
-const gridV = [0.25, 0.5, 0.75].map((k) => CH_PAD + k * (CH_W - 2 * CH_PAD))
-const gridH = [0.25, 0.5, 0.75].map((f) => CH_H - CH_PAD - f * (CH_H - 2 * CH_PAD))
-
-// ---- 阿基米德验证条 ----
 const archPct = computed(() => Math.min(100, (Fb.value / Fmax.value) * 100))
 
 function reset() {
@@ -431,33 +405,16 @@ watch([kAnim], () => {
         </div>
       </div>
 
-      <!-- F–浸入 曲线 -->
+      <!-- 实验的验证要点 -->
       <div class="lab-panel">
-        <div class="lab-panel-head"><strong>F–浸入 关系</strong><span>称重法 / 排水法</span></div>
-        <svg class="chart-svg" :viewBox="`0 0 ${CH_W} ${CH_H}`" preserveAspectRatio="xMidYMid meet">
-          <line :x1="CH_PAD" :y1="CH_H - CH_PAD" :x2="CH_W - CH_PAD" :y2="CH_H - CH_PAD" stroke="#0b0b0b" stroke-width="1.5" />
-          <line :x1="CH_PAD" :y1="CH_PAD" :x2="CH_PAD" :y2="CH_H - CH_PAD" stroke="#0b0b0b" stroke-width="1.5" />
-          <line v-for="(x, i) in gridV" :key="'v' + i" :x1="x" :y1="CH_PAD" :x2="x" :y2="CH_H - CH_PAD" stroke="rgba(0,0,0,0.07)" stroke-width="1" />
-          <line v-for="(y, i) in gridH" :key="'h' + i" :x1="CH_PAD" :y1="y" :x2="CH_W - CH_PAD" :y2="y" stroke="rgba(0,0,0,0.07)" stroke-width="1" />
-          <path :d="fbArea" fill="rgba(13,155,97,0.16)" />
-          <path :d="fbPath" fill="none" stroke="#0d9b61" stroke-width="2.8" stroke-linejoin="round" />
-          <path :d="fpPath" fill="none" stroke="#d92135" stroke-width="2.8" stroke-linejoin="round" />
-          <circle :cx="curX" :cy="curFbY" r="5.5" fill="#0d9b61" stroke="#0b0b0b" stroke-width="1.5">
-            <animate attributeName="r" values="5.5;7.5;5.5" dur="1.4s" repeatCount="indefinite" />
-          </circle>
-          <circle :cx="curX" :cy="curFpY" r="5.5" fill="#d92135" stroke="#0b0b0b" stroke-width="1.5">
-            <animate attributeName="r" values="5.5;7.5;5.5" dur="1.4s" repeatCount="indefinite" />
-          </circle>
-          <text :x="CH_PAD" :y="CH_H - CH_PAD + 14" font-size="10" fill="#777067">0</text>
-          <text :x="CH_W - CH_PAD" :y="CH_H - CH_PAD + 14" text-anchor="end" font-size="10" fill="#777067">浸入 k →</text>
-          <text :x="CH_PAD - 6" :y="CH_PAD + 4" text-anchor="end" font-size="10" fill="#777067">F</text>
-          <g class="chart-legend">
-            <rect :x="CH_W - 96" y="6" width="11" height="4" rx="2" fill="#0d9b61" />
-            <text :x="CH_W - 80" y="11" font-size="10" font-weight="700" fill="#0d9b61">F浮</text>
-            <rect :x="CH_W - 50" y="6" width="11" height="4" rx="2" fill="#d92135" />
-            <text :x="CH_W - 34" y="11" font-size="10" font-weight="700" fill="#d92135">F拉</text>
-          </g>
-        </svg>
+        <div class="lab-panel-head"><strong>实验的验证要点</strong></div>
+        <ul class="verify-list">
+          <li>物块浸入水中，弹簧测力计示数变小——液体对物体产生向上的浮力</li>
+          <li>浸没深度增大，F浮 变大——浮力大小与排开液体体积 V排 有关</li>
+          <li>完全浸没后继续下移，F浮 不变——V排 不再增大</li>
+          <li>同一深度换用密度更大的液体（盐水），F浮 变大——与 ρ液 有关</li>
+          <li>F浮 = G排，符合阿基米德原理</li>
+        </ul>
       </div>
     </aside>
   </div>
@@ -470,11 +427,26 @@ watch([kAnim], () => {
   height: 100%;
   min-height: 440px;
 }
-.chart-svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  padding: 6px;
+/* 实验的验证要点 */
+.verify-list {
+  list-style: none;
+  margin: 0;
+  padding: 10px 12px 12px;
+}
+.verify-list li {
+  position: relative;
+  padding: 2px 0 2px 20px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text);
+}
+.verify-list li::before {
+  content: '✔';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  color: var(--success);
+  font-weight: 800;
 }
 .param-group {
   display: flex;
