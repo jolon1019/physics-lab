@@ -1,9 +1,12 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useAuthStore } from '../../stores/auth'
 import FormulaPanel from './FormulaPanel.vue'
 import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
+const auth = useAuthStore()
+const isAdmin = computed(() => auth.isAdmin)
 
 // ===== 教材实验参数 =====
 // 木块自重 G块 = 2 N；每个钩码 G码 = 4 N；压力 N = 2 + 钩码数 × 4
@@ -627,7 +630,7 @@ onBeforeUnmount(() => {
         <button class="btn" :class="{ 'btn-primary': surface === 'sand' }" @click="surface = 'sand'">砂纸面</button>
         <button class="btn" :class="{ 'btn-primary': wide }" @click="wide = true">接触面积大</button>
         <button class="btn" :class="{ 'btn-primary': !wide }" @click="wide = false">接触面积小</button>
-        <button class="btn" :class="{ 'btn-primary': editMode }" @click="editMode = !editMode">{{ editMode ? '完成摆放' : '编辑摆放位置' }}</button>
+        <button v-if="isAdmin" class="btn" :class="{ 'btn-primary': editMode }" @click="editMode = !editMode">{{ editMode ? '完成摆放' : '编辑摆放位置' }}</button>
         <FullscreenBtn />
       </div>
     </div>

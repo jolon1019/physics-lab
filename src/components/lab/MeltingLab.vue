@@ -2,6 +2,7 @@
 import { boardFg, boardText } from '../../lib/boardText'
 
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useAuthStore } from '../../stores/auth'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
@@ -12,6 +13,8 @@ import MeltHeatFlow from './melt/MeltHeatFlow.vue'
 import './melt/melt.css'
 
 const emit = defineEmits(['complete'])
+const auth = useAuthStore()
+const isAdmin = computed(() => auth.isAdmin)
 
 // ===== 装置图片资源（PNG，400×400 帧 + 不透明 bbox 裁剪）=====
 // 格式 [opaqueBotY, opaqueW, opaqueH] —— yMax+1、不透明宽、不透明高
@@ -368,6 +371,10 @@ function render() {
 }
 
 // ===== 摆放编辑器：交互（拖动 / 滚轮缩放 / 方向键微调）=====
+function toggleEditMode() {
+  editMode.value = !editMode.value
+  if (!editMode.value) selected.value = ''
+}
 // 每个装置组件 emit @pointerdown(name, e) → 这里路由；拖动改用 window-level 监听，绕开 SVG 自身 capture 的坑。
 let dragging = false
 let dragStart = null
@@ -617,7 +624,7 @@ onBeforeUnmount(() => {
         </div>
         <button v-if="state !== 'running'" class="btn btn-primary" @click="startRun">{{ startBtn }}</button>
         <button class="btn" @click="resetAll">重置</button>
-        <button class="btn" :class="{ 'btn-primary': editMode }" @click="editMode = !editMode">{{ editMode ? '完成摆放' : '编辑摆放位置' }}</button>
+        <button v-if="isAdmin" class="btn" :class="{ 'btn-primary': editMode }" @click="toggleEditMode">{{ editMode ? '完成摆放' : '编辑摆放位置' }}</button>
         <span class="feedback" :class="completed ? 'ok' : 'no'">{{ hint }}</span>
         <FullscreenBtn />
       </div>

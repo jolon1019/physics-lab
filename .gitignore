@@ -29,6 +29,9 @@ dist-ssr
 deploy/sakura.env
 deploy/*.log
 
+# 环境变量（含密钥，切勿提交）
+.env
+
 # WorkBuddy 本地数据（个人记忆/配置，不入库）
 .workbuddy
 

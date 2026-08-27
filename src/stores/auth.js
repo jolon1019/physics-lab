@@ -15,13 +15,14 @@ function loadToken() {
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: loadToken(),
-    user: null, // { email }
+    user: null, // { email, role }
     showLogin: false,
     pendingRoute: null, // 登录后要跳转的页面
     error: ''
   }),
   getters: {
-    isLoggedIn: (s) => !!s.token
+    isLoggedIn: (s) => !!s.token,
+    isAdmin: (s) => s.user?.role === 'admin'
   },
   actions: {
     // 应用启动时校验本地 token 是否仍有效
@@ -86,6 +87,17 @@ export const useAuthStore = defineStore('auth', {
     closeLogin() {
       this.showLogin = false
       this.error = ''
+    },
+    async changePassword(oldPassword, newPassword) {
+      this.error = ''
+      const res = await api.changePassword(oldPassword, newPassword)
+      return res
+    },
+    async adminListUsers() {
+      return api.adminListUsers()
+    },
+    async adminResetPassword(email, newPassword) {
+      return api.adminResetPassword(email, newPassword)
     }
   }
 })

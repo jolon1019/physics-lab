@@ -5,6 +5,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
+import { boardTheme } from '../../lib/boardTheme'
 import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
@@ -63,7 +64,7 @@ function arrow(x1, y1, x2, y2, color) {
 function render() {
   if (!ctx) return
   const { W, H } = dims()
-  paintBoard(ctx, W, H, 'dark')
+  paintBoard(ctx, W, H, boardTheme.variant === 'light' ? 'light' : 'dark')
 
   const cx = W / 2
   const mirrorY = H * 0.66
@@ -210,7 +211,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="lab-stage">
     <div class="lab-left">
-      <div class="lab-panel board-dark" style="padding: 0">
+      <div class="lab-panel board-dark board-adaptive" style="padding: 0">
         <canvas
           class="logic-canvas" ref="canvasRef"
           style="display: block; width: 100%; height: 520px; background: transparent; border-radius: 8px"

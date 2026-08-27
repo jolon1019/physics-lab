@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
+import { boardTheme } from '../../lib/boardTheme'
 import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
@@ -127,7 +128,7 @@ function dimLine(x1, x2, y, label) {
 function render(t) {
   if (!ctx) return
   const { W, H } = dims()
-  paintBoard(ctx, W, H, 'dark')
+  paintBoard(ctx, W, H, boardTheme.variant === 'light' ? 'light' : 'dark')
 
   // 动态比例：保证 48cm 也能放进半屏
   const SCALE = Math.min((W / 2 - 70) / 48, 5.6)
@@ -323,7 +324,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="lab-stage">
     <div class="lab-left">
-      <div class="lab-panel board-dark" style="padding: 0">
+      <div class="lab-panel board-dark board-adaptive" style="padding: 0">
         <canvas
           class="logic-canvas" ref="canvasRef"
           style="display: block; width: 100%; height: 520px; background: transparent; border-radius: 8px"

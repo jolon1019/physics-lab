@@ -37,6 +37,21 @@ export function getMe() {
 export function logout() {
   return request('/logout', { method: 'POST' })
 }
+export function changePassword(oldPassword, newPassword) {
+  return request('/change-password', { method: 'POST', body: { oldPassword, newPassword } })
+}
+export function requestReset(email) {
+  return request('/request-reset', { method: 'POST', body: { email } })
+}
+export function resetPassword(code, email, newPassword) {
+  return request('/reset-password', { method: 'POST', body: { code, email, newPassword } })
+}
+export function adminListUsers() {
+  return request('/admin/users', { method: 'GET' })
+}
+export function adminResetPassword(email, newPassword) {
+  return request('/admin/reset-password', { method: 'POST', body: { email, newPassword } })
+}
 
 // 读取/保存当前登录用户的学习进度（服务端隔离，按用户保存）
 export function getProgress() {

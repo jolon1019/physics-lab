@@ -14,6 +14,19 @@
       },
       "sessions": 3,
       "lastVisit": "2026"
-    }
+    },
+    "role": "admin"
+  },
+  {
+    "email": "jolon1019@qq.com",
+    "salt": "3b3b43db121f4a23fe0770d499d0c5df",
+    "hash": "acbe545248cf1f9d3873cbd2593c7ad72a341b92789d41a9c048b6155b6c4b342b65e2f698537b3d62efa687eef6173cf351d13a8d5aff5cbda7130dad51a47c",
+    "createdAt": "2026-08-27T06:58:48.838Z",
+    "progress": {
+      "records": {},
+      "sessions": 1,
+      "lastVisit": "2026/8/27"
+    },
+    "role": "user"
   }
 ]

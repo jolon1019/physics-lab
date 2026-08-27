@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>滑轮组物理沙盒 · 最小可运行 Demo</title>
+<style>
+  body { margin: 0; font-family: system-ui, "Microsoft YaHei", sans-serif; background: #0b1220; color: #dfe7f1; display: flex; }
+  #stage { padding: 12px; }
+  canvas { background: #0e1726; border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.4); max-width: 900px; }
+  aside { width: 320px; padding: 12px 16px; }
+  h3 { margin: 8px 0; font-size: 14px; color: #8ec5ff; }
+  ul#route { list-style: none; padding: 0; margin: 0 0 12px; }
+  ul#route li { background: #16233a; border: 1px solid #2b3c57; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; cursor: grab; }
+  ul#route li span { color: #6f8; font-weight: 700; }
+  ul#route li b { color: #ffd479; }
+  ul#route li i { color: #9fb3cc; font-style: normal; }
+  button { background: #244a78; color: #eaf2ff; border: 0; border-radius: 5px; padding: 3px 8px; cursor: pointer; font-size: 12px; }
+  button:disabled { opacity: .35; cursor: default; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  #info { font-size: 12.5px; line-height: 1.7; background: #16233a; border-radius: 6px; padding: 8px 10px; }
+  .hint { font-size: 11.5px; color: #7e8da3; margin-top: 10px; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <p class="hint">操作：拖动左上「锚点」(可锁定) · 拖动绿色「手拉端」即可真实提升/放下动滑轮（绳长守恒，动滑轮由绳拉力决定位置）· 拖动任意滑轮重排位置 · 右侧列表可「↑/↓」或拖拽调整 route 顺序，或翻转绕向。</p>
+  </div>
+  <aside>
+    <h3>绳索路由 route（可拖拽排序）</h3>
+    <ul id="route"></ul>
+    <div class="row">
+      <button id="addFixed">＋定滑轮</button>
+      <button id="addMov">＋动滑轮</button>
+      <button id="lockAnchor">锁定/解锁锚点</button>
+    </div>
+    <h3>机械参数</h3>
+    <div id="info"></div>
+  </aside>
+  <script src="pulley-demo.js"></script>
+</body>
+</html>

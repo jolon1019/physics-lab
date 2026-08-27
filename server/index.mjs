@@ -1,11 +1,15 @@
 // 零依赖 Node 鉴权后端：邮箱 + 密码 注册/登录
 // 运行：node server/index.mjs  （端口可用 PORT 环境变量覆盖，默认 3001）
-// 依赖：仅 Node 内置模块
+// 依赖：Node 内置模块 + nodemailer（可选，用于发送邮件）
+import dotenv from 'dotenv'
+dotenv.config()
+
 import http from 'node:http'
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, extname, normalize } from 'node:path'
+import nodemailer from 'nodemailer'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = join(__dirname, 'data')
@@ -14,17 +18,68 @@ const DIST_DIR = join(__dirname, '..', 'dist')
 const PORT = Number(process.env.PORT) || 3001
 const TOKEN_TTL = 1000 * 60 * 60 * 24 * 7 // 7 天
 
+// ===== SMTP 邮件配置 =====
+const SMTP_HOST = process.env.SMTP_HOST || ''
+const SMTP_PORT = Number(process.env.SMTP_PORT) || 465
+const SMTP_SECURE = process.env.SMTP_SECURE !== 'false'
+const SMTP_USER = process.env.SMTP_USER || ''
+const SMTP_PASS = process.env.SMTP_PASS || ''
+const SMTP_FROM = process.env.SMTP_FROM || ''
+const EMAIL_ENABLED = !!(SMTP_HOST && SMTP_USER && SMTP_PASS)
+
+let transporter = null
+if (EMAIL_ENABLED) {
+  transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: { user: SMTP_USER, pass: SMTP_PASS }
+  })
+  console.log('[email] SMTP 邮件服务已启用')
+} else {
+  console.log('[email] SMTP 未配置，使用演示模式（验证码直接显示在页面）')
+}
+
+async function sendResetEmail(to, code) {
+  if (!EMAIL_ENABLED) return false
+  const mailOptions = {
+    from: SMTP_FROM || SMTP_USER,
+    to,
+    subject: '物理实验平台 - 密码重置验证码',
+    text: `您的密码重置验证码是：${code}，10 分钟内有效。如非本人操作请忽略此邮件。`,
+    html: `<div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px; margin: 0 auto;">
+      <h2 style="color: #3b6fd4; text-align: center;">物理实验平台</h2>
+      <p>您好，收到此邮件是因为您（或他人）请求了密码重置。</p>
+      <p style="text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 8px; color: #3b6fd4; background: #f0f4ff; padding: 20px; border-radius: 8px;">${code}</p>
+      <p style="color: #888; font-size: 13px;">验证码 10 分钟内有效，如非本人操作请忽略此邮件。</p>
+    </div>`
+  }
+  await transporter.sendMail(mailOptions)
+  return true
+}
+
 // token -> { email, expires }
 const sessions = new Map()
 // 简易限流：IP -> { count, first }
 const loginFails = new Map()
+// 重置密码 token -> { email, expires }
+const resetTokens = new Map()
 
 // ===== 用户存储 =====
 function loadUsers() {
   if (!existsSync(USERS_FILE)) return []
   try {
     const arr = JSON.parse(readFileSync(USERS_FILE, 'utf8'))
-    return Array.isArray(arr) ? arr : []
+    if (!Array.isArray(arr)) return []
+    let changed = false
+    arr.forEach((u, i) => {
+      if (!u.role) {
+        u.role = i === 0 ? 'admin' : 'user'
+        changed = true
+      }
+    })
+    if (changed) saveUsers(arr)
+    return arr
   } catch {
     return []
   }
@@ -124,17 +179,19 @@ async function handleApi(req, res, url) {
       return send(res, 409, { message: '该邮箱已注册，请直接登录' })
     }
     const { salt, hash } = hashPassword(password)
+    const isFirst = users.length === 0
     users.push({
       email,
       salt,
       hash,
+      role: isFirst ? 'admin' : 'user',
       createdAt: new Date().toISOString(),
       progress: defaultProgress()
     })
     saveUsers(users)
     const token = makeToken()
     sessions.set(token, { email, expires: Date.now() + TOKEN_TTL })
-    return send(res, 201, { token, user: { email } })
+    return send(res, 201, { token, user: { email, role: isFirst ? 'admin' : 'user' } })
   }
 
   if (url.pathname === '/api/login' && req.method === 'POST') {
@@ -159,7 +216,8 @@ async function handleApi(req, res, url) {
     loginFails.delete(ip)
     const token = makeToken()
     sessions.set(token, { email, expires: Date.now() + TOKEN_TTL })
-    return send(res, 200, { token, user: { email } })
+    const role = user.role || 'user'
+    return send(res, 200, { token, user: { email, role } })
   }
 
   if (url.pathname === '/api/me' && req.method === 'GET') {
@@ -167,10 +225,11 @@ async function handleApi(req, res, url) {
     const sess = token ? sessions.get(token) : null
     if (!sess || sess.expires < Date.now()) {
       if (sess) sessions.delete(token)
-      // 无效/过期 token 一律视为「未登录」，返回 200 + user:null，避免前端首屏 401 噪声
       return send(res, 200, { user: null })
     }
-    return send(res, 200, { user: { email: sess.email } })
+    const user = users.find((u) => u.email === sess.email)
+    const role = user?.role || 'user'
+    return send(res, 200, { user: { email: sess.email, role } })
   }
 
   if (url.pathname === '/api/logout' && req.method === 'POST') {
@@ -205,6 +264,138 @@ async function handleApi(req, res, url) {
     user.progress = progress
     saveUsers(users)
     return send(res, 200, { progress })
+  }
+
+  // 修改密码（需验证当前密码）
+  if (url.pathname === '/api/change-password' && req.method === 'POST') {
+    const user = authUser(req)
+    if (!user) return send(res, 401, { message: '未登录或登录已过期' })
+    let body
+    try {
+      body = await readBody(req)
+    } catch (e) {
+      return send(res, 400, { message: e.message })
+    }
+    const { oldPassword, newPassword } = body || {}
+    if (!oldPassword || !newPassword) {
+      return send(res, 400, { message: '请填写当前密码和新密码' })
+    }
+    if (!verifyPassword(oldPassword, user.salt, user.hash)) {
+      return send(res, 401, { message: '当前密码不正确' })
+    }
+    if (newPassword.length < 6) {
+      return send(res, 400, { message: '新密码至少 6 位' })
+    }
+    const { salt, hash } = hashPassword(newPassword)
+    user.salt = salt
+    user.hash = hash
+    saveUsers(users)
+    return send(res, 200, { ok: true })
+  }
+
+  // 请求重置密码（忘记密码流程第一步：输入邮箱，发送验证码邮件）
+  if (url.pathname === '/api/request-reset' && req.method === 'POST') {
+    let body
+    try {
+      body = await readBody(req)
+    } catch (e) {
+      return send(res, 400, { message: e.message })
+    }
+    const email = String(body.email || '').trim().toLowerCase()
+    if (!EMAIL_RE.test(email)) return send(res, 400, { message: '请输入有效的邮箱地址' })
+    const user = users.find((u) => u.email === email)
+    if (!user) return send(res, 404, { message: '该邮箱未注册' })
+    const code = randomBytes(3).toString('hex').toUpperCase() // 6 位验证码
+    const expires = Date.now() + 10 * 60 * 1000 // 10 分钟有效
+    resetTokens.set(code, { email, expires })
+
+    // 尝试发送邮件
+    try {
+      const sent = await sendResetEmail(email, code)
+      if (sent) {
+        return send(res, 200, { ok: true, mode: 'email' })
+      } else {
+        // 演示模式：返回验证码
+        return send(res, 200, { ok: true, mode: 'demo', code })
+      }
+    } catch (e) {
+      // 邮件发送失败，降级为演示模式
+      console.error('[email] 发送邮件失败，降级为演示模式：', e.message)
+      return send(res, 200, { ok: true, mode: 'demo', code })
+    }
+  }
+
+  // 重置密码（忘记密码流程第二步：输入验证码 + 新密码）
+  if (url.pathname === '/api/reset-password' && req.method === 'POST') {
+    let body
+    try {
+      body = await readBody(req)
+    } catch (e) {
+      return send(res, 400, { message: e.message })
+    }
+    const { code, email, newPassword } = body || {}
+    if (!code || !email || !newPassword) {
+      return send(res, 400, { message: '请填写邮箱、验证码和新密码' })
+    }
+    const entry = resetTokens.get(String(code).toUpperCase())
+    if (!entry || entry.email !== email) {
+      return send(res, 400, { message: '验证码不正确' })
+    }
+    if (entry.expires < Date.now()) {
+      resetTokens.delete(String(code).toUpperCase())
+      return send(res, 400, { message: '验证码已过期，请重新申请' })
+    }
+    if (newPassword.length < 6) {
+      return send(res, 400, { message: '新密码至少 6 位' })
+    }
+    const user = users.find((u) => u.email === email)
+    if (!user) return send(res, 404, { message: '用户不存在' })
+    const { salt, hash } = hashPassword(newPassword)
+    user.salt = salt
+    user.hash = hash
+    resetTokens.delete(String(code).toUpperCase())
+    saveUsers(users)
+    return send(res, 200, { ok: true })
+  }
+
+  // 管理员：获取用户列表
+  if (url.pathname === '/api/admin/users' && req.method === 'GET') {
+    const user = authUser(req)
+    if (!user) return send(res, 401, { message: '未登录或登录已过期' })
+    if (user.role !== 'admin') return send(res, 403, { message: '仅管理员可访问' })
+    const list = users.map((u) => ({
+      email: u.email,
+      role: u.role || 'user',
+      createdAt: u.createdAt || null
+    }))
+    return send(res, 200, { users: list })
+  }
+
+  // 管理员：直接重置某用户密码
+  if (url.pathname === '/api/admin/reset-password' && req.method === 'POST') {
+    const admin = authUser(req)
+    if (!admin) return send(res, 401, { message: '未登录或登录已过期' })
+    if (admin.role !== 'admin') return send(res, 403, { message: '仅管理员可操作' })
+    let body
+    try {
+      body = await readBody(req)
+    } catch (e) {
+      return send(res, 400, { message: e.message })
+    }
+    const { email, newPassword } = body || {}
+    if (!email || !newPassword) {
+      return send(res, 400, { message: '请填写用户邮箱和新密码' })
+    }
+    const target = users.find((u) => u.email === String(email).trim().toLowerCase())
+    if (!target) return send(res, 404, { message: '用户不存在' })
+    if (newPassword.length < 6) {
+      return send(res, 400, { message: '新密码至少 6 位' })
+    }
+    const { salt, hash } = hashPassword(newPassword)
+    target.salt = salt
+    target.hash = hash
+    saveUsers(users)
+    return send(res, 200, { ok: true })
   }
 
   return send(res, 404, { message: '接口不存在' })

@@ -26,7 +26,10 @@ export const GRADES = [
       { id: 'e-force', title: '探究重力的大小跟质量的关系', slug: 'spring-dynamometer', type: '探究', level: '基础' },
       { id: 'e-friction', title: '探究影响滑动摩擦力大小的因素', slug: 'sliding-friction', type: '探究', level: '核心' },
       { id: 'e-pressure', title: '探究液体内部压强的规律', slug: 'liquid-pressure', type: '探究', level: '核心' },
-      { id: 'e-buoyancy', title: '探究浮力大小的影响因素', slug: 'buoyancy', type: '探究', level: '核心' }
+      { id: 'e-buoyancy', title: '探究浮力大小的影响因素', slug: 'buoyancy', type: '探究', level: '核心' },
+      { id: 'e-lever', title: '探究杠杆的平衡条件', slug: 'lever-balance', type: '探究', level: '核心' },
+      { id: 'e-pulley', title: '研究定滑轮和动滑轮的特点', slug: 'pulley-characteristics', type: '探究', level: '核心' },
+      { id: 'e-pulley-sandbox', title: '滑轮组装沙盒与机械效率', slug: 'pulley-sandbox', type: '探究', level: '进阶' }
     ]
   },
   {

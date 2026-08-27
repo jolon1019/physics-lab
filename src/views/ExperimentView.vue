@@ -22,6 +22,9 @@ import ForceLab from '../components/lab/ForceLab.vue'
 import FrictionLab from '../components/lab/FrictionLab.vue'
 import PressureLab from '../components/lab/PressureLab.vue'
 import BuoyancyLab from '../components/lab/BuoyancyLab.vue'
+import LeverLab from '../components/lab/LeverLab.vue'
+import PulleyLab from '../components/lab/PulleyLab.vue'
+import PulleySandbox from '../components/lab/PulleySandbox.vue'
 import CircuitSimLab from '../components/lab/CircuitSimLab.vue'
 import ResistanceLab from '../components/lab/ResistanceLab.vue'
 import OhmLab from '../components/lab/OhmLab.vue'
@@ -145,6 +148,9 @@ function nextQuiz() {
           <FrictionLab v-else-if="detail && detail.id === 'e-friction'" @complete="onLabComplete" />
           <PressureLab v-else-if="detail && detail.id === 'e-pressure'" @complete="onLabComplete" />
           <BuoyancyLab v-else-if="detail && detail.id === 'e-buoyancy'" @complete="onLabComplete" />
+          <LeverLab v-else-if="detail && detail.id === 'e-lever'" @complete="onLabComplete" />
+          <PulleyLab v-else-if="detail && detail.id === 'e-pulley'" @complete="onLabComplete" />
+      <PulleySandbox v-else-if="detail && detail.id === 'e-pulley-sandbox'" @complete="onLabComplete" />
           <CircuitSimLab v-else-if="detail && detail.id === 'e-circuit'" @complete="onLabComplete" />
           <ResistanceLab v-else-if="detail && detail.id === 'e-resistance'" @complete="onLabComplete" />
           <OhmLab v-else-if="detail && detail.id === 'e-ohm'" @complete="onLabComplete" />

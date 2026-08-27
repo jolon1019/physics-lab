@@ -115,7 +115,7 @@ p { margin: 0; }
 .topbar {
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: 100;
   height: var(--topbar);
   display: grid;
   grid-template-columns: minmax(260px, 360px) auto;
@@ -130,7 +130,7 @@ p { margin: 0; }
   transition: margin-top 260ms cubic-bezier(0.4, 0, 0.2, 1), opacity 200ms ease,
     max-height 260ms cubic-bezier(0.4, 0, 0.2, 1), padding 260ms ease,
     border-width 260ms ease;
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* 沉浸模式：把顶栏高度常量归零，实验区高度公式（calc(100vh - var(--topbar) - …)）
