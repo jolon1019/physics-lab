@@ -1362,20 +1362,25 @@ p { margin: 0; }
     margin-top: 14px;
   }
 
-  /* 画布类实验的动画区吸顶（canvas 直挂面板 / canvas-wrap 两种结构都覆盖）。
-     带 .lab-stage 前缀提高优先级，压过组件 scoped 样式里的 .canvas-wrap{position:relative}。
-     不覆写 .lab-panel 背景：其自带不透明底色，board-dark 实验另有深色底。 */
-  .lab-stage .lab-left > .canvas-wrap {
-    position: sticky;
+  /* 动画区吸顶：覆盖所有实验结构（canvas-wrap / 直挂 canvas / 面板内含
+     canvas、svg、motion-stage、bench-wrap）。
+     sticky 加 !important：熔化/摩擦/透镜等面板写了行内 position:relative，
+     行内样式优先级高于样式表，不加 !important 吸不住（sticky 同样能充当
+     绝对定位子元素的包含块，覆盖 relative 不影响内部布局）。 */
+  .lab-stage .lab-left > .canvas-wrap,
+  .lab-stage .lab-left > canvas,
+  .lab-stage .lab-left > .lab-panel:has(> canvas),
+  .lab-stage .lab-left > .lab-panel:has(> svg),
+  .lab-stage .lab-left > .lab-panel:has(> .motion-stage),
+  .lab-stage .lab-left > .lab-panel:has(.bench-wrap) {
+    position: sticky !important;
     top: var(--lab-stick-top, 76px);
     z-index: 30;
-    background: var(--surface); /* 滑轮类画布为透明底，吸顶时必须垫实色挡住下方滚动内容 */
   }
 
-  .lab-stage .lab-left > .lab-panel:has(> canvas) {
-    position: sticky;
-    top: var(--lab-stick-top, 76px);
-    z-index: 30;
+  /* 滑轮类透明画布垫实色，挡住下方滚动内容 */
+  .lab-stage .lab-left > .canvas-wrap {
+    background: var(--surface);
   }
 }
 
@@ -1557,10 +1562,14 @@ p { margin: 0; }
   overflow: hidden; /* 取消普通模式的 overflow-y:auto，避免左列内部出现滚动条 */
   grid-template-rows: minmax(0, 1fr) auto;
 }
-/* 全屏时动画区不再吸顶 */
+/* 全屏时动画区不再吸顶（需带 !important 抵消上面的吸顶规则） */
 .lab-stage.is-fullscreen .lab-left > .canvas-wrap,
-.lab-stage.is-fullscreen .lab-left > .lab-panel:has(> canvas) {
-  position: static;
+.lab-stage.is-fullscreen .lab-left > canvas,
+.lab-stage.is-fullscreen .lab-left > .lab-panel:has(> canvas),
+.lab-stage.is-fullscreen .lab-left > .lab-panel:has(> svg),
+.lab-stage.is-fullscreen .lab-left > .lab-panel:has(> .motion-stage),
+.lab-stage.is-fullscreen .lab-left > .lab-panel:has(.bench-wrap) {
+  position: static !important;
 }
 /* 动画容器撑满左侧列：
    svg 类实验保持 100% 拉伸填充（viewBox + preserveAspectRatio 自带等比保护） */
