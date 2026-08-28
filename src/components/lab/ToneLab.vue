@@ -253,7 +253,7 @@ onBeforeUnmount(() => {
   <div class="lab-stage">
     <div class="lab-left">
       <div class="lab-panel" style="padding:0">
-        <canvas ref="canvasRef" style="display:block;width:100%"></canvas>
+        <canvas ref="canvasRef" class="cv-tone" style="display:block;width:100%"></canvas>
       </div>
 
       <div class="lab-actions">

@@ -482,7 +482,7 @@ onBeforeUnmount(() => {
   <div class="lab-stage">
     <div class="lab-left">
       <div class="lab-panel" style="padding:0">
-        <canvas ref="canvasRef" style="display:block;width:100%;height:100%;touch-action:none"></canvas>
+        <canvas ref="canvasRef" class="cv-sound" style="display:block;width:100%;height:100%;touch-action:none"></canvas>
       </div>
       <div class="lab-actions">
         <button class="btn" :class="{ 'btn-primary': mode === 'fork' }" @click="mode = 'fork'">音叉发声</button>

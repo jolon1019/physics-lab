@@ -27,6 +27,21 @@ let experimentDone = false
 const LENS_X = 460
 const PX_CM = 3.0
 const CY = 310
+// 光具台设计尺寸（所有绝对定位均基于此坐标系）
+const BENCH_W = 920
+const BENCH_H = 520
+
+// 台面等比缩放：容器多大就整体缩到多大，内部逻辑坐标不变
+const wrapRef = ref(null)
+const benchRef = ref(null)
+let BSCALE = 1
+function layoutBench() {
+  const w = wrapRef.value, b = benchRef.value
+  if (!w || !b) return
+  const s = Math.max(0.2, Math.min(w.clientWidth / BENCH_W, w.clientHeight / BENCH_H))
+  BSCALE = s
+  b.style.transform = `translate(-50%, -50%) scale(${s})`
+}
 const OFF_TOP = -46
 const OFF_MID = -4
 const OFF_BOT = 46
@@ -362,19 +377,22 @@ onMounted(() => {
   const lab = labRef.value
   if (!lab) return
 
-  document.getElementById('labFObj').addEventListener('mousedown', e => {
+  document.getElementById('labFObj').addEventListener('pointerdown', e => {
     dragObj = true
     e.preventDefault()
   })
-  document.getElementById('labScreen').addEventListener('mousedown', e => {
+  document.getElementById('labScreen').addEventListener('pointerdown', e => {
     dragScr = true
     e.preventDefault()
   })
 
-  document.addEventListener('mousemove', e => {
+  document.addEventListener('pointermove', e => {
     if (!dragObj && !dragScr) return
-    const rect = lab.getBoundingClientRect()
-    const x = e.clientX - rect.left
+    const b = benchRef.value
+    if (!b) return
+    // 屏幕坐标 → 台面设计坐标（÷ 缩放比）
+    const brect = b.getBoundingClientRect()
+    const x = (e.clientX - brect.left) / (BSCALE || 1)
     if (dragObj) {
       const u = Math.max(8, Math.min(140, Math.round((LENS_X - x) / PX_CM)))
       uDist.value = u
@@ -394,10 +412,17 @@ onMounted(() => {
       render()
     }
   })
-  document.addEventListener('mouseup', () => {
+  document.addEventListener('pointerup', () => {
     dragObj = false
     dragScr = false
   })
+
+  // 台面缩放自适应
+  layoutBench()
+  if (window.ResizeObserver && wrapRef.value) {
+    new ResizeObserver(layoutBench).observe(wrapRef.value)
+  }
+  window.addEventListener('resize', layoutBench)
 })
 
 watch([uDist, focalLength, screenDist], () => render())
@@ -429,6 +454,9 @@ function checkSeen() {
             <div><span class="l-axis"></span>主轴光线</div>
           </div>
 
+          <!-- 光具台：固定 920×520 设计坐标，外层按容器等比缩放（窄屏不跑位不裁剪） -->
+          <div class="bench-wrap" ref="wrapRef">
+            <div class="bench" ref="benchRef">
           <div class="axis"></div>
           <div class="ruler" id="labRuler"></div>
 
@@ -489,6 +517,8 @@ function checkSeen() {
           </svg>
 
           <div id="rayBox"></div>
+            </div>
+          </div>
 
           <div class="hint hint-v" id="hintV">
             👁 撤去光屏，从右侧透过透镜观察<br>
@@ -592,6 +622,27 @@ function checkSeen() {
 
 <style scoped>
 /* ========== 完全复制参考案例的 CSS ========== */
+
+/* 光具台等比缩放容器：
+   wrap 铺满整个容器，bench 固定 920×520 设计尺寸、由 JS 设置 scale，
+   任何屏幕宽度下光学布局都与桌面版完全一致（仅整体等比缩放，不跑位不裁剪） */
+.bench-wrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.bench {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 920px;
+  height: 520px;
+  transform-origin: center center;
+}
+/* 拖拽热区：允许指针拖动而不触发页面滚动 */
+#labFObj, #labScreen { touch-action: none; cursor: grab; }
+#labFObj:active, #labScreen:active { cursor: grabbing; }
+
 .lab-container {
   width: 100%;
   height: 100%;
@@ -633,22 +684,6 @@ function checkSeen() {
   height: 24px;
   pointer-events: none;
   z-index: 2;
-}
-.tick {
-  position: absolute;
-  top: 0;
-  width: 1px;
-  background: rgba(100,150,200,0.4);
-}
-.tick.major { height: 10px; background: rgba(100,150,200,0.7); }
-.tick.minor { height: 5px; }
-.num {
-  position: absolute;
-  top: 12px;
-  transform: translateX(-50%);
-  color: rgba(100,150,200,0.6);
-  font-size: 9px;
-  font-family: monospace;
 }
 .lens {
   position: absolute;
@@ -946,9 +981,75 @@ function checkSeen() {
 .l-vir { background: repeating-linear-gradient(90deg, rgba(180,180,200,0.6), rgba(180,180,200,0.6) 4px, transparent 4px, transparent 8px); height: 2px; }
 .l-axis { background: rgba(150,150,180,0.6); height: 2px; }
 #rayBox { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; }
+
+/* ========== 移动端适配 ==========
+   标题/面板改为文档流，光具台按 920:520 比例占满宽度，
+   等比缩放后整机布局完整可见，不再裁剪不跑位 */
+@media (max-width: 720px) {
+  .lab-container {
+    min-height: 0;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .lab-title {
+    position: static;
+    transform: none;
+    font-size: 13px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    padding: 10px 8px 4px;
+  }
+  .legend {
+    top: 56px;
+    left: 10px;
+    font-size: 9px;
+    line-height: 1.8;
+  }
+  .bench-wrap {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 220px;
+    height: auto;
+    aspect-ratio: 920 / 520;
+    min-height: 200px;
+  }
+  .panel {
+    position: static;
+    height: auto;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .info {
+    flex: 1 1 100%;
+    order: 3;
+    border: none;
+    border-top: 1px solid rgba(30,50,80,0.5);
+    padding: 6px 2px 0;
+  }
+}
 </style>
-<!-- 非 scoped 样式：用于动态创建的 DOM 元素（drawRay 创建的光线） -->
+<!-- 非 scoped 样式：用于动态创建的 DOM 元素（drawRay/drawRuler 运行时 createElement，
+     不会带 scoped 的 data-v 属性，样式必须放在全局块才能生效） -->
 <style>
+.tick {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  background: rgba(100,150,200,0.4);
+}
+.tick.major { height: 10px; background: rgba(100,150,200,0.7); }
+.tick.minor { height: 5px; }
+.num {
+  position: absolute;
+  top: 12px;
+  transform: translateX(-50%);
+  color: rgba(100,150,200,0.6);
+  font-size: 9px;
+  font-family: monospace;
+}
 .ray {
   position: absolute;
   height: 2.5px;

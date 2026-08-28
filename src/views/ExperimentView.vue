@@ -121,9 +121,8 @@ function nextQuiz() {
         </div>
 
         <div class="exp-stage-tabs">
-          <button class="btn" :class="{ 'btn-primary': showCognition }" @click="openCognition">认知台阶</button>
-          <button class="btn" :class="{ 'btn-primary': !showCognition && !showChallenge }" @click="goOperate">操作台阶</button>
-          <button class="btn" :class="{ 'btn-primary': showChallenge }" @click="openChallenge">挑战台阶</button>
+          <button class="btn" :class="{ 'btn-primary': showCognition }" @click="openCognition">实验理论</button>
+          <button class="btn" :class="{ 'btn-primary': showChallenge }" @click="openChallenge">巩固练习</button>
         </div>
       </header>
 
@@ -157,7 +156,7 @@ function nextQuiz() {
           <PowerLab v-else-if="detail && detail.id === 'e-power'" @complete="onLabComplete" />
           <ElectromagnetLab v-else-if="detail && detail.id === 'e-magnet'" @complete="onLabComplete" />
 <CoilRotateLab v-else-if="detail && detail.id === 'e-coil-rotation'" @complete="onLabComplete" />
-          <p v-else>该实验仿真打磨中，先进入「挑战」台阶练习。</p>
+          <p v-else>该实验仿真打磨中，先进入「巩固练习」。</p>
         </section>
 
         <RouterLink to="/record" class="btn btn-block" style="margin-top:24px">查看学习记录 →</RouterLink>

@@ -763,6 +763,27 @@ p { margin: 0; }
 @media (max-width: 760px) {
   .exp-detail-head {
     flex-direction: column;
+    gap: 8px;
+    padding: 10px 14px 10px;
+  }
+
+  .exp-detail-head .eyebrow {
+    margin-bottom: 2px;
+    font-size: 10px;
+  }
+
+  .exp-detail-head h2 {
+    font-size: 18px;
+    line-height: 1.2;
+  }
+
+  .exp-detail-head .page-sub {
+    margin-top: 3px;
+    font-size: 12px;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .exp-stage-tabs {
@@ -1091,6 +1112,21 @@ p { margin: 0; }
   --bb-purple: #d5a8ff;
   --bb-pink: #ff8fb0;
 }
+/* 浅色主题下整页背景同步切换为浅色纸面 */
+[data-board-theme="light"] {
+  --bg: #f2efe7;
+  --shadow: 0 20px 0 rgba(0, 0, 0, 0.08);
+}
+[data-board-theme="light"] body {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+    var(--bg);
+}
+[data-board-theme="light"] .app-footer {
+  border-top-color: rgba(0, 0, 0, 0.14);
+  color: rgba(0, 0, 0, 0.55);
+}
 [data-board-theme="light"] {
   --bb-surface: radial-gradient(130% 120% at 50% -10%, #fbfaf7 0%, #f4f1ea 55%, #ece7da 100%);
   --bb-frame: inset 0 0 0 9px #c9a87f, inset 0 0 0 11px #a9824f, inset 0 0 16px rgba(0, 0, 0, 0.06);
@@ -1249,13 +1285,15 @@ p { margin: 0; }
   }
 
   /* 统一移动端布局（适用于所有使用 .lab-stage 的互动实验）：
-     动画+控制列吸顶固定在顶栏下方，说明列随页面向上滚动 */
+     注意此处故意不用 position:sticky —— 单列布局下吸顶的动画区（含不透明
+     背景与 z-index）会永久遮挡随后流入的"参数滑块面板"上半部（坡度/入射角
+     等），只露出底部残影，表现为"控制面板显示不完全"。改为普通文档流，
+     动画与控制面板依次完整可见。 */
   .lab-left {
-    position: sticky;
-    top: var(--lab-stick-top, var(--topbar));
-    z-index: 5;
     height: auto;
+    max-height: none; /* 关键：桌面端 max-height 会残留，把高舞台动画（如 42vh 的运动描述）裁掉 */
     min-height: 0;
+    overflow: visible; /* 取消桌面端内部滚动，内容自然撑开整页滚动 */
     background: var(--surface);
   }
 
@@ -1299,6 +1337,46 @@ p { margin: 0; }
   .lab-left .lab-title { font-size: 14px; letter-spacing: 1px; white-space: normal; max-width: 92%; line-height: 1.2; }
   .lab-left .legend { font-size: 9px; line-height: 1.6; }
   .lab-left .legend .flip-note { display: none; }
+
+  /* ===== 移动端动画吸顶 =====
+     原先 .lab-left 是单列网格项，sticky 的包含块＝它自己的网格区域（高度等于自身），
+     动画滚出视口后就再也吸不住，只能整页一起走。
+     这里让 .lab-left 用 display:contents 交出自身盒子，动画面板的包含块上移到
+     .lab-stage（覆盖动画 + 提示 + 右侧参数全部高度），于是动画上滑到顶栏下方后
+     持续吸附，下方内容继续上滑从它底下经过。
+     .exp-detail 用 overflow:clip 正是为此：不创建滚动容器，sticky 才对视口生效。 */
+  .lab-stage {
+    display: block;
+  }
+
+  .lab-left {
+    display: contents;
+  }
+
+  /* display:contents 后网格 gap 失效，改回外边距维持原有间距 */
+  .lab-left > .lab-actions {
+    margin: 12px 0 0;
+  }
+
+  .lab-right {
+    margin-top: 14px;
+  }
+
+  /* 画布类实验的动画区吸顶（canvas 直挂面板 / canvas-wrap 两种结构都覆盖）。
+     带 .lab-stage 前缀提高优先级，压过组件 scoped 样式里的 .canvas-wrap{position:relative}。
+     不覆写 .lab-panel 背景：其自带不透明底色，board-dark 实验另有深色底。 */
+  .lab-stage .lab-left > .canvas-wrap {
+    position: sticky;
+    top: var(--lab-stick-top, 76px);
+    z-index: 30;
+    background: var(--surface); /* 滑轮类画布为透明底，吸顶时必须垫实色挡住下方滚动内容 */
+  }
+
+  .lab-stage .lab-left > .lab-panel:has(> canvas) {
+    position: sticky;
+    top: var(--lab-stick-top, 76px);
+    z-index: 30;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1313,14 +1391,20 @@ p { margin: 0; }
 }
 
 /* 实验画布统一显示策略（全系统通用）：
-   桌面保持组件自带尺寸；≤1180px（手机/平板）时按视口宽度等比 900:520
-   给出明确高度（不依赖 aspect-ratio 对 canvas 的兼容性），所有 canvas
-   实验通用——动画比例不变、内容完整，不再出现长条背景或只显示左上角 */
+   桌面保持组件自带尺寸；≤1180px（手机/平板）时宽度撑满内容区、
+   高度用 aspect-ratio 锁定为画布逻辑比例——框比恒等于位图比，
+   画面完整、绝不拉伸变形（此前用 100vw 换算高度，与容器实际宽度
+   口径不一致，窄屏下画面被竖向拉伸 ~20%） */
 @media (max-width: 1180px) {
   .lab-left canvas {
     width: 100% !important;
-    height: calc(100vw * 520 / 900) !important;
+    height: auto !important;
+    aspect-ratio: 900 / 520;
   }
+  /* 自适应缩放类实验：按各自画布逻辑比例锁定框比（与 e-speed 标准一致） */
+  .lab-left canvas.cv-velocity { aspect-ratio: 860 / 460; }
+  .lab-left canvas.cv-tone     { aspect-ratio: 860 / 400; }
+  .lab-left canvas.cv-sound    { aspect-ratio: 880 / 470; }
 }
 
 /* ===== 页脚 ===== */
@@ -1448,13 +1532,24 @@ p { margin: 0; }
   align-items: stretch;
   width: 100vw;
   height: 100vh;
+  height: 100dvh; /* 移动端浏览器地址栏占位修正 */
   max-width: none;
   margin: 0;
   padding: 10px;
   background: var(--surface, #16202c);
   overflow: hidden;
 }
+/* 窄竖屏（未锁成横屏的兜底）：仍保持"动画 + 右侧变量面板"两栏，
+   但收窄右栏、缩小留白，保证动画尽量宽 */
+@media (max-width: 700px) {
+  .lab-stage.is-fullscreen {
+    grid-template-columns: minmax(0, 1fr) minmax(170px, 42vw);
+    gap: 8px;
+    padding: 8px;
+  }
+}
 .lab-stage.is-fullscreen .lab-left {
+  display: grid; /* 抵消移动端 display:contents（吸顶方案），全屏两栏布局必须恢复自身盒子 */
   position: static; /* 抵消移动端 sticky 吸顶 */
   height: 100%;
   max-height: none; /* 关键：清除普通模式下的 max-height 上限，否则全屏左列被截断在约 3/4 屏高 */
@@ -1462,12 +1557,42 @@ p { margin: 0; }
   overflow: hidden; /* 取消普通模式的 overflow-y:auto，避免左列内部出现滚动条 */
   grid-template-rows: minmax(0, 1fr) auto;
 }
-/* 动画容器撑满左侧列：canvas 内联 height（520px 等）用 !important 覆盖 */
-.lab-stage.is-fullscreen .lab-left > .lab-panel canvas,
+/* 全屏时动画区不再吸顶 */
+.lab-stage.is-fullscreen .lab-left > .canvas-wrap,
+.lab-stage.is-fullscreen .lab-left > .lab-panel:has(> canvas) {
+  position: static;
+}
+/* 动画容器撑满左侧列：
+   svg 类实验保持 100% 拉伸填充（viewBox + preserveAspectRatio 自带等比保护） */
 .lab-stage.is-fullscreen .lab-left > .lab-panel > svg {
   width: 100% !important;
   height: 100% !important;
-  object-fit: contain;
+}
+/* canvas 类实验统一改为"内在尺寸 + 双向 max 约束"等比缩放模型：
+   位图即内在尺寸，浏览器自动取满足两个上限的最大等比尺寸——
+   画面完整、绝不拉伸变形；框比恒等于位图比，指针坐标映射依旧精确。
+   覆盖各实验私有的 max-height（如滑轮沙盒的 calc(100vh - 250px)）与
+   移动端 900:520 定高规则，任何实验接入全屏都无需单独适配。 */
+.lab-stage.is-fullscreen .lab-left .canvas-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.lab-stage.is-fullscreen .lab-left > .lab-panel {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.lab-stage.is-fullscreen .lab-left canvas {
+  display: block;
+  width: auto !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  margin: auto; /* 块级替换元素：宽度有富余时自动水平居中 */
 }
 /* .lab-container（通电线圈 / 透镜等）：取消 min-height 500px 限制，撑满全屏列 */
 .lab-stage.is-fullscreen .lab-left .lab-container {

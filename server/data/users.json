@@ -23,9 +23,16 @@
     "hash": "acbe545248cf1f9d3873cbd2593c7ad72a341b92789d41a9c048b6155b6c4b342b65e2f698537b3d62efa687eef6173cf351d13a8d5aff5cbda7130dad51a47c",
     "createdAt": "2026-08-27T06:58:48.838Z",
     "progress": {
-      "records": {},
+      "records": {
+        "e-lens-camera": {
+          "attempts": 0,
+          "correct": 0,
+          "completed": true,
+          "latest": ""
+        }
+      },
       "sessions": 1,
-      "lastVisit": "2026/8/27"
+      "lastVisit": "2026/8/28"
     },
     "role": "user"
   }
