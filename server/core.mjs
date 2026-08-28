@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import nodemailer from 'nodemailer'
-import { head, put } from '@vercel/blob'
+import { get, put } from '@vercel/blob'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -88,9 +88,11 @@ export async function loadUsers() {
   let raw = null
   if (BLOB_MODE) {
     try {
-      const meta = await head('users.json')
-      const r = await fetch(meta.url, { cache: 'no-store' })
-      if (r.ok) raw = JSON.parse(await r.text())
+      // 私有存储：get() 直接带鉴权读取；useCache:false 保证读-modify-写的一致性
+      const res = await get('users.json', { access: 'private', useCache: false })
+      if (res) {
+        raw = JSON.parse(await new Response(res.stream).text())
+      }
     } catch {
       /* Blob 里还没有 users.json */
     }
@@ -113,8 +115,9 @@ export async function saveUsers(users) {
   const json = JSON.stringify(users, null, 2)
   if (BLOB_MODE) {
     await put('users.json', json, {
-      access: 'public',
+      access: 'private',
       addRandomSuffix: false,
+      allowOverwrite: true,
       contentType: 'application/json'
     })
     return
