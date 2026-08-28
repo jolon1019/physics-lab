@@ -98,6 +98,7 @@ onMounted(syncOpen)
       <div class="side-nav-foot">
         <RouterLink to="/" class="side-nav-link" :class="{ 'router-link-active': route.path === '/' }">首页</RouterLink>
         <RouterLink to="/record" class="side-nav-link" :class="{ 'router-link-active': route.path === '/record' }">学习记录</RouterLink>
+        <RouterLink to="/resources" class="side-nav-link" :class="{ 'router-link-active': route.path === '/resources' }">试卷资料库</RouterLink>
       </div>
     </template>
 

@@ -27,6 +27,12 @@ const routes = [
     name: 'record',
     component: () => import('../views/RecordView.vue'),
     meta: { title: '学习记录', requiresAuth: true }
+  },
+  {
+    path: '/resources',
+    name: 'resources',
+    component: () => import('../views/ResourcesView.vue'),
+    meta: { title: '试卷资料库' }
   }
 ]
 

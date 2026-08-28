@@ -48,6 +48,7 @@ const steps = [
         <div class="hp-cta">
           <RouterLink to="/experiment/e-motion-desc" class="btn btn-primary hp-btn-lg">开始第一个实验 →</RouterLink>
           <RouterLink to="/record" class="btn hp-btn-lg">查看学习记录</RouterLink>
+          <RouterLink to="/resources" class="btn hp-btn-lg">试卷资料库</RouterLink>
         </div>
         <ul class="hp-stats">
           <li><strong>{{ totalExps }}</strong><span>个同步实验</span></li>
