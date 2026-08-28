@@ -33,6 +33,15 @@ const SMTP_PASS = process.env.SMTP_PASS || ''
 const SMTP_FROM = process.env.SMTP_FROM || ''
 const EMAIL_ENABLED = !!(SMTP_HOST && SMTP_USER && SMTP_PASS)
 
+// 发件人：SMTP_FROM 只存纯地址（兼容旧的「名称 <地址>」格式，自动剥出地址），
+// 显示名固定英文并由 nodemailer 做 RFC2047 编码——中文名放环境变量里
+// 经过 PowerShell/CLI/服务器链路极易变成乱码（如「鐗╃悊瀹為獙骞冲彴」）
+const FROM_ADDRESS = (() => {
+  const m = String(SMTP_FROM || SMTP_USER || '').match(/<([^>]+)>/)
+  return (m ? m[1] : String(SMTP_FROM || SMTP_USER || '')).trim()
+})()
+const FROM_NAME = 'Physics Lab'
+
 let transporter = null
 if (EMAIL_ENABLED) {
   transporter = nodemailer.createTransport({
@@ -60,7 +69,7 @@ async function sendCodeEmail(to, code, purpose) {
   }
   const s = scenes[purpose] || scenes.reset
   const mailOptions = {
-    from: SMTP_FROM || SMTP_USER,
+    from: { name: FROM_NAME, address: FROM_ADDRESS },
     to,
     subject: s.subject,
     text: `${s.intro}${code}，10 分钟内有效。如非本人操作请忽略此邮件。`,
