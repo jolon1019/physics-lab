@@ -105,13 +105,16 @@ function makeToken() {
 }
 
 // ===== 工具 =====
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+}
 function send(res, status, obj) {
   const body = JSON.stringify(obj)
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+    ...CORS
   })
   res.end(body)
 }
@@ -163,7 +166,12 @@ function defaultProgress() {
 
 // ===== 接口处理 =====
 async function handleApi(req, res, url) {
-  if (req.method === 'OPTIONS') return send(res, 204, {})
+  // 跨域预检：204 不允许带响应体，单独处理
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, CORS)
+    res.end()
+    return
+  }
   if (url.pathname === '/api/register' && req.method === 'POST') {
     let body
     try {

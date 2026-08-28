@@ -1,5 +1,8 @@
 // 轻量 fetch 封装：统一拼接 /api、自动附带 Bearer token、规范化错误
-const BASE = '/api'
+// API 基址两手准备：
+//   本地测试 → 默认 '/api'（Vite dev 代理转发到 localhost:3001；生产由后端直接托管 dist 时同样走 /api）
+//   正式部署 → 构建时设 VITE_API_BASE=https://你的后端域名/api（Vercel 项目环境变量里配置）
+const BASE = import.meta.env.VITE_API_BASE || '/api'
 
 async function request(path, options = {}) {
   const token = localStorage.getItem('physics-lab-token') || ''
