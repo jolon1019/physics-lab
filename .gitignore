@@ -35,6 +35,12 @@ deploy/*.log
 # 用户数据（邮箱/密码哈希，切勿提交）
 server/data/
 
+# Vercel CLI 本地凭据与关联信息（切勿提交）
+.vercel-cli-data/
+.vercel/
+.env.local
+.env.*.local
+
 # WorkBuddy 本地数据（个人记忆/配置，不入库）
 .workbuddy
 
@@ -47,3 +53,6 @@ server/data/
 # 临时构建产物
 .bchk
 
+
+.vercel
+.env*
