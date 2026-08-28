@@ -32,6 +32,9 @@ deploy/*.log
 # 环境变量（含密钥，切勿提交）
 .env
 
+# 用户数据（邮箱/密码哈希，切勿提交）
+server/data/
+
 # WorkBuddy 本地数据（个人记忆/配置，不入库）
 .workbuddy
 
