@@ -210,6 +210,19 @@ function setupCanvas() {
 function dims() {
   return { W: 900, H: 520 }
 }
+// 设计层等比缩放：画布与装置图共用 900×520 逻辑坐标，
+// 手机端整体缩到容器宽度，装置图片（烧杯/酒精灯）随画布同步缩小，不再保持原始像素尺寸
+const DESIGN_W = 900
+const DESIGN_H = 520
+const stageRef = ref(null)
+const scaleRef = ref(null)
+function layoutStage() {
+  const st = stageRef.value, sc = scaleRef.value
+  if (!st || !sc) return
+  const s = Math.max(0.25, Math.min(st.clientWidth / DESIGN_W, 1.6))
+  sc.style.transform = `scale(${s})`
+  st.style.height = Math.round(DESIGN_H * s) + 'px'
+}
 function rr(x, y, w, h, r) {
   if (ctx.roundRect) {
     ctx.beginPath()
@@ -503,6 +516,7 @@ function loop(now) {
 function resizeCanvas() {
   if (!canvasRef.value) return
   setupCanvas()
+  layoutStage()
   if (!editMode.value) applyDefaults()   // 非编辑态随画布自适应；编辑态保留手动微调
   render()
 }
@@ -516,12 +530,13 @@ let resizeObs = null
 onMounted(() => {
   setupCanvas()
   loadSaved()              // 先读已保存的摆放
+  layoutStage()            // 先按容器宽度算好缩放，再摆默认布局
   applyDefaults()          // 首次渲染前算好布局（有保存则用保存值）
   render()
   window.addEventListener('keydown', onKey)
   if (window.ResizeObserver) {
     resizeObs = new ResizeObserver(resizeCanvas)
-    resizeObs.observe(canvasRef.value.parentElement)
+    resizeObs.observe(stageRef.value)   // 观察外层容器（缩放层宽度固定 900，观察它不会触发）
   }
   raf = requestAnimationFrame(loop)
 })
@@ -539,9 +554,12 @@ onBeforeUnmount(() => {
   <div class="lab-stage">
     <div class="lab-left">
       <div class="lab-panel" style="padding:0;position:relative">
+        <!-- 外层容器：高度由 JS 按缩放比例设定，内部为 900×520 设计层整体缩放 -->
+        <div class="melt-stage" ref="stageRef">
+          <div class="melt-scale" ref="scaleRef">
         <canvas
           class="logic-canvas" ref="canvasRef"
-          style="display:block;width:100%;height:520px;touch-action:none;border-radius:8px"
+          style="display:block;width:900px;height:520px;touch-action:none;border-radius:8px"
         ></canvas>
 
         <!-- 装置区（SVG 组件层），绝对覆盖在 canvas 之上；自身不处理滚轮，由 .melt-rig 统一接管 -->
@@ -578,8 +596,10 @@ onBeforeUnmount(() => {
             :tube-x="tubeX" :tube-mid-y="tubeMidY"
           />
         </div>
+          </div>
+        </div>
 
-        <!-- 摆放编辑器浮层 -->
+        <!-- 摆放编辑器浮层（在缩放层之外，保持可读尺寸） -->
         <div v-if="editMode" class="pos-editor">
           <div class="pe-head">
             <strong>摆放编辑器</strong>
@@ -679,6 +699,22 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* 外层容器：宽度铺满，高度由 JS 按 900:520 缩放比设定 */
+.melt-stage {
+  position: relative;
+  width: 100%;
+  height: 520px;
+  overflow: hidden;
+}
+/* 设计层：固定 900×520 逻辑坐标，整体等比缩放（左上角为原点） */
+.melt-scale {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 900px;
+  height: 520px;
+  transform-origin: top left;
+}
 .pos-editor {
   position: absolute;
   top: 12px;
