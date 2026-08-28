@@ -9,7 +9,6 @@ import { paintBoard } from '../../lib/boardBg'
 import FullscreenBtn from './FullscreenBtn.vue'
 import MeltPieceImg from './melt/MeltPieceImg.vue'
 import MeltThermo   from './melt/MeltThermo.vue'
-import MeltHeatFlow from './melt/MeltHeatFlow.vue'
 import './melt/melt.css'
 
 const emit = defineEmits(['complete'])
@@ -255,23 +254,6 @@ const lampSrc  = computed(() => LAMP_SRC[isOn.value ? 'on' : 'off'])
 const lampMeta = computed(() => isOn.value ? IMG_META.lampOn : IMG_META.lampOff)
 const flaskSrc  = computed(() => PHASE_TO_FLASK[phase.value].src)
 const flaskMeta = computed(() => PHASE_TO_FLASK[phase.value].meta)
-
-// ===== 热流箭头关键点（按 PNG 的不透明 bbox 推算）=====
-// 不透明内容顶部 = baseline - opaqueH * (w / opaqueW)
-const lampScale   = computed(() => layout.lamp.w  / lampMeta.value[1])
-const flaskScale  = computed(() => layout.flask.w / flaskMeta.value[1])
-const rigW = computed(() => canvasRef.value ? canvasRef.value.clientWidth : 880)
-const rigH = computed(() => canvasRef.value ? canvasRef.value.clientHeight : 520)
-const flameX = computed(() => layout.lamp.x)
-const flameY = computed(() => layout.lamp.baseline - lampMeta.value[2] * lampScale.value)
-// 烧杯口 / 试管口 / 试管中：在 3 态合体图内的相对位置（基于目测：口 y≈70，中 y≈200）
-// 烧杯口 ABOVE opaque 底 ≈ 388 - 70 = 318
-// 试管中心 ABOVE opaque 底 ≈ 388 - 200 = 188
-// 试管 x 比组合图中心略偏右 ~10px（即 (210-200)/400*frame）
-const flaskX = computed(() => layout.flask.x)
-const beakerTopY = computed(() => layout.flask.baseline - (flaskMeta.value[0] - 70) * flaskScale.value)
-const tubeX = computed(() => layout.flask.x + 10 * flaskScale.value)
-const tubeMidY = computed(() => layout.flask.baseline - (flaskMeta.value[0] - 200) * flaskScale.value)
 
 // 右侧 T-t 图
 function drawGraph(L) {
@@ -587,13 +569,6 @@ onBeforeUnmount(() => {
             :temp="temp" :t-min="Tmin" :t-max="Tmax"
             :selected="selected === 'thermo'" :edit-mode="editMode"
             @pointerdown="(e) => onPiecePointerDown('thermo', e)"
-          />
-          <MeltHeatFlow
-            v-if="isOn"
-            :W="rigW" :H="rigH"
-            :lamp-flame-x="flameX" :lamp-flame-y="flameY"
-            :beaker-x="flaskX" :beaker-top-y="beakerTopY"
-            :tube-x="tubeX" :tube-mid-y="tubeMidY"
           />
         </div>
           </div>
