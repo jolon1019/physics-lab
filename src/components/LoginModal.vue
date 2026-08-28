@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import * as api from '../lib/api'
@@ -12,6 +12,37 @@ const email = ref('')
 const password = ref('')
 const loading = ref(false)
 const err = ref('')
+
+// 注册验证码流程
+const regCode = ref('')
+const regCodeSending = ref(false)
+const regCountdown = ref(0)
+const regIsEmailMode = ref(false) // true=邮件已发送  false=演示模式
+const regReceivedCode = ref('')
+let regTimer = null
+
+function startRegCountdown() {
+  regCountdown.value = 60
+  if (regTimer) clearInterval(regTimer)
+  regTimer = setInterval(() => {
+    regCountdown.value--
+    if (regCountdown.value <= 0) clearInterval(regTimer)
+  }, 1000)
+}
+
+function resetRegState() {
+  regCode.value = ''
+  regCodeSending.value = false
+  regCountdown.value = 0
+  regIsEmailMode.value = false
+  regReceivedCode.value = ''
+  if (regTimer) {
+    clearInterval(regTimer)
+    regTimer = null
+  }
+}
+
+onBeforeUnmount(() => regTimer && clearInterval(regTimer))
 
 // 忘记密码流程
 const forgotStep = ref(1) // 1:输入邮箱  2:输入验证码+新密码
@@ -30,6 +61,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 function switchMode(m) {
   mode.value = m
   err.value = ''
+  resetRegState()
   if (m !== 'forgot') {
     forgotStep.value = 1
     forgotEmail.value = ''
@@ -40,6 +72,31 @@ function switchMode(m) {
     forgotOk.value = ''
     receivedCode.value = ''
     isEmailMode.value = false
+  }
+}
+
+async function requestRegCode() {
+  err.value = ''
+  const mail = email.value.trim().toLowerCase()
+  if (!EMAIL_RE.test(mail)) {
+    err.value = '请先输入有效的邮箱地址'
+    return
+  }
+  regCodeSending.value = true
+  try {
+    const res = await api.requestRegisterCode(mail)
+    if (res.mode === 'email') {
+      regIsEmailMode.value = true
+      regReceivedCode.value = ''
+    } else {
+      regIsEmailMode.value = false
+      regReceivedCode.value = res.code || ''
+    }
+    startRegCountdown()
+  } catch (e) {
+    err.value = e.message || '发送验证码失败'
+  } finally {
+    regCodeSending.value = false
   }
 }
 
@@ -54,12 +111,16 @@ async function submit() {
     err.value = '密码至少 6 位'
     return
   }
+  if (mode.value === 'register' && !regCode.value.trim()) {
+    err.value = '请先获取并输入邮箱验证码'
+    return
+  }
   loading.value = true
   try {
     if (mode.value === 'login') {
       await auth.login(mail, password.value)
     } else {
-      await auth.register(mail, password.value)
+      await auth.register(mail, password.value, regCode.value.trim().toUpperCase())
     }
     password.value = ''
     // 登录成功且存在待跳转页面时，跳转过去
@@ -146,16 +207,40 @@ function close() {
       <!-- 登录 / 注册 -->
       <template v-if="mode !== 'forgot'">
         <h2 class="modal-title">{{ mode === 'login' ? '登录物理实验平台' : '注册新账号' }}</h2>
-        <p class="modal-sub">邮箱 + 密码，学习进度将保存到你的账号</p>
+        <p class="modal-sub">{{ mode === 'login' ? '邮箱 + 密码，学习进度将保存到你的账号' : '邮箱验证码 + 密码注册，学习进度保存到你的账号' }}</p>
 
         <form class="modal-form" @submit.prevent="submit">
           <label class="field">
             <span>邮箱</span>
             <input v-model="email" type="email" autocomplete="email" placeholder="you@example.com" />
           </label>
+
+          <template v-if="mode === 'register'">
+            <div v-if="regIsEmailMode" class="form-hint">
+              ✓ 验证码已发送到 <u>{{ email }}</u>，请查收邮件
+            </div>
+            <div v-else-if="regReceivedCode" class="form-hint">
+              验证码：<strong>{{ regReceivedCode }}</strong>（演示模式，请复制后在下方输入）
+            </div>
+            <label class="field">
+              <span>验证码</span>
+              <div class="code-row">
+                <input v-model="regCode" type="text" maxlength="6" placeholder="6 位验证码" />
+                <button
+                  class="btn code-btn"
+                  type="button"
+                  :disabled="regCodeSending || regCountdown > 0"
+                  @click="requestRegCode"
+                >
+                  {{ regCountdown > 0 ? `${regCountdown}s 后重发` : regCodeSending ? '发送中…' : '发送验证码' }}
+                </button>
+              </div>
+            </label>
+          </template>
+
           <label class="field">
             <span>密码</span>
-            <input v-model="password" type="password" autocomplete="current-password" placeholder="至少 6 位" />
+            <input v-model="password" type="password" :autocomplete="mode === 'login' ? 'current-password' : 'new-password'" placeholder="至少 6 位" />
           </label>
 
           <p v-if="err" class="form-error">{{ err }}</p>
@@ -327,6 +412,39 @@ function close() {
 .field input:focus {
   border-color: var(--accent);
   box-shadow: 3px 3px 0 var(--accent);
+}
+
+/* 验证码输入行：输入框 + 发送按钮 同行 */
+.code-row {
+  display: flex;
+  gap: 8px;
+}
+.code-row input {
+  flex: 1;
+  min-width: 0;
+}
+.code-btn {
+  flex: 0 0 auto;
+  height: 42px;
+  padding: 0 14px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-h);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.code-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.code-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+.form-hint u {
+  text-underline-offset: 3px;
 }
 
 .form-error {

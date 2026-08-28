@@ -31,8 +31,11 @@ async function request(path, options = {}) {
 export function login(email, password) {
   return request('/login', { method: 'POST', body: { email, password } })
 }
-export function register(email, password) {
-  return request('/register', { method: 'POST', body: { email, password } })
+export function requestRegisterCode(email) {
+  return request('/register-code', { method: 'POST', body: { email } })
+}
+export function register(email, password, code) {
+  return request('/register', { method: 'POST', body: { email, password, code } })
 }
 export function getMe() {
   return request('/me', { method: 'GET' })

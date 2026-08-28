@@ -46,16 +46,27 @@ if (EMAIL_ENABLED) {
   console.log('[email] SMTP 未配置，使用演示模式（验证码直接显示在页面）')
 }
 
-async function sendResetEmail(to, code) {
+async function sendCodeEmail(to, code, purpose) {
   if (!EMAIL_ENABLED) return false
+  const scenes = {
+    reset: {
+      subject: '物理实验平台 - 密码重置验证码',
+      intro: '您好，收到此邮件是因为您（或他人）请求了密码重置。'
+    },
+    register: {
+      subject: '物理实验平台 - 注册验证码',
+      intro: '您好，感谢注册物理实验平台，您的注册验证码是：'
+    }
+  }
+  const s = scenes[purpose] || scenes.reset
   const mailOptions = {
     from: SMTP_FROM || SMTP_USER,
     to,
-    subject: '物理实验平台 - 密码重置验证码',
-    text: `您的密码重置验证码是：${code}，10 分钟内有效。如非本人操作请忽略此邮件。`,
+    subject: s.subject,
+    text: `${s.intro}${code}，10 分钟内有效。如非本人操作请忽略此邮件。`,
     html: `<div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px; margin: 0 auto;">
       <h2 style="color: #3b6fd4; text-align: center;">物理实验平台</h2>
-      <p>您好，收到此邮件是因为您（或他人）请求了密码重置。</p>
+      <p>${s.intro}</p>
       <p style="text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 8px; color: #3b6fd4; background: #f0f4ff; padding: 20px; border-radius: 8px;">${code}</p>
       <p style="color: #888; font-size: 13px;">验证码 10 分钟内有效，如非本人操作请忽略此邮件。</p>
     </div>`
@@ -124,6 +135,45 @@ export async function saveUsers(users) {
   }
   if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true })
   writeFileSync(USERS_FILE, json)
+}
+
+// ===== 注册验证码存储（注册时用户尚不存在，独立持久化；读取时自动清理过期项） =====
+const PENDING_FILE = join(DATA_DIR, 'pending-codes.json')
+
+async function loadPendingCodes() {
+  let raw = null
+  if (BLOB_MODE) {
+    try {
+      const r = await get('pending-codes.json', { access: 'private', useCache: false })
+      if (r) raw = JSON.parse(await new Response(r.stream).text())
+    } catch {
+      /* 还没有 pending-codes.json */
+    }
+  } else if (existsSync(PENDING_FILE)) {
+    try {
+      raw = JSON.parse(readFileSync(PENDING_FILE, 'utf8'))
+    } catch {
+      raw = null
+    }
+  }
+  if (!Array.isArray(raw)) return []
+  const now = Date.now()
+  return raw.filter((e) => e && e.email && e.code && Number(e.expires) > now)
+}
+
+async function savePendingCodes(list) {
+  const json = JSON.stringify(list, null, 2)
+  if (BLOB_MODE) {
+    await put('pending-codes.json', json, {
+      access: 'private',
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType: 'application/json'
+    })
+    return
+  }
+  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true })
+  writeFileSync(PENDING_FILE, json)
 }
 
 // ===== 密码哈希（scrypt）=====
@@ -222,6 +272,41 @@ export async function handleApi(req, res, url) {
     res.end()
     return
   }
+  // 发送注册验证码（60 秒限频，10 分钟有效；SMTP 未配置时降级演示模式）
+  if (url.pathname === '/api/register-code' && req.method === 'POST') {
+    let body
+    try {
+      body = await readBody(req)
+    } catch (e) {
+      return send(res, 400, { message: e.message })
+    }
+    const email = String(body.email || '').trim().toLowerCase()
+    if (!EMAIL_RE.test(email)) return send(res, 400, { message: '请输入有效的邮箱地址' })
+    const users = await loadUsers()
+    if (users.some((u) => u.email === email)) {
+      return send(res, 409, { message: '该邮箱已注册，请直接登录' })
+    }
+    const pend = await loadPendingCodes()
+    const prev = pend.find((p) => p.email === email)
+    if (prev && Date.now() - prev.sentAt < 60_000) {
+      return send(res, 429, { message: '发送过于频繁，请稍后再试' })
+    }
+    const code = randomBytes(3).toString('hex').toUpperCase()
+    const entry = { email, code, expires: Date.now() + 10 * 60 * 1000, sentAt: Date.now() }
+    const idx = pend.findIndex((p) => p.email === email)
+    if (idx >= 0) pend[idx] = entry
+    else pend.push(entry)
+    await savePendingCodes(pend)
+    try {
+      const sent = await sendCodeEmail(email, code, 'register')
+      if (sent) return send(res, 200, { ok: true, mode: 'email' })
+      return send(res, 200, { ok: true, mode: 'demo', code })
+    } catch (e) {
+      console.error('[email] 注册验证码发送失败，降级为演示模式：', e.message)
+      return send(res, 200, { ok: true, mode: 'demo', code })
+    }
+  }
+
   if (url.pathname === '/api/register' && req.method === 'POST') {
     let body
     try {
@@ -231,12 +316,22 @@ export async function handleApi(req, res, url) {
     }
     const email = String(body.email || '').trim().toLowerCase()
     const password = String(body.password || '')
+    const code = String(body.code || '').trim().toUpperCase()
     if (!EMAIL_RE.test(email)) return send(res, 400, { message: '请输入有效的邮箱地址' })
     if (password.length < 6) return send(res, 400, { message: '密码至少 6 位' })
+    if (!code) return send(res, 400, { message: '请先获取邮箱验证码' })
     const users = await loadUsers()
     if (users.some((u) => u.email === email)) {
       return send(res, 409, { message: '该邮箱已注册，请直接登录' })
     }
+    // 校验注册验证码（过期项在 loadPendingCodes 里已被清理）
+    const pend = await loadPendingCodes()
+    const entry = pend.find((p) => p.email === email)
+    if (!entry || entry.code !== code) {
+      return send(res, 400, { message: '验证码不正确或已过期，请重新获取' })
+    }
+    pend.splice(pend.indexOf(entry), 1)
+    await savePendingCodes(pend)
     const { salt, hash } = hashPassword(password)
     const isFirst = users.length === 0
     users.push({
@@ -367,7 +462,7 @@ export async function handleApi(req, res, url) {
 
     // 尝试发送邮件
     try {
-      const sent = await sendResetEmail(email, code)
+      const sent = await sendCodeEmail(email, code, 'reset')
       if (sent) {
         return send(res, 200, { ok: true, mode: 'email' })
       } else {

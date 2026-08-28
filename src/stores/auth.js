@@ -48,9 +48,9 @@ export const useAuthStore = defineStore('auth', {
       this._applySession(res)
       return res
     },
-    async register(email, password) {
+    async register(email, password, code) {
       this.error = ''
-      const res = await api.register(email, password)
+      const res = await api.register(email, password, code)
       this._applySession(res)
       return res
     },
