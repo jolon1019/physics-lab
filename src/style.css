@@ -231,9 +231,10 @@ p { margin: 0; }
 
 .topbar h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 19px;
   font-weight: 900;
   line-height: 1.1;
+  white-space: nowrap; /* 标题变长后禁止折行，靠缩小字号保持单行 */
 }
 
 .topbar .progress-chip {
@@ -1517,7 +1518,7 @@ p { margin: 0; }
   }
 
   .topbar h1 {
-    font-size: 19px;
+    font-size: 16px;
   }
 
   /* 顶栏精简：手机隐藏进度胶囊，数据可在学习记录页查看，避免挤压品牌 */

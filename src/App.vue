@@ -134,8 +134,8 @@ function onGlobalClick() {
       <div class="brand-block">
         <div class="brand-mark" aria-hidden="true"></div>
         <div class="brand-text">
-          <p class="eyebrow">初中物理</p>
-          <h1>物理实验平台</h1>
+          <p class="eyebrow">初中物理 · 数学</p>
+          <h1>自主自学实验平台</h1>
         </div>
         <RouterLink to="/record" class="progress-chip">⑤ 已通过 {{ progress.completedCount }} 个实验</RouterLink>
       </div>

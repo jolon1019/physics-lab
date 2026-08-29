@@ -74,7 +74,7 @@ async function sendCodeEmail(to, code, purpose) {
     subject: s.subject,
     text: `${s.intro}${code}，10 分钟内有效。如非本人操作请忽略此邮件。`,
     html: `<div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 500px; margin: 0 auto;">
-      <h2 style="color: #3b6fd4; text-align: center;">物理实验平台</h2>
+      <h2 style="color: #3b6fd4; text-align: center;">自主自学实验平台</h2>
       <p>${s.intro}</p>
       <p style="text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 8px; color: #3b6fd4; background: #f0f4ff; padding: 20px; border-radius: 8px;">${code}</p>
       <p style="color: #888; font-size: 13px;">验证码 10 分钟内有效，如非本人操作请忽略此邮件。</p>

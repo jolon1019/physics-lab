@@ -8,7 +8,7 @@ const routes = [
     path: '/',
     name: 'home',
     component: HomeView,
-    meta: { title: '物理实验平台' }
+    meta: { title: '自主自学实验平台' }
   },
   {
     path: '/chapters/:grade',
@@ -61,7 +61,7 @@ router.beforeEach((to) => {
 })
 
 router.afterEach((to) => {
-  document.title = to.meta.title ? `${to.meta.title} · 物理实验平台` : '物理实验平台'
+  document.title = to.meta.title ? `${to.meta.title} · 自主自学实验平台` : '自主自学实验平台'
 })
 
 export default router

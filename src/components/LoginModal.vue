@@ -206,7 +206,7 @@ function close() {
 
       <!-- 登录 / 注册 -->
       <template v-if="mode !== 'forgot'">
-        <h2 class="modal-title">{{ mode === 'login' ? '登录物理实验平台' : '注册新账号' }}</h2>
+        <h2 class="modal-title">{{ mode === 'login' ? '登录自主自学实验平台' : '注册新账号' }}</h2>
         <p class="modal-sub">{{ mode === 'login' ? '邮箱 + 密码，学习进度将保存到你的账号' : '邮箱验证码 + 密码注册，学习进度保存到你的账号' }}</p>
 
         <form class="modal-form" @submit.prevent="submit">
