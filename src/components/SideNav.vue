@@ -1,7 +1,7 @@
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { GRADES, findExperiment } from '../data/experiments'
+import { SUBJECTS, findExperiment, gradesBySubject } from '../data/experiments'
 import { useProgressStore } from '../stores/progress'
 import { useLayoutStore } from '../stores/layout'
 
@@ -9,19 +9,31 @@ const route = useRoute()
 const progress = useProgressStore()
 const layout = useLayoutStore()
 
+const subject = ref('physics')
 const openGrades = ref(new Set())
 
+const grades = computed(() => gradesBySubject(subject.value))
+
 function totalCount() {
-  return GRADES.reduce((s, g) => s + g.experiments.length, 0)
+  return grades.value.reduce((s, g) => s + g.experiments.length, 0)
+}
+
+function pickSubject(id) {
+  if (subject.value === id) return
+  subject.value = id
+  const list = gradesBySubject(id)
+  if (list.length) openGrades.value = new Set([list[0].grade])
 }
 
 function syncOpen() {
   const id = route.params.id
   const hit = id ? findExperiment(id) : null
   if (hit) {
+    subject.value = hit.grade.subject || 'physics'
     openGrades.value.add(hit.grade.grade)
   } else {
-    openGrades.value.add(GRADES[0].grade)
+    const first = gradesBySubject(subject.value)[0]
+    if (first) openGrades.value.add(first.grade)
   }
   openGrades.value = new Set(openGrades.value)
 }
@@ -74,7 +86,21 @@ onMounted(syncOpen)
 
     <!-- 展开态：完整目录树 -->
     <template v-if="!layout.navCollapsed">
-      <div v-for="(g, gi) in GRADES" :key="g.grade" class="nav-module">
+      <div class="subject-tabs" role="tablist" aria-label="学科分类">
+        <button
+          v-for="s in SUBJECTS"
+          :key="s.id"
+          class="subject-tab"
+          :class="{ active: subject === s.id }"
+          role="tab"
+          :aria-selected="subject === s.id"
+          @click="pickSubject(s.id)"
+        >
+          {{ s.label }}
+        </button>
+      </div>
+
+      <div v-for="(g, gi) in grades" :key="g.grade" class="nav-module">
         <button class="nav-module-btn" :class="{ open: openGrades.has(g.grade) }" @click="toggleGrade(g.grade)">
           <span class="rail-index">{{ String(gi + 1).padStart(2, '0') }}</span>
           <span class="nav-module-label">{{ g.label }}</span>
@@ -98,7 +124,6 @@ onMounted(syncOpen)
       <div class="side-nav-foot">
         <RouterLink to="/" class="side-nav-link" :class="{ 'router-link-active': route.path === '/' }">首页</RouterLink>
         <RouterLink to="/record" class="side-nav-link" :class="{ 'router-link-active': route.path === '/record' }">学习记录</RouterLink>
-        <RouterLink to="/resources" class="side-nav-link" :class="{ 'router-link-active': route.path === '/resources' }">试卷资料库</RouterLink>
       </div>
     </template>
 
@@ -106,7 +131,7 @@ onMounted(syncOpen)
     <template v-else>
       <div class="rail-grades">
         <button
-          v-for="(g, gi) in GRADES"
+          v-for="(g, gi) in grades"
           :key="g.grade"
           class="rail-grade"
           :title="g.label"

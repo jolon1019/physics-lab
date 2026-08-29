@@ -1,6 +1,12 @@
+export const SUBJECTS = [
+  { id: 'physics', label: '物理' },
+  { id: 'math', label: '数学' }
+]
+
 export const GRADES = [
   {
     grade: 'grade8a',
+    subject: 'physics',
     label: '八年级 上册',
     experiments: [
       { id: 'e-motion-desc', title: '运动的描述（参照物）', slug: 'motion-description', type: '探究', level: '基础' },
@@ -21,6 +27,7 @@ export const GRADES = [
   },
   {
     grade: 'grade8b',
+    subject: 'physics',
     label: '八年级 下册',
     experiments: [
       { id: 'e-force', title: '探究重力的大小跟质量的关系', slug: 'spring-dynamometer', type: '探究', level: '基础' },
@@ -33,7 +40,16 @@ export const GRADES = [
     ]
   },
   {
+    grade: 'math8',
+    subject: 'math',
+    label: '八年级',
+    experiments: [
+      { id: 'e-geometry-transform', title: '探究平移、旋转与轴对称', slug: 'geometry-transformations', type: '探究', level: '核心' }
+    ]
+  },
+  {
     grade: 'grade9',
+    subject: 'physics',
     label: '九年级 全册',
     experiments: [
       { id: 'e-circuit', title: '探究串并联电路的电流规律', slug: 'series-parallel-current', type: '探究', level: '核心' },
@@ -45,6 +61,14 @@ export const GRADES = [
     ]
   }
 ]
+
+export function gradesBySubject(subject) {
+  return GRADES.filter((g) => (g.subject || 'physics') === subject)
+}
+
+export function subjectOfGrade(gradeId) {
+  return GRADES.find((g) => g.grade === gradeId)?.subject || 'physics'
+}
 
 export function findExperiment(id) {
   for (const g of GRADES) {

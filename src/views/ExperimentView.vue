@@ -31,6 +31,7 @@ import OhmLab from '../components/lab/OhmLab.vue'
 import PowerLab from '../components/lab/PowerLab.vue'
 import ElectromagnetLab from '../components/lab/ElectromagnetLab.vue'
 import CoilRotateLab from '../components/lab/CoilRotateLab.vue'
+import GeometryLab from '../components/lab/GeometryLab.vue'
 
 const route = useRoute()
 const progress = useProgressStore()
@@ -156,6 +157,7 @@ function nextQuiz() {
           <PowerLab v-else-if="detail && detail.id === 'e-power'" @complete="onLabComplete" />
           <ElectromagnetLab v-else-if="detail && detail.id === 'e-magnet'" @complete="onLabComplete" />
 <CoilRotateLab v-else-if="detail && detail.id === 'e-coil-rotation'" @complete="onLabComplete" />
+          <GeometryLab v-else-if="detail && detail.id === 'e-geometry-transform'" @complete="onLabComplete" />
           <p v-else>该实验仿真打磨中，先进入「巩固练习」。</p>
         </section>
 

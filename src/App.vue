@@ -151,6 +151,7 @@ function onGlobalClick() {
         >
           <span class="nav-toggle-icon">{{ layout.navCollapsed ? '☰' : '✕' }}</span>
         </button>
+        <RouterLink to="/resources" class="nav-toggle-top" :class="{ active: $route.path === '/resources' }">试卷资料库</RouterLink>
         <button
           class="nav-toggle-top"
           type="button"
