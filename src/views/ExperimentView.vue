@@ -32,6 +32,9 @@ import PowerLab from '../components/lab/PowerLab.vue'
 import ElectromagnetLab from '../components/lab/ElectromagnetLab.vue'
 import CoilRotateLab from '../components/lab/CoilRotateLab.vue'
 import GeometryLab from '../components/lab/GeometryLab.vue'
+import CongruentLab from '../components/lab/CongruentLab.vue'
+import PythagorasLab from '../components/lab/PythagorasLab.vue'
+import MultFormulaLab from '../components/lab/MultFormulaLab.vue'
 
 const route = useRoute()
 const progress = useProgressStore()
@@ -158,6 +161,9 @@ function nextQuiz() {
           <ElectromagnetLab v-else-if="detail && detail.id === 'e-magnet'" @complete="onLabComplete" />
 <CoilRotateLab v-else-if="detail && detail.id === 'e-coil-rotation'" @complete="onLabComplete" />
           <GeometryLab v-else-if="detail && detail.id === 'e-geometry-transform'" @complete="onLabComplete" />
+          <CongruentLab v-else-if="detail && detail.id === 'e-congruent-tri'" @complete="onLabComplete" />
+          <PythagorasLab v-else-if="detail && detail.id === 'e-pythagoras'" @complete="onLabComplete" />
+          <MultFormulaLab v-else-if="detail && detail.id === 'e-mult-formula'" @complete="onLabComplete" />
           <p v-else>该实验仿真打磨中，先进入「巩固练习」。</p>
         </section>
 

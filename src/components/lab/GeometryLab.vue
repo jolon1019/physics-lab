@@ -401,6 +401,7 @@ const VLBL = ['A', 'B', 'C']
   display: block;
   width: 100%;
   height: auto;
+  max-height: 100%; /* 桌面端 .lab-left 行高固定：超高时等比缩小而非被 overflow:hidden 裁切 */
   aspect-ratio: 900 / 520;
   touch-action: pan-y;
   user-select: none;

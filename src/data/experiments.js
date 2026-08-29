@@ -44,7 +44,10 @@ export const GRADES = [
     subject: 'math',
     label: '八年级',
     experiments: [
-      { id: 'e-geometry-transform', title: '探究平移、旋转与轴对称', slug: 'geometry-transformations', type: '探究', level: '核心' }
+      { id: 'e-geometry-transform', title: '探究平移、旋转与轴对称', slug: 'geometry-transformations', type: '探究', level: '核心' },
+      { id: 'e-congruent-tri', title: '探究全等三角形的判定', slug: 'congruent-triangles', type: '探究', level: '核心' },
+      { id: 'e-pythagoras', title: '验证勾股定理（面积割补）', slug: 'pythagoras-theorem', type: '验证', level: '核心' },
+      { id: 'e-mult-formula', title: '乘法公式的几何证明', slug: 'multiplication-formulas', type: '验证', level: '基础' }
     ]
   },
   {
