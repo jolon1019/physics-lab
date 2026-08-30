@@ -9,23 +9,35 @@
     @pointerdown="emit('pointerdown', $event)"
   >
     <svg viewBox="0 0 60 290" :width="size.w" :height="size.h" xmlns="http://www.w3.org/2000/svg" aria-label="温度计">
+      <defs>
+        <linearGradient id="mt-glass" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="rgba(255,255,255,0.55)" />
+          <stop offset="1" stop-color="rgba(224,236,244,0.2)" />
+        </linearGradient>
+        <linearGradient id="mt-mercury" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#f0705f" />
+          <stop offset="0.45" stop-color="#e85a4f" />
+          <stop offset="1" stop-color="#c93a30" />
+        </linearGradient>
+      </defs>
       <rect class="melt-piece-hit" :x="-6" :y="-6" :width="VBW + 12" :height="VBH + 12" fill="transparent" />
       <!-- 玻璃管身 -->
       <path
         d="M24 20 L24 248 A 18 18 0 0 0 36 248 L36 20"
-        class="melt-glass-fill"
+        class="melt-glass-stroke"
+        fill="url(#mt-glass)"
       />
       <!-- 玻璃球：先填充再描边 -->
-      <circle cx="30" cy="260" r="18" class="melt-glass-fill" />
+      <circle cx="30" cy="260" r="18" fill="url(#mt-glass)" class="melt-glass-stroke" />
       <!-- 管壁高光 -->
       <path d="M27 30 L27 240" stroke="#fff" stroke-opacity="0.55" stroke-width="1.6" fill="none" stroke-linecap="round" />
       <!-- 顶帽 -->
       <ellipse cx="30" cy="14" rx="10" ry="4" :fill="colors.cap" :stroke="colors.stroke" stroke-width="1.6" />
       <!-- 汞泡（球内红圆） -->
-      <circle cx="30" cy="260" r="13" :fill="colors.mercury" />
+      <circle cx="30" cy="260" r="13" fill="url(#mt-mercury)" />
       <ellipse cx="26" cy="256" rx="3.5" ry="2" fill="#fff" opacity="0.55" />
       <!-- 汞柱（管内） -->
-      <rect :x="26" :y="mercuryTop" width="8" :height="bulbTopY - mercuryTop" :fill="colors.mercury" rx="1" />
+      <rect :x="26" :y="mercuryTop" width="8" :height="bulbTopY - mercuryTop" fill="url(#mt-mercury)" rx="1" />
       <!-- 刻度线 + 数字 -->
       <g :stroke="colors.line" stroke-width="1.4" opacity="0.7" font-size="6" font-weight="700" font-family="system-ui" fill="#22324a">
         <g v-for="(T, i) in ticks" :key="i">

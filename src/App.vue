@@ -1,11 +1,16 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { useProgressStore } from './stores/progress'
 import { useAuthStore } from './stores/auth'
 import { useLayoutStore } from './stores/layout'
 import { boardTheme, toggleBoardVariant } from './lib/boardTheme'
 import SideNav from './components/SideNav.vue'
 import LoginModal from './components/LoginModal.vue'
+
+const route = useRoute()
+// 试卷资料库页不展示左侧实验目录（嵌入文档需要整行宽度）
+const isResources = computed(() => route.path === '/resources')
 
 const progress = useProgressStore()
 const auth = useAuthStore()
@@ -141,8 +146,9 @@ function onGlobalClick() {
       </div>
 
       <div class="user-zone">
-        <!-- 移动端：展开/收起侧边栏目录抽屉（桌面端隐藏） -->
+        <!-- 移动端：展开/收起侧边栏目录抽屉（桌面端隐藏；资料库页无目录） -->
         <button
+          v-if="!isResources"
           class="nav-hamburger"
           type="button"
           :title="layout.navCollapsed ? '展开实验目录' : '收起实验目录'"
@@ -151,7 +157,12 @@ function onGlobalClick() {
         >
           <span class="nav-toggle-icon">{{ layout.navCollapsed ? '☰' : '✕' }}</span>
         </button>
-        <RouterLink to="/resources" class="nav-toggle-top" :class="{ active: $route.path === '/resources' }">试卷资料库</RouterLink>
+        <!-- 资料库页时此按钮变为返回实验平台入口 -->
+        <RouterLink
+          :to="isResources ? '/' : '/resources'"
+          class="nav-toggle-top"
+          :class="{ active: isResources }"
+        >{{ isResources ? '实验平台' : '试卷资料库' }}</RouterLink>
         <button
           class="nav-toggle-top"
           type="button"
@@ -199,7 +210,7 @@ function onGlobalClick() {
     >⤢ 退出沉浸</button>
 
     <div class="workspace">
-      <SideNav />
+      <SideNav v-if="!isResources" />
       <main class="main-grid">
         <RouterView />
       </main>
@@ -207,10 +218,10 @@ function onGlobalClick() {
 
     <footer class="app-footer">初中物理同步实验 · 学生自主学习平台</footer>
 
-    <!-- 移动端抽屉遮罩：目录展开时点击收起 -->
+    <!-- 移动端抽屉遮罩：目录展开时点击收起（资料库页无目录，不渲染） -->
     <div
       class="nav-backdrop"
-      v-if="!layout.navCollapsed"
+      v-if="!layout.navCollapsed && !isResources"
       @click="layout.setNav(true)"
       aria-hidden="true"
     ></div>

@@ -7,50 +7,27 @@ import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
 import FullscreenBtn from './FullscreenBtn.vue'
-import MeltPieceImg from './melt/MeltPieceImg.vue'
-import MeltThermo   from './melt/MeltThermo.vue'
+import MeltFlask  from './melt/MeltFlask.vue'
+import MeltBurner from './melt/MeltBurner.vue'
+import MeltThermo from './melt/MeltThermo.vue'
 import './melt/melt.css'
 
 const emit = defineEmits(['complete'])
 const auth = useAuthStore()
 const isAdmin = computed(() => auth.isAdmin)
 
-// ===== 装置图片资源（PNG，400×400 帧 + 不透明 bbox 裁剪）=====
-// 格式 [opaqueBotY, opaqueW, opaqueH] —— yMax+1、不透明宽、不透明高
-// （opaqueBotY 用于 MeltPieceImg 把"不透明底部"贴到 baseline；缩放按 opaqueW 算）
-// 注意：2026-08-22 起，烧杯 + 试管合并为单张 3 态 PNG（keli/rongjie/yeti）。
-const IMG_META = {
-  flaskKeli:    [388, 232, 368], // 烧杯+试管（颗粒/固态）
-  flaskRongjie: [388, 232, 368], // 烧杯+试管（融化中）
-  flaskYeti:    [388, 232, 368], // 烧杯+试管（全液）
-  lampOff:    [390, 253, 247],   // 酒精灯（关）
-  lampOn:     [390, 253, 368],   // 酒精灯（开，含火焰）
-}
-// 把 pickTubePhase() 返回的 4 态映射到 3 张 PNG：kong/gu→颗粒；rong→融化；feiteng→液体
-const PHASE_TO_FLASK = {
-  kong:    { src: '/assets/lab/shaobei-shiguan-keli.png',    meta: IMG_META.flaskKeli },
-  gu:      { src: '/assets/lab/shaobei-shiguan-keli.png',    meta: IMG_META.flaskKeli },
-  rong:    { src: '/assets/lab/shaobei-shiguan-rongjie.png', meta: IMG_META.flaskRongjie },
-  feiteng: { src: '/assets/lab/shaobei-shiguan-yeti.png',    meta: IMG_META.flaskYeti },
-}
-const LAMP_SRC = {
-  on:  '/assets/lab/jiujingdeng-on.png',
-  off: '/assets/lab/jiujingdeng-off.png',
-}
+// ===== 装置渲染（纯 SVG 组件，零网络请求）=====
+// 视觉由连续量驱动：meltFrac（0..1 已熔化比例）让颗粒渐消、液池渐涨，
+// 酒精灯点燃/熄灭走 transform+opacity 过渡，不再有 PNG 三态硬切换。
 
-// 试管 4 阶段判定：按 (state, 物质, 当前温度) 选 kong/gu/rong/feiteng
-function pickTubePhase() {
-  if (state.value === 'ready') return isCrystal.value ? 'gu' : 'kong'
-  const T = temp.value
-  if (isCrystal.value) {
-    if (T < MELT) return 'gu'            // 固态（颗粒）：升温到熔点 48℃ 之前
-    if (T < MELT + 0.3) return 'rong'    // 熔化平台 @48℃：固液共存（温度不变）
-    return 'feiteng'                      // 已全熔：>48℃ 即液体
-  }
-  if (T < T_START.wax) return 'kong'
-  if (T < 65) return 'rong'
-  return 'feiteng'
-}
+// 试管内容物熔化进度：按 (物质, 当前时间) 连续插值
+// 海波：0~4s 固态升温；4~8s 熔化平台（进度 0→1）；之后全液
+// 石蜡：全程缓慢软化，约 9s 完全熔化
+const meltFrac = computed(() => {
+  if (state.value === 'ready') return 0
+  const t = tNow.value
+  return isCrystal.value ? clamp((t - 4) / 4, 0, 1) : clamp(t / 9, 0, 1)
+})
 
 // ===== 摆放编辑器（editMode 下可拖动 / 滚轮缩放每个元件）=====
 // 每个元件用绝对逻辑坐标 {x:中心x, baseline:底部y, w:内容宽} 描述，便于手动微调。
@@ -61,7 +38,7 @@ const layout = reactive({              // 各元件坐标（SVG 组件直接读�
   thermo: { x: 0, baseline: 0, w: 0 },
   lamp:   { x: 0, baseline: 0, w: 0 },
 })
-const LS_KEY = 'emelt-layout-v1'       // 已保存摆放的 localStorage 键
+const LS_KEY = 'emelt-layout-v2'       // 已保存摆放的 localStorage 键（v2：SVG 新装置几何）
 const savedLayout = ref(null)          // 用户保存过的固定布局（优先于自适应）
 // 编辑器内实时显示 / 复制用：随 layout 与画布尺寸自动更新
 const layoutJson = computed(() => {
@@ -72,23 +49,20 @@ const layoutJson = computed(() => {
   )
 })
 
-// 按当前画布尺寸算默认布局（即原内联公式的显式坐标版）
+// 按当前画布尺寸算默认布局（SVG 装置几何见各组件注释）：
+// flask 自带三脚架（viewBox 200×420，石棉网底距 baseline 186.5 单位），
+// lamp 高 212 单位、火焰尖距 baseline 208 单位 —— 取 lampW 使火焰尖刚好舔到石棉网。
 function computeDefaults(L) {
-  const cx = L.W * 0.27
+  const cx = L.W * 0.24
   const baseY = L.H - 70
-  // 烧杯+试管合并图
-  const flaskW = Math.min(140, L.W * 0.20)
-  const thermoW = Math.min(26, flaskW * 0.18)
-  const lampW = Math.min(46, L.W * 0.07)
-  const flaskBottomY = baseY - 130
-  const flaskCx = cx - 5
-  const thermoCx = flaskCx + (flaskW / 2) - (thermoW / 2) - 4
-  const thermoBottomY = flaskBottomY + 4
-  const lampCx = Math.max(60, cx - flaskW * 0.6)
+  const flaskW = Math.min(185, L.W * 0.205)
+  const s = flaskW / 200
+  const lampW = Math.max(40, Math.min(120, (186.5 * s - 4) / 1.6))
+  const thermoW = Math.min(24, flaskW * 0.13)
   return {
-    flask:  { x: flaskCx, baseline: flaskBottomY, w: flaskW },
-    thermo: { x: thermoCx, baseline: thermoBottomY, w: thermoW },
-    lamp:   { x: lampCx, baseline: baseY, w: lampW },
+    flask:  { x: cx, baseline: baseY, w: flaskW },
+    thermo: { x: cx, baseline: baseY - 229 * s, w: thermoW },
+    lamp:   { x: cx, baseline: baseY, w: lampW },
   }
 }
 function applyDefaults() {
@@ -145,8 +119,8 @@ function modelTemp(mat, t) {
     if (t < 12) return MELT + (T_END.sea - MELT) * ((t - 8) / 4)
     return T_END.sea
   }
-  // 石蜡：用 rate 缩放时间，平滑上升
-  const tt = Math.min(t * rate, 1)
+  // 石蜡：用 rate 缩放时间，平滑上升（铺满整个计时区间）
+  const tt = Math.min((t / DURATION) * rate, 1)
   return T_START.wax + (T_END.wax - T_START.wax) * Math.pow(tt, 0.85)
 }
 
@@ -247,13 +221,9 @@ function drawSetup(L) {
 }
 
 // ===== 装置状态（供模板用） =====
-const phase = computed(() => pickTubePhase())
-const isOn  = computed(() => state.value === 'running' || state.value === 'done')
-// 装置 PNG 资源（随状态/物质切换）
-const lampSrc  = computed(() => LAMP_SRC[isOn.value ? 'on' : 'off'])
-const lampMeta = computed(() => isOn.value ? IMG_META.lampOn : IMG_META.lampOff)
-const flaskSrc  = computed(() => PHASE_TO_FLASK[phase.value].src)
-const flaskMeta = computed(() => PHASE_TO_FLASK[phase.value].meta)
+const isOn    = computed(() => state.value === 'running' || state.value === 'done')
+const isHot   = computed(() => isOn.value)               // 灯亮即有对流/微颤
+const steamOn = computed(() => isOn.value && temp.value >= 58)
 
 // 右侧 T-t 图
 function drawGraph(L) {
@@ -451,6 +421,7 @@ function startRun() {
     ? '海波升温到 48℃ 后将出现“熔化平台”——温度不变、固液共存'
     : '石蜡全程温度持续上升，没有平台'
   lastT = performance.now()
+  startLoop()
 }
 
 function stopRun() {
@@ -476,20 +447,33 @@ function resetAll() {
   hint.value = '选择物质后点击「开始加热」，观察温度—时间图像的形成'
 }
 
+// rAF 仅在加热运行时启动：空闲时零重绘（旧版每帧全量重画黑板 + 图像，常驻开销大）
+function startLoop() {
+  if (raf != null) return
+  lastT = performance.now()
+  raf = requestAnimationFrame(loop)
+}
+function stopLoop() {
+  if (raf != null) cancelAnimationFrame(raf)
+  raf = null
+  lastT = null
+}
 function loop(now) {
+  if (state.value !== 'running') { raf = null; return }
   if (!lastT) lastT = now
   const dt = Math.min((now - lastT) / 1000, 0.05)
   lastT = now
-  if (state.value === 'running') {
-    tNow.value += dt * SLOWMO
-    const t = tNow.value
-    temp.value = modelTemp(material.value, t)
-    points.value.push({ t, T: temp.value })
-    if (tNow.value >= DURATION) {
-      tNow.value = DURATION
-      temp.value = T_END[material.value]
-      stopRun()
-    }
+  tNow.value += dt * SLOWMO
+  const t = tNow.value
+  temp.value = modelTemp(material.value, t)
+  points.value.push({ t, T: temp.value })
+  if (tNow.value >= DURATION) {
+    tNow.value = DURATION
+    temp.value = T_END[material.value]
+    stopRun()
+    render()
+    raf = null
+    return
   }
   render()
   raf = requestAnimationFrame(loop)
@@ -506,6 +490,7 @@ function resizeCanvas() {
 watch(material, () => {
   // 切换物质时重置
   if (state.value !== 'running') resetAll()
+  render()
 })
 
 let resizeObs = null
@@ -520,10 +505,9 @@ onMounted(() => {
     resizeObs = new ResizeObserver(resizeCanvas)
     resizeObs.observe(stageRef.value)   // 观察外层容器（缩放层宽度固定 900，观察它不会触发）
   }
-  raf = requestAnimationFrame(loop)
 })
 onBeforeUnmount(() => {
-  if (raf) cancelAnimationFrame(raf)
+  stopLoop()
   if (resizeObs) resizeObs.disconnect()
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('pointermove', onWinPointerMove)
@@ -544,25 +528,23 @@ onBeforeUnmount(() => {
           style="display:block;width:900px;height:520px;touch-action:none;border-radius:8px"
         ></canvas>
 
-        <!-- 装置区（SVG 组件层），绝对覆盖在 canvas 之上；自身不处理滚轮，由 .melt-rig 统一接管 -->
+        <!-- 装置区（SVG 组件层），绝对覆盖在 canvas 之上；lamp 最先画（位于脚架后方），thermo 最前 -->
         <div
           class="melt-rig"
           style="position:absolute;inset:0;height:520px"
           @wheel="onWheel"
         >
-          <MeltPieceImg
-            :src="flaskSrc" :meta="flaskMeta"
-            :x="layout.flask.x" :baseline="layout.flask.baseline" :w="layout.flask.w"
-            :selected="selected === 'flask'" :edit-mode="editMode"
-            @pointerdown="(e) => onPiecePointerDown('flask', e)"
-            alt="烧杯+试管"
-          />
-          <MeltPieceImg
-            :src="lampSrc" :meta="lampMeta"
+          <MeltBurner
             :x="layout.lamp.x" :baseline="layout.lamp.baseline" :w="layout.lamp.w"
+            :on="isOn"
             :selected="selected === 'lamp'" :edit-mode="editMode"
             @pointerdown="(e) => onPiecePointerDown('lamp', e)"
-            alt="酒精灯"
+          />
+          <MeltFlask
+            :x="layout.flask.x" :baseline="layout.flask.baseline" :w="layout.flask.w"
+            :hot="isHot" :melt-frac="meltFrac" :material="material" :steam="steamOn"
+            :selected="selected === 'flask'" :edit-mode="editMode"
+            @pointerdown="(e) => onPiecePointerDown('flask', e)"
           />
           <MeltThermo
             :x="layout.thermo.x" :baseline="layout.thermo.baseline" :w="layout.thermo.w"

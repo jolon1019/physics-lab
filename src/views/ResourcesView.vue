@@ -1,23 +1,18 @@
 <script setup>
 // 试卷资料库：嵌入抖音《自主自学》的腾讯文档分享库
 // 文档在腾讯侧更新，这里实时同步，无需维护两份数据
+import { onBeforeUnmount, onMounted } from 'vue'
+
 const DOC_URL = 'https://docs.qq.com/sheet/DSnRwYVRjcUJLUmZR?tab=BB08J2'
+
+// 外层页面锁定：进入本页时禁止整页滚动（滚轮/触控板只作用于内嵌文档），
+// 页面以 flex 撑满一屏，iframe 占据剩余高度、在文档内部滚动
+onMounted(() => document.documentElement.classList.add('res-lock'))
+onBeforeUnmount(() => document.documentElement.classList.remove('res-lock'))
 </script>
 
 <template>
-  <h2 class="page-title">试卷资料库</h2>
-  <p class="page-sub">来自抖音「自主自学」的试卷与视频课分享库，持续更新中</p>
-
   <section class="res-card card">
-    <div class="res-bar">
-      <div class="res-info">
-        <strong>自主自学资料库</strong>
-        <span>视频课 · 试卷 · 按机构分类整理（洋葱学院 / 希望学 / 作业帮 等）</span>
-      </div>
-      <div class="res-actions">
-        <a class="btn" :href="DOC_URL" target="_blank" rel="noopener">新窗口打开</a>
-      </div>
-    </div>
     <iframe
       class="res-frame"
       :src="DOC_URL"
@@ -37,31 +32,6 @@ const DOC_URL = 'https://docs.qq.com/sheet/DSnRwYVRjcUJLUmZR?tab=BB08J2'
   padding: 0;
   overflow: hidden;
 }
-.res-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 14px 16px;
-  border-bottom: 2px solid var(--line);
-}
-.res-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.res-info strong {
-  font-size: 16px;
-}
-.res-info span {
-  font-size: 12px;
-  color: var(--text-2);
-}
-.res-actions {
-  display: flex;
-  gap: 8px;
-}
 .res-frame {
   display: block;
   width: 100%;
@@ -80,5 +50,44 @@ const DOC_URL = 'https://docs.qq.com/sheet/DSnRwYVRjcUJLUmZR?tab=BB08J2'
   .res-frame {
     height: 78vh;
   }
+}
+</style>
+
+<!-- 非 scoped：资料库锁定态要作用到 html/body 与全局布局类（仅在 html.res-lock 时生效） -->
+<style>
+html.res-lock,
+html.res-lock body {
+  overflow: hidden;
+  height: 100%;
+}
+html.res-lock .app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+html.res-lock .workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin: 14px auto 10px;
+  min-height: 0;
+}
+html.res-lock .main-grid {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+html.res-lock .res-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+html.res-lock .res-frame {
+  flex: 1;
+  height: auto;
+  min-height: 0;
 }
 </style>

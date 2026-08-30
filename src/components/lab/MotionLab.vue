@@ -27,19 +27,11 @@ const speed = ref(2) // 车速 m/s
 const cloudSpeed = ref(2) // 白云速度 m/s（默认与车相同 → 相对静止）
 const reference = ref('ground') // ground | car | cloud
 
-// ===== 三元素贴纸尺寸（car/cloud/road.png 均为 400×400 透明画布） =====
-// car.png 车视觉 bbox y114~298（400 高）→ 车底贴地参考线 298/400
-const CAR_W = 150
-const CAR_H = 150
-// 车贴纸顶部相对 groundY 的偏移系数（用户已调好的车的位置）
-const CAR_TOP_FRAC = 0.345
-// 车视觉中心在贴纸内的竖向比例（像素校准：视觉 bbox 中心 ≈ 468/1000）
-const CAR_VISUAL_CY_FRAC = 0.468
-const CLOUD_W = 116
-const CLOUD_H = 116
-const ROAD_H = 76 // 路面渲染高度（road.png 路视觉在 y164~280，slice 裁剪后占满高度）
-const ROAD_TILE_W = 220 // 单段路的渲染宽度（视觉 4:1，原图 1:1 拉伸）
-const ROAD_TILES = 10 // 最多铺 10 段，覆盖 W 最大 2600 + buffer
+// ===== 三元素尺寸（汽车/白云/路面全部内联 SVG 绘制，零贴图请求） =====
+const CAR_W = 150          // 车绘制宽（SVG 局部坐标 150×74，朝右）
+const CAR_CY_OFF = 19      // 车视觉中心相对 groundY 的偏移（车轮压在路带上）
+const ROAD_H = 76 // 路面渲染高度
+const ROAD_TILE_W = 220 // 路面横向循环周期（纹理 pattern 周期 110/55 均整除它，滚动无缝）
 
 // 连续位置（始终单向增大、循环，绝不反向）
 let carPos = carCenter()
@@ -203,9 +195,9 @@ function loop() {
   carBounce.value = Math.sin(frame * 0.22) * 1.6
   wheelAngleVal.value = wheelAngle
 
-  // 尾气粒子（从车尾后方冒出，向左飘散）
+  // 尾气粒子（从车尾排气位置冒出，向左飘散）
   if (frame % 10 === 0 && reference.value !== 'car') {
-    puffs.value.push({ id: frame, x: cx - 96, y: groundY - 34, a: 0.34, r: 4 })
+    puffs.value.push({ id: frame, x: cx - 72, y: groundY + 22, a: 0.34, r: 4 })
   }
   const arr = puffs.value
   for (const p of arr) {
@@ -312,6 +304,16 @@ onBeforeUnmount(() => {
                 <stop offset="0" stop-color="#9ff6ff" stop-opacity="0.9" />
                 <stop offset="1" stop-color="#9ff6ff" stop-opacity="0" />
               </linearGradient>
+              <!-- 云朵体（上亮下影） -->
+              <linearGradient id="ml-cloud" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#ffffff" />
+                <stop offset="1" stop-color="#e2ecfa" />
+              </linearGradient>
+              <!-- 车灯光锥 -->
+              <linearGradient id="ml-beam" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="rgba(255,240,180,0.32)" />
+                <stop offset="1" stop-color="rgba(255,240,180,0)" />
+              </linearGradient>
               <filter id="ml-soft" x="-30%" y="-30%" width="160%" height="160%">
                 <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0a0a1a" flood-opacity="0.4" />
               </filter>
@@ -323,9 +325,17 @@ onBeforeUnmount(() => {
                 </feMerge>
               </filter>
 
-              <!-- 车道虚线（滚动） -->
-              <pattern id="ml-lane" x="0" y="0" width="150" height="14" patternUnits="userSpaceOnUse">
+              <!-- 车道虚线（随路面滚动；周期 110 整除循环周期 220，无缝衔接） -->
+              <pattern id="ml-lane" x="0" y="0" width="110" height="14" patternUnits="userSpaceOnUse">
                 <rect x="0" y="3" width="64" height="8" rx="4" fill="rgba(255,236,170,0.92)" />
+              </pattern>
+              <!-- 沥青颗粒（周期 55 整除 220） -->
+              <pattern id="ml-grain" width="55" height="36" patternUnits="userSpaceOnUse">
+                <circle cx="8" cy="7" r="1.3" fill="rgba(255,255,255,0.06)" />
+                <circle cx="30" cy="18" r="1.1" fill="rgba(0,0,0,0.25)" />
+                <circle cx="46" cy="9" r="0.9" fill="rgba(255,255,255,0.05)" />
+                <circle cx="18" cy="28" r="1.2" fill="rgba(0,0,0,0.2)" />
+                <circle cx="41" cy="30" r="1" fill="rgba(255,255,255,0.05)" />
               </pattern>
               <!-- 远山（视差滚动） -->
               <pattern id="ml-hill" x="0" y="0" width="460" height="200" patternUnits="userSpaceOnUse">
@@ -390,15 +400,13 @@ onBeforeUnmount(() => {
             </g>
 
             <!-- 地面已移除：统一露出黑板底（地平线处的路面/车道线保留） -->
-            <!-- 柏油路面（road.png 平铺，沿车速反向滚动 → laneOffset） -->
+            <!-- 柏油路面（SVG 渐变 + 颗粒纹理，沿车速反向滚动 → laneOffset） -->
             <g :transform="`translate(${-laneOffset} ${groundY})`">
-              <image
-                v-for="i in ROAD_TILES" :key="i - 1"
-                :x="(i - 1) * ROAD_TILE_W" y="0"
-                :width="ROAD_TILE_W" :height="ROAD_H"
-                preserveAspectRatio="xMidYMid slice"
-                href="/assets/lab/road.png"
-              />
+              <rect :x="-ROAD_TILE_W" y="0" :width="W + ROAD_TILE_W * 3" :height="ROAD_H" fill="url(#ml-road)" />
+              <rect :x="-ROAD_TILE_W" y="0" :width="W + ROAD_TILE_W * 3" :height="ROAD_H" fill="url(#ml-grain)" />
+              <rect :x="-ROAD_TILE_W" y="2.5" :width="W + ROAD_TILE_W * 3" height="2.5" fill="rgba(255,236,170,0.5)" />
+              <rect :x="-ROAD_TILE_W" :y="ROAD_H - 5" :width="W + ROAD_TILE_W * 3" height="2.5" fill="rgba(255,236,170,0.3)" />
+              <rect :x="-ROAD_TILE_W" :y="ROAD_H / 2 - 4" :width="W + ROAD_TILE_W * 3" height="8" fill="url(#ml-lane)" />
             </g>
             <!-- 霓虹街灯已移除：统一露出黑板底 -->
 
@@ -421,33 +429,72 @@ onBeforeUnmount(() => {
             >
               <animate attributeName="stroke-dashoffset" from="0" to="-38" dur="1.1s" repeatCount="indefinite" />
             </circle>
-            <!-- 参照物高亮：选车厢时圈出汽车（圆心跟随车视觉中心：
-                 cy = 车顶部 + 视觉中心偏移 = groundY - CAR_H*CAR_TOP_FRAC + CAR_H*CAR_VISUAL_CY_FRAC，
-                 并随 carBounce 一起跳动始终包裹车） -->
+            <!-- 参照物高亮：选车厢时圈出汽车（圆心跟随车视觉中心，随 carBounce 一起跳动始终包裹车） -->
             <circle
               v-if="reference === 'car'"
-              :cx="carX" :cy="groundY - CAR_H * CAR_TOP_FRAC + CAR_H * CAR_VISUAL_CY_FRAC - carBounce" r="80"
+              :cx="carX" :cy="groundY + CAR_CY_OFF - carBounce" r="80"
               fill="none" stroke="#ff4d7d" stroke-width="3" stroke-dasharray="10 9"
               opacity="0.9"
             >
               <animate attributeName="stroke-dashoffset" from="0" to="-38" dur="1.1s" repeatCount="indefinite" />
             </circle>
 
-            <!-- 白云（cloud.png 贴纸，参照物本体） -->
-            <image
-              href="/assets/lab/cloud.png"
-              :x="cloudX - CLOUD_W / 2" :y="cloudY - CLOUD_H / 2"
-              :width="CLOUD_W" :height="CLOUD_H"
-              filter="url(#ml-soft)"
-            />
+            <!-- 白云（SVG 云朵，参照物本体；cloudY 已含浮动） -->
+            <g :transform="`translate(${cloudX} ${cloudY})`" filter="url(#ml-soft)">
+              <!-- 底部阴影层 -->
+              <g fill="#c3d3ea">
+                <circle cx="-40" cy="10" r="22" /><circle cx="-14" cy="-4" r="28" />
+                <circle cx="16" cy="2" r="25" /><circle cx="40" cy="14" r="17" />
+                <rect x="-50" y="8" width="100" height="22" rx="11" />
+              </g>
+              <!-- 主体 -->
+              <g fill="url(#ml-cloud)">
+                <circle cx="-40" cy="6" r="22" /><circle cx="-14" cy="-8" r="28" />
+                <circle cx="16" cy="-2" r="25" /><circle cx="40" cy="10" r="17" />
+                <rect x="-50" y="4" width="100" height="22" rx="11" />
+              </g>
+              <!-- 顶部高光 -->
+              <circle cx="-14" cy="-16" r="10" fill="#ffffff" opacity="0.85" />
+              <circle cx="14" cy="-9" r="7" fill="#ffffff" opacity="0.6" />
+            </g>
 
-            <!-- 汽车（car.png 贴纸，车轮贴路面，保留微跳 carBounce） -->
-            <image
-              href="/assets/lab/car.png"
-              :x="carX - CAR_W / 2" :y="groundY - CAR_H * CAR_TOP_FRAC - carBounce"
-              :width="CAR_W" :height="CAR_H"
-              filter="url(#ml-soft)"
-            />
+            <!-- 汽车（SVG 绘制：车轮随车速真实转动，车内可见乘客剪影） -->
+            <g :transform="`translate(${carX - CAR_W / 2} ${groundY - 18 - carBounce})`">
+              <!-- 车灯光锥（黄昏氛围） -->
+              <polygon points="149,39 182,31 182,52 149,48" fill="url(#ml-beam)" />
+              <!-- 车身 -->
+              <path
+                d="M12 50 Q10 36 20 33 L40 30 Q52 12 70 10 L100 10 Q118 12 128 30 L138 33 Q146 36 146 46 L145 52 Q144 58 136 58 L22 58 Q13 58 12 50 Z"
+                fill="url(#ml-car)"
+              />
+              <!-- 车窗（后 / 前，中柱留白） -->
+              <path d="M46 29 Q56 15 70 13 L77 13 L77 29 Z" fill="url(#ml-win)" stroke="rgba(10,20,40,0.25)" stroke-width="1" />
+              <path d="M83 13 L98 13 Q112 15 122 29 L83 29 Z" fill="url(#ml-win)" stroke="rgba(10,20,40,0.25)" stroke-width="1" />
+              <!-- 车内乘客剪影（前窗） -->
+              <circle cx="97" cy="20.5" r="4" fill="#31435e" />
+              <path d="M91.5 29 Q92 25.5 97 25.5 Q102 25.5 102.5 29 Z" fill="#31435e" />
+              <!-- 车门缝与把手 -->
+              <path d="M80 13 L80 57" stroke="#0b6a8f" stroke-width="1.5" opacity="0.6" />
+              <rect x="84" y="36" width="9" height="2.6" rx="1.3" fill="#0b5c80" />
+              <!-- 高光 -->
+              <path d="M100 13 Q116 15 126 31" fill="none" stroke="#bff7ff" stroke-width="2" stroke-linecap="round" opacity="0.5" />
+              <path d="M20 35 Q14 39 14 47" fill="none" stroke="#bff7ff" stroke-width="2" stroke-linecap="round" opacity="0.35" />
+              <!-- 前大灯 / 尾灯 -->
+              <rect x="143" y="38" width="6" height="7" rx="2.5" fill="#fff3c4" />
+              <rect x="9" y="37" width="5" height="7" rx="2" fill="#ff5d7a" />
+              <!-- 车轮（轮辋辐条 + 偏心螺栓随 wheelAngleVal 旋转） -->
+              <g v-for="wx in [42, 116]" :key="wx">
+                <circle :cx="wx" cy="58" r="17" fill="#141a26" />
+                <circle :cx="wx" cy="58" r="13.5" fill="#232830" stroke="#0d1016" stroke-width="2" />
+                <circle :cx="wx" cy="58" r="7" fill="#d9e2ec" />
+                <g :transform="`rotate(${wheelAngleVal} ${wx} 58)`">
+                  <line :x1="wx" y1="51.5" :x2="wx" y2="64.5" stroke="#8fa1b8" stroke-width="2.2" />
+                  <line :x1="wx - 6.5" y1="58" :x2="wx + 6.5" y2="58" stroke="#8fa1b8" stroke-width="2.2" />
+                  <circle :cx="wx" cy="54.5" r="1.5" fill="#7c8ea6" />
+                </g>
+                <circle :cx="wx" cy="58" r="2.4" fill="#5b6b80" />
+              </g>
+            </g>
 
             <!-- 尾气粒子 -->
             <g>
@@ -459,7 +506,7 @@ onBeforeUnmount(() => {
             </g>
 
             <!-- 物体状态标签 -->
-            <g :transform="`translate(${carX} ${groundY - 156})`" v-if="verdict.car !== '静止' || reference !== 'ground'">
+            <g :transform="`translate(${carX} ${groundY - 108})`" v-if="verdict.car !== '静止' || reference !== 'ground'">
               <rect x="-46" y="-16" width="92" height="27" rx="13" fill="rgba(20,16,40,0.82)" stroke="#46e8d2" stroke-width="1.6" />
               <text x="0" y="4" text-anchor="middle" font-size="14" font-weight="800" fill="#46e8d2">{{ verdict.car }}</text>
             </g>
