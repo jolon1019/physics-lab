@@ -40,14 +40,45 @@ export const GRADES = [
     ]
   },
   {
+    grade: 'math7',
+    subject: 'math',
+    label: '七年级',
+    experiments: [
+      { id: 'e-num-line', title: '数轴与相反数·绝对值', slug: 'number-line-absolute', type: '探究', level: '基础' },
+      { id: 'e-linear-eq', title: '一元一次方程（天平平衡）', slug: 'linear-equation-balance', type: '探究', level: '核心' },
+      { id: 'e-coord-plane', title: '平面直角坐标系（描点挑战）', slug: 'coordinate-plane', type: '探究', level: '核心' },
+      { id: 'e-parallel-lines', title: '相交线与平行线（三线八角）', slug: 'parallel-lines-angles', type: '探究', level: '基础' },
+      { id: 'e-data-charts', title: '数据的收集与描述（三种统计图）', slug: 'data-charts', type: '探究', level: '基础' }
+    ]
+  },
+  {
     grade: 'math8',
     subject: 'math',
     label: '八年级',
     experiments: [
+      { id: 'e-tri-angles', title: '探究三角形内角和', slug: 'triangle-angle-sum', type: '探究', level: '基础' },
+      { id: 'e-tri-sides', title: '探究三角形三边关系', slug: 'triangle-sides', type: '探究', level: '基础' },
+      { id: 'e-aux-lines', title: '辅助线实验室（补·折·切·移）', slug: 'auxiliary-lines', type: '探究', level: '进阶' },
       { id: 'e-geometry-transform', title: '探究平移、旋转与轴对称', slug: 'geometry-transformations', type: '探究', level: '核心' },
       { id: 'e-congruent-tri', title: '探究全等三角形的判定', slug: 'congruent-triangles', type: '探究', level: '核心' },
       { id: 'e-pythagoras', title: '验证勾股定理（面积割补）', slug: 'pythagoras-theorem', type: '验证', level: '核心' },
-      { id: 'e-mult-formula', title: '乘法公式的几何证明', slug: 'multiplication-formulas', type: '验证', level: '基础' }
+      { id: 'e-mult-formula', title: '乘法公式的几何证明', slug: 'multiplication-formulas', type: '验证', level: '基础' },
+      { id: 'e-linear-func', title: '探究一次函数 y=kx+b', slug: 'linear-function', type: '探究', level: '核心' }
+    ]
+  },
+  {
+    grade: 'math9',
+    subject: 'math',
+    label: '九年级',
+    experiments: [
+      { id: 'e-quadratic-func', title: '探究二次函数的图像与性质', slug: 'quadratic-function', type: '探究', level: '核心' },
+      { id: 'e-quad-eq', title: '探究一元二次方程的解法', slug: 'quadratic-equation', type: '探究', level: '核心' },
+      { id: 'e-circle', title: '探究圆的性质（垂径定理·圆周角）', slug: 'circle-properties', type: '探究', level: '核心' },
+      { id: 'e-inverse-func', title: '探究反比例函数 k 的几何意义', slug: 'inverse-function', type: '探究', level: '核心' },
+      { id: 'e-similar-tri', title: '探究相似三角形的性质', slug: 'similar-triangles', type: '探究', level: '核心' },
+      { id: 'e-trig-func', title: '探究锐角三角函数', slug: 'trigonometric-ratios', type: '探究', level: '基础' },
+      { id: 'e-probability', title: '用频率估计概率（抛硬币·掷骰子）', slug: 'probability-intro', type: '探究', level: '基础' },
+      { id: 'e-block-views', title: '投影与三视图（方块塔）', slug: 'block-three-views', type: '探究', level: '进阶' }
     ]
   },
   {

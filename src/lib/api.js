@@ -58,6 +58,21 @@ export function adminListUsers() {
 export function adminResetPassword(email, newPassword) {
   return request('/admin/reset-password', { method: 'POST', body: { email, newPassword } })
 }
+export function adminSetRole(email, role) {
+  return request('/admin/user-role', { method: 'POST', body: { email, role } })
+}
+export function adminSetMembership(email, membership) {
+  return request('/admin/user-membership', { method: 'POST', body: { email, membership } })
+}
+export function getPublicSettings() {
+  return request('/settings', { method: 'GET' })
+}
+export function adminGetSettings() {
+  return request('/admin/settings', { method: 'GET' })
+}
+export function adminSaveSettings(paidExperiments) {
+  return request('/admin/settings', { method: 'POST', body: { paidExperiments } })
+}
 
 // 读取/保存当前登录用户的学习进度（服务端隔离，按用户保存）
 export function getProgress() {

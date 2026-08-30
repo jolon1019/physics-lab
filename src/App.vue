@@ -116,6 +116,7 @@ function onResize() { syncStickTop() }
 onMounted(() => {
   progress.startSession()
   auth.init()
+  auth.loadSettings() // 付费实验名单（公开接口，游客也需要）
   // 移动端首屏默认收起目录（不持久化，避免影响桌面端的展开偏好）
   if (window.matchMedia('(max-width: 1180px)').matches) layout.navCollapsed = true
   // 首帧布局完成后再测量顶栏高度，避免字体未加载导致高度不准
@@ -163,6 +164,8 @@ function onGlobalClick() {
           class="nav-toggle-top"
           :class="{ active: isResources }"
         >{{ isResources ? '实验平台' : '试卷资料库' }}</RouterLink>
+        <!-- 管理员后台入口 -->
+        <RouterLink v-if="auth.isAdmin" to="/admin" class="nav-toggle-top" :class="{ active: $route.path === '/admin' }">后台</RouterLink>
         <button
           class="nav-toggle-top"
           type="button"

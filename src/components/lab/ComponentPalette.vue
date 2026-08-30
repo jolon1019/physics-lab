@@ -1,18 +1,14 @@
 <script setup>
 // 元件库：每个元件以"实物图"呈现，支持拖拽到画布，也支持点击添加（触屏/无障碍回退）
 import { META, COMP_TYPES, buildArt } from '../../circuit/components'
-import { PNG_URL, PNG_SIZE } from '../../circuit/pngAssets'
+import { componentArtSvg } from '../../circuit/componentArt'
 import { useCircuitStore } from '../../stores/circuit'
 
 const store = useCircuitStore()
 
-function pngUrl(t) {
+function art(t) {
   // 缩略图默认展示闭合开关
-  if (t === 'switch') return PNG_URL.switchClosed
-  return PNG_URL[t]
-}
-function pngSize(t) {
-  return PNG_SIZE[t] || { w: 100, h: 100 }
+  return componentArtSvg(t, t === 'switch' ? { open: false } : {})
 }
 
 function onDragStart(e, type) {
@@ -40,7 +36,7 @@ function onClick(type) {
         @click="onClick(t)"
       >
         <svg viewBox="-60 -52 120 104" class="pal-art">
-          <image v-if="t !== 'resistor'" :href="pngUrl(t)" :x="-pngSize(t).w / 2" :y="-pngSize(t).h / 2" :width="pngSize(t).w" :height="pngSize(t).h" />
+          <g v-if="t !== 'resistor'" v-html="art(t)"></g>
           <g v-else v-html="buildArt(t, {})"></g>
         </svg>
         <span>{{ META[t].label }}</span>

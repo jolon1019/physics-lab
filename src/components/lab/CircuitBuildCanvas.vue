@@ -4,7 +4,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { META, buildArt, routeWire, terminalNormal } from '../../circuit/components'
 import { curveWire, pathFromPolyline, polylineLength, pointOnPolyline } from '../../circuit/smoothWire'
-import { PNG_URL, PNG_SIZE, PNG_TERMINAL_Y } from '../../circuit/pngAssets'
+import { componentArtSvg } from '../../circuit/componentArt'
 import { useCircuitStore } from '../../stores/circuit'
 import BlackBoardBg from './BlackBoardBg.vue'
 
@@ -53,29 +53,22 @@ function artState(c) {
   }
 }
 
-// ---------- PNG 元件渲染 ----------
-// 用同一套 PNG 素材（与 OhmLab 一致）替换矢量 buildArt，保留 META 端子坐标使导线对齐不变。
-// 返回 SVG 标记字符串，用 v-html 注入到组件 <g> 内（与原 buildArt 同模式）。
+// ---------- 矢量元件渲染 ----------
+// 用 componentArt.js 的写实矢量图（替代原 PNG），端子坐标 (±44) 不变，导线对齐不受影响。
+// 返回 SVG 标记字符串，用 v-html 注入到组件 <g> 内（与 buildArt 同模式）。
 // 灯泡辉光使用根 SVG 里定义的径向渐变 #g-bulb-glow / #g-bulb-core。
 function pngArtHtml(type, st) {
-  if (type === 'resistor') return buildArt(type, st) // 暂无 PNG，沿用矢量
-  const sz = PNG_SIZE[type] || { w: 100, h: 100 }
-  // 端子行 y 对齐：多状态图（开关开/合）需把"端子行"对齐到元件中心 (0,0)，否则切换时整张图
-  // 上下跳。用 PNG 原始坐标里的端子 y 中心按本框 contain 比例换算偏移。详见 pngAssets.js。
-  const scale = Math.min(sz.w, sz.h) / 400
-  const dy = type === 'switch' ? (st.open ? (PNG_TERMINAL_Y.switchClosed - PNG_TERMINAL_Y.switchOpen) * scale : 0) : 0
-  const ix = -sz.w / 2
-  const iy = -sz.h / 2 + dy
-  const url = type === 'switch' ? (st.open ? PNG_URL.switchOpen : PNG_URL.switchClosed) : PNG_URL[type]
-  const img = `<image href="${url}" x="${ix}" y="${iy}" width="${sz.w}" height="${sz.h}" />`
+  if (type === 'resistor') return buildArt(type, st) // 矢量原理图样式沿用
+  const art = componentArtSvg(type, type === 'switch' ? { open: !!st.open } : {})
   let extra = ''
   if (type === 'bulb') {
     const g = st.glow || 0
     if (g > 0.04) {
+      // 辉光中心对准玻璃泡（局部 (0,-22)）
       const r = 30 + g * 40
       const a = 0.2 + g * 0.5
-      extra += `<circle cx="0" cy="0" r="${r}" fill="url(#g-bulb-glow)" opacity="${a.toFixed(3)}" />`
-      extra += `<circle cx="0" cy="0" r="14" fill="url(#g-bulb-core)" opacity="${(g * 0.6).toFixed(3)}" />`
+      extra += `<circle cx="0" cy="-22" r="${r}" fill="url(#g-bulb-glow)" opacity="${a.toFixed(3)}" />`
+      extra += `<circle cx="0" cy="-22" r="14" fill="url(#g-bulb-core)" opacity="${(g * 0.6).toFixed(3)}" />`
     }
   } else if (type === 'switch') {
     const closed = !st.open
@@ -90,14 +83,11 @@ function pngArtHtml(type, st) {
     const rOhm = Math.round(frac * 20)
     extra += `<text x="0" y="40" font-size="10" font-weight="700" fill="var(--bb-blue)" text-anchor="middle" font-family="system-ui">R=${rOhm} Ω</text>`
   } else if (type === 'ammeter' || type === 'voltmeter') {
-    // PNG 是笔记本形态：屏幕在 PNG 上半（y≈30-180），下方"A/V"铭牌 + 3 端子底座。
-    // 数字读数放在屏幕内部（PNG y≈110 黑色显示区），按本框 contain 比例换算。
-    const readingY = -90 * scale
+    // 表体上部深色屏（局部 y ≈ -38..-4），数字读数画在屏内
     const txt = st.reading || (type === 'ammeter' ? '0.00A' : '0.00V')
-    extra += `<text x="0" y="${readingY.toFixed(2)}" font-size="14" font-weight="800" fill="var(--bb-red)" text-anchor="middle" font-family="ui-monospace,monospace">${txt}</text>`
-    // 屏幕底部"A"/"V"标签保留 PNG 自带的，不再画额外标签
+    extra += `<text x="0" y="-21" font-size="13" font-weight="800" fill="#ff5b67" text-anchor="middle" font-family="ui-monospace,monospace">${txt}</text>`
   }
-  return img + extra
+  return art + extra
 }
 
 function normOf(compId, term) {

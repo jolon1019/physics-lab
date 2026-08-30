@@ -15,14 +15,18 @@ function loadToken() {
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: loadToken(),
-    user: null, // { email, role }
+    user: null, // { email, role, membership }
     showLogin: false,
     pendingRoute: null, // 登录后要跳转的页面
-    error: ''
+    error: '',
+    paidExperiments: [] // 站点设置：会员专享实验 id 列表（公开接口拉取）
   }),
   getters: {
     isLoggedIn: (s) => !!s.token,
-    isAdmin: (s) => s.user?.role === 'admin'
+    isAdmin: (s) => s.user?.role === 'admin',
+    isMember: (s) => !!s.user && (s.user.membership === 'member' || s.user.role === 'admin'),
+    // 某实验是否对当前用户锁定（会员专享且非会员/未登录）
+    isLocked: (s) => (expId) => s.paidExperiments.includes(expId) && !s.isMember
   },
   actions: {
     // 应用启动时校验本地 token 是否仍有效
@@ -98,6 +102,27 @@ export const useAuthStore = defineStore('auth', {
     },
     async adminResetPassword(email, newPassword) {
       return api.adminResetPassword(email, newPassword)
+    },
+    async adminSetRole(email, role) {
+      return api.adminSetRole(email, role)
+    },
+    async adminSetMembership(email, membership) {
+      return api.adminSetMembership(email, membership)
+    },
+    async adminGetSettings() {
+      return api.adminGetSettings()
+    },
+    async adminSaveSettings(paidExperiments) {
+      return api.adminSaveSettings(paidExperiments)
+    },
+    // 拉取公开设置（付费实验名单）：登录与否都需要
+    async loadSettings() {
+      try {
+        const s = await api.getPublicSettings()
+        this.paidExperiments = Array.isArray(s.paidExperiments) ? s.paidExperiments : []
+      } catch {
+        /* 拉取失败保持现状（离线/后端未升级时全部按免费处理） */
+      }
     }
   }
 })

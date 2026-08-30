@@ -26,12 +26,18 @@ const layout = computed(() => {
     const s = A + B
     return {
       blocks: [
-        { pts: [[ox, oy - A], [ox + A, oy - A], [ox + A, oy], [ox, oy]], cls: 'k-a', txt: `a² = ${fmt(av * av)}`, tx: ox + A / 2, ty: oy - A / 2 + 6 },
-        { pts: [[ox + A, oy - s], [ox + s, oy - s], [ox + s, oy - A], [ox + A, oy - A]], cls: 'k-b', txt: `b² = ${fmt(bv * bv)}`, tx: ox + A + B / 2, ty: oy - A - B / 2 + 6 },
-        { pts: [[ox, oy - s], [ox + A, oy - s], [ox + A, oy - A], [ox, oy - A]], cls: 'k-ab', txt: `ab = ${fmt(av * bv)}`, tx: ox + A / 2, ty: oy - A - B / 2 + 6 },
-        { pts: [[ox + A, oy - A], [ox + s, oy - A], [ox + s, oy], [ox + A, oy]], cls: 'k-ab', txt: `ab = ${fmt(av * bv)}`, tx: ox + A + B / 2, ty: oy - A / 2 + 6 }
+        { pts: [[ox, oy - A], [ox + A, oy - A], [ox + A, oy], [ox, oy]], cls: 'k-a', txt: `a² = ${fmt(av * av)}`, short: 'a²', tx: ox + A / 2, ty: oy - A / 2 + 6 },
+        { pts: [[ox + A, oy - s], [ox + s, oy - s], [ox + s, oy - A], [ox + A, oy - A]], cls: 'k-b', txt: `b² = ${fmt(bv * bv)}`, short: 'b²', tx: ox + A + B / 2, ty: oy - A - B / 2 + 6 },
+        { pts: [[ox, oy - s], [ox + A, oy - s], [ox + A, oy - A], [ox, oy - A]], cls: 'k-ab', txt: `ab = ${fmt(av * bv)}`, short: 'ab', tx: ox + A / 2, ty: oy - A - B / 2 + 6 },
+        { pts: [[ox + A, oy - A], [ox + s, oy - A], [ox + s, oy], [ox + A, oy]], cls: 'k-ab', txt: `ab = ${fmt(av * bv)}`, short: 'ab', tx: ox + A + B / 2, ty: oy - A / 2 + 6 }
       ],
       outline: [[ox, oy], [ox + s, oy], [ox + s, oy - s], [ox, oy - s]],
+      dims: [
+        { x1: ox, y1: oy + 30, x2: ox + A, y2: oy + 30, label: 'a', cls: 'dim-a' },
+        { x1: ox + A, y1: oy + 30, x2: ox + s, y2: oy + 30, label: 'b', cls: 'dim-b' },
+        { x1: ox + s + 30, y1: oy - A, x2: ox + s + 30, y2: oy, label: 'a', cls: 'dim-a', vertical: true },
+        { x1: ox + s + 30, y1: oy - s, x2: ox + s + 30, y2: oy - A, label: 'b', cls: 'dim-b', vertical: true }
+      ],
       dim: `大正方形边长 a + b = ${fmt(av + bv)}，面积 = ${fmt((av + bv) ** 2)}`,
       total: (av + bv) ** 2
     }
@@ -41,12 +47,19 @@ const layout = computed(() => {
     const d = A - B
     return {
       blocks: [
-        { pts: [[ox, oy - d], [ox + d, oy - d], [ox + d, oy], [ox, oy]], cls: 'k-d', txt: `(a−b)² = ${fmt((av - bv) ** 2)}`, tx: ox + d / 2, ty: oy - d / 2 + 6 },
-        { pts: [[ox + d, oy], [ox + A, oy], [ox + A, oy - A], [ox + d, oy - A]], cls: 'k-ab', txt: `ab = ${fmt(av * bv)}`, tx: ox + d + B / 2, ty: oy - A / 2 + 6 },
-        { pts: [[ox, oy - d], [ox + A, oy - d], [ox + A, oy - A], [ox, oy - A]], cls: 'k-ab', txt: `ab = ${fmt(av * bv)}`, tx: ox + A / 2, ty: oy - d - B / 2 + 6 },
-        { pts: [[ox + d, oy - d], [ox + A, oy - d], [ox + A, oy - A], [ox + d, oy - A]], cls: 'k-b', txt: `b² 多减`, tx: ox + d + B / 2, ty: oy - d - B / 2 + 6 }
+        { pts: [[ox, oy - d], [ox + d, oy - d], [ox + d, oy], [ox, oy]], cls: 'k-d', txt: `(a−b)² = ${fmt((av - bv) ** 2)}`, short: '(a−b)²', tx: ox + d / 2, ty: oy - d / 2 + 6 },
+        { pts: [[ox + d, oy], [ox + A, oy], [ox + A, oy - d], [ox + d, oy - d]], cls: 'k-ab', txt: `ab = ${fmt(av * bv)}`, short: 'ab', tx: ox + d + B / 2, ty: oy - d / 2 + 6 },
+        { pts: [[ox, oy - d], [ox + d, oy - d], [ox + d, oy - A], [ox, oy - A]], cls: 'k-ab', txt: `ab = ${fmt(av * bv)}`, short: 'ab', tx: ox + d / 2, ty: oy - d - B / 2 + 6 },
+        { pts: [[ox + d, oy - d], [ox + A, oy - d], [ox + A, oy - A], [ox + d, oy - A]], cls: 'k-b', txt: `b² 多减`, short: 'b²', tx: ox + d + B / 2, ty: oy - d - B / 2 + 6 }
       ],
       outline: [[ox, oy], [ox + A, oy], [ox + A, oy - A], [ox, oy - A]],
+      dims: [
+        { x1: ox - 30, y1: oy - A, x2: ox - 30, y2: oy, label: 'a', cls: 'dim-a', vertical: true },
+        { x1: ox, y1: oy + 30, x2: ox + d, y2: oy + 30, label: 'a−b', cls: 'dim-d' },
+        { x1: ox + d, y1: oy + 30, x2: ox + A, y2: oy + 30, label: 'b', cls: 'dim-b' },
+        { x1: ox + A + 30, y1: oy - d, x2: ox + A + 30, y2: oy, label: 'a−b', cls: 'dim-d', vertical: true },
+        { x1: ox + A + 30, y1: oy - A, x2: ox + A + 30, y2: oy - d, label: 'b', cls: 'dim-b', vertical: true }
+      ],
       dim: `a² − 2ab + b² = ${fmt(av * av - 2 * av * bv + bv * bv)}（绿色 b² 角被两条 ab 重复减，需 +b² 补回）`,
       total: av ** 2
     }
@@ -55,10 +68,16 @@ const layout = computed(() => {
   const UR = 30
   return {
     blocks: [
-      { pts: [[ox, oy - A], [ox + A, oy - A], [ox + A, oy], [ox, oy]], cls: 'k-a', txt: `a² = ${fmt(av * av)}`, tx: ox + A / 2 - B / 2, ty: oy - A / 2 + 6 },
-      { pts: [[ox + (av - bv) * U, oy], [ox + A, oy], [ox + A, oy - B], [ox + (av - bv) * U, oy - B]], cls: 'k-cut', txt: `−b² = ${fmt(bv * bv)}`, tx: ox + (av - bv) * U + B / 2, ty: oy - B / 2 + 6 }
+      { pts: [[ox, oy - A], [ox + A, oy - A], [ox + A, oy], [ox, oy]], cls: 'k-a', txt: `a² = ${fmt(av * av)}`, short: 'a²', tx: ox + A / 2 - B / 2, ty: oy - A / 2 + 6 },
+      { pts: [[ox + (av - bv) * U, oy], [ox + A, oy], [ox + A, oy - B], [ox + (av - bv) * U, oy - B]], cls: 'k-cut', txt: `−b² = ${fmt(bv * bv)}`, short: '−b²', tx: ox + (av - bv) * U + B / 2, ty: oy - B / 2 + 6 }
     ],
     outline: [[ox, oy], [ox + A, oy], [ox + A, oy - A], [ox, oy - A]],
+    dims: [
+      { x1: ox, y1: oy + 30, x2: ox + A, y2: oy + 30, label: 'a', cls: 'dim-a' },
+      { x1: ox + (av - bv) * U, y1: oy + 58, x2: ox + A, y2: oy + 58, label: 'b', cls: 'dim-b' },
+      { x1: ox + A + 30, y1: oy - A, x2: ox + A + 30, y2: oy, label: 'a', cls: 'dim-a', vertical: true },
+      { x1: ox + A + 58, y1: oy - B, x2: ox + A + 58, y2: oy, label: 'b', cls: 'dim-b', vertical: true }
+    ],
     rect: { x: ox + A + 80, y: oy - (av + bv) * UR, w: (av + bv) * UR, h: (av - bv) * UR },
     dim: `剩余面积 = ${fmt(av * av - bv * bv)}`,
     total: av ** 2 - bv ** 2
@@ -66,6 +85,25 @@ const layout = computed(() => {
 })
 
 const polyStr = (pts) => pts.map((p) => p.join(',')).join(' ')
+
+/* ===== 标注自适应：色块小的时候降级为短标签 / 隐藏，避免文字溢出重叠 ===== */
+const dispBlocks = computed(() =>
+  layout.value.blocks.map((blk) => {
+    const xs = blk.pts.map((p) => p[0])
+    const ys = blk.pts.map((p) => p[1])
+    const w = Math.max(...xs) - Math.min(...xs)
+    const h = Math.max(...ys) - Math.min(...ys)
+    const textW = (t) => [...t].reduce((s, ch) => s + (ch.charCodeAt(0) > 255 ? 13.5 : 8.2), 0)
+    let txt = blk.txt
+    let fs = 14
+    if (w < textW(txt) + 14 || h < 36) {
+      txt = blk.short || ''
+      fs = 12.5
+    }
+    if (txt && (w < textW(txt) + 8 || h < 20)) txt = ''
+    return { ...blk, txt, fs }
+  })
+)
 
 /* ===== 公式与读数 ===== */
 const FORMULAS = {
@@ -130,10 +168,10 @@ function checkDone() {
       <div class="lab-panel mf-panel" style="padding: 0">
         <svg class="mf-svg" :viewBox="`0 0 ${VW} ${VH}`" preserveAspectRatio="xMidYMid meet"
           role="img" aria-label="乘法公式的几何证明">
-          <!-- 分块 -->
-          <g v-for="(blk, i) in layout.blocks" :key="'b' + i">
+          <!-- 分块（标注随色块大小自适应） -->
+          <g v-for="(blk, i) in dispBlocks" :key="'b' + i">
             <polygon :class="['blk', blk.cls]" :points="polyStr(blk.pts)" />
-            <text class="blk-txt" :x="blk.tx" :y="blk.ty" text-anchor="middle">{{ blk.txt }}</text>
+            <text v-if="blk.txt" class="blk-txt" :font-size="blk.fs" :x="blk.tx" :y="blk.ty" text-anchor="middle">{{ blk.txt }}</text>
           </g>
 
           <!-- 平方差：拼出的长方形 -->
@@ -146,7 +184,21 @@ function checkDone() {
 
           <!-- 外框与尺寸 -->
           <polygon class="outline" :points="polyStr(layout.outline)" />
-          <text class="dim" x="60" :y="VH - 24">{{ layout.dim }}</text>
+          <!-- 外部尺寸标注：标明 a、b 各对应哪条线段 -->
+          <g v-for="(d, i) in layout.dims" :key="'dm' + i" :class="['dimline', d.cls]">
+            <line class="dim-main" :x1="d.x1" :y1="d.y1" :x2="d.x2" :y2="d.y2" />
+            <template v-if="!d.vertical">
+              <line :x1="d.x1" :y1="d.y1 - 5" :x2="d.x1" :y2="d.y1 + 5" />
+              <line :x1="d.x2" :y1="d.y2 - 5" :x2="d.x2" :y2="d.y2 + 5" />
+              <text :x="(d.x1 + d.x2) / 2" :y="d.y1 - 7" text-anchor="middle">{{ d.label }}</text>
+            </template>
+            <template v-else>
+              <line :x1="d.x1 - 5" :y1="d.y1" :x2="d.x1 + 5" :y2="d.y1" />
+              <line :x1="d.x2 - 5" :y1="d.y2" :x2="d.x2 + 5" :y2="d.y2" />
+              <text :x="d.x1 + 9" :y="(d.y1 + d.y2) / 2 + 5" text-anchor="start">{{ d.label }}</text>
+            </template>
+          </g>
+          <text class="dim" x="60" :y="VH - 6">{{ layout.dim }}</text>
         </svg>
       </div>
 
@@ -203,4 +255,13 @@ function checkDone() {
 .rect-txt { fill: var(--bb-green); font-size: 16px; font-weight: 900; font-family: var(--mono); }
 .rect-txt.small { font-size: 13px; }
 .dim { fill: var(--bb-fg-dim); font-size: 13px; font-family: var(--mono); }
+/* 外部尺寸标注线（a 蓝 / b 绿 / a−b 紫，与色块颜色对应） */
+.dimline line { stroke-width: 1.6; }
+.dim-a line { stroke: var(--bb-blue); }
+.dim-b line { stroke: var(--bb-green); }
+.dim-d line { stroke: var(--bb-purple); }
+.dimline text { font-size: 16px; font-weight: 800; font-style: italic; font-family: var(--mono); }
+.dim-a text { fill: var(--bb-blue); }
+.dim-b text { fill: var(--bb-green); }
+.dim-d text { fill: var(--bb-purple); }
 </style>

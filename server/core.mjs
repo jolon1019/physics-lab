@@ -100,6 +100,10 @@ function normalizeUsers(arr) {
       u.role = i === 0 ? 'admin' : 'user'
       changed = true
     }
+    if (!u.membership) {
+      u.membership = 'free'
+      changed = true
+    }
   })
   return { arr, changed }
 }
@@ -144,6 +148,46 @@ export async function saveUsers(users) {
   }
   if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true })
   writeFileSync(USERS_FILE, json)
+}
+
+// ===== 站点设置（付费实验名单等）：settings.json / Blob =====
+const SETTINGS_FILE = join(DATA_DIR, 'settings.json')
+const DEFAULT_SETTINGS = { paidExperiments: [] }
+
+export async function loadSettings() {
+  let raw = null
+  if (BLOB_MODE) {
+    try {
+      const r = await get('settings.json', { access: 'private', useCache: false })
+      if (r) raw = JSON.parse(await new Response(r.stream).text())
+    } catch {
+      /* Blob 里还没有 settings.json */
+    }
+  } else if (existsSync(SETTINGS_FILE)) {
+    try {
+      raw = JSON.parse(readFileSync(SETTINGS_FILE, 'utf8'))
+    } catch {
+      raw = null
+    }
+  }
+  const s = { ...DEFAULT_SETTINGS, ...(raw || {}) }
+  if (!Array.isArray(s.paidExperiments)) s.paidExperiments = []
+  return s
+}
+
+async function saveSettings(settings) {
+  const json = JSON.stringify(settings, null, 2)
+  if (BLOB_MODE) {
+    await put('settings.json', json, {
+      access: 'private',
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType: 'application/json'
+    })
+    return
+  }
+  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true })
+  writeFileSync(SETTINGS_FILE, json)
 }
 
 // ===== 注册验证码存储（注册时用户尚不存在，独立持久化；读取时自动清理过期项） =====
@@ -352,7 +396,7 @@ export async function handleApi(req, res, url) {
       progress: defaultProgress()
     })
     await saveUsers(users)
-    return send(res, 201, { token: makeToken(email), user: { email, role: isFirst ? 'admin' : 'user' } })
+    return send(res, 201, { token: makeToken(email), user: { email, role: isFirst ? 'admin' : 'user', membership: 'free' } })
   }
 
   if (url.pathname === '/api/login' && req.method === 'POST') {
@@ -377,14 +421,14 @@ export async function handleApi(req, res, url) {
     }
     loginFails.delete(ip)
     const role = user.role || 'user'
-    return send(res, 200, { token: makeToken(email), user: { email, role } })
+    return send(res, 200, { token: makeToken(email), user: { email, role, membership: user.membership || 'free' } })
   }
 
   if (url.pathname === '/api/me' && req.method === 'GET') {
     const users = await loadUsers()
     const user = authUser(req, users)
     if (!user) return send(res, 200, { user: null })
-    return send(res, 200, { user: { email: user.email, role: user.role || 'user' } })
+    return send(res, 200, { user: { email: user.email, role: user.role || 'user', membership: user.membership || 'free' } })
   }
 
   // 无状态 token 无需服务端注销：前端删除本地 token 即失效
@@ -528,6 +572,7 @@ export async function handleApi(req, res, url) {
     const list = users.map((u) => ({
       email: u.email,
       role: u.role || 'user',
+      membership: u.membership || 'free',
       createdAt: u.createdAt || null
     }))
     return send(res, 200, { users: list })
@@ -557,6 +602,91 @@ export async function handleApi(req, res, url) {
     const { salt, hash } = hashPassword(newPassword)
     target.salt = salt
     target.hash = hash
+    await saveUsers(users)
+    return send(res, 200, { ok: true })
+  }
+
+  // 公开设置：付费实验名单（前端门禁需要，无需登录）
+  if (url.pathname === '/api/settings' && req.method === 'GET') {
+    return send(res, 200, await loadSettings())
+  }
+
+  // 管理员：读取设置
+  if (url.pathname === '/api/admin/settings' && req.method === 'GET') {
+    const users = await loadUsers()
+    const admin = authUser(req, users)
+    if (!admin) return send(res, 401, { message: '未登录或登录已过期' })
+    if (admin.role !== 'admin') return send(res, 403, { message: '仅管理员可访问' })
+    return send(res, 200, await loadSettings())
+  }
+
+  // 管理员：保存设置（付费实验名单）
+  if (url.pathname === '/api/admin/settings' && req.method === 'POST') {
+    const users = await loadUsers()
+    const admin = authUser(req, users)
+    if (!admin) return send(res, 401, { message: '未登录或登录已过期' })
+    if (admin.role !== 'admin') return send(res, 403, { message: '仅管理员可操作' })
+    let body
+    try {
+      body = await readBody(req)
+    } catch (e) {
+      return send(res, 400, { message: e.message })
+    }
+    const paid = Array.isArray(body && body.paidExperiments)
+      ? body.paidExperiments.filter((x) => typeof x === 'string')
+      : null
+    if (!paid) return send(res, 400, { message: 'paidExperiments 必须是字符串数组' })
+    const settings = await loadSettings()
+    settings.paidExperiments = [...new Set(paid)]
+    await saveSettings(settings)
+    return send(res, 200, { ok: true, settings })
+  }
+
+  // 管理员：设置用户角色
+  if (url.pathname === '/api/admin/user-role' && req.method === 'POST') {
+    const users = await loadUsers()
+    const admin = authUser(req, users)
+    if (!admin) return send(res, 401, { message: '未登录或登录已过期' })
+    if (admin.role !== 'admin') return send(res, 403, { message: '仅管理员可操作' })
+    let body
+    try {
+      body = await readBody(req)
+    } catch (e) {
+      return send(res, 400, { message: e.message })
+    }
+    const { email, role } = body || {}
+    if (!email || !['admin', 'user'].includes(role)) {
+      return send(res, 400, { message: '参数不合法' })
+    }
+    const target = users.find((u) => u.email === String(email).trim().toLowerCase())
+    if (!target) return send(res, 404, { message: '用户不存在' })
+    if (target.email === admin.email && role !== 'admin') {
+      return send(res, 400, { message: '不能降级自己的管理员角色' })
+    }
+    target.role = role
+    await saveUsers(users)
+    return send(res, 200, { ok: true })
+  }
+
+  // 管理员：设置用户会员身份
+  if (url.pathname === '/api/admin/user-membership' && req.method === 'POST') {
+    const users = await loadUsers()
+    const admin = authUser(req, users)
+    if (!admin) return send(res, 401, { message: '未登录或登录已过期' })
+    if (admin.role !== 'admin') return send(res, 403, { message: '仅管理员可操作' })
+    let body
+    try {
+      body = await readBody(req)
+    } catch (e) {
+      return send(res, 400, { message: e.message })
+    }
+    const { email, membership } = body || {}
+    if (!email || !['free', 'member'].includes(membership)) {
+      return send(res, 400, { message: '参数不合法' })
+    }
+    const target = users.find((u) => u.email === String(email).trim().toLowerCase())
+    if (!target) return send(res, 404, { message: '用户不存在' })
+    target.membership = membership
     await saveUsers(users)
     return send(res, 200, { ok: true })
   }

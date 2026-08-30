@@ -10,6 +10,7 @@ import FullscreenBtn from './FullscreenBtn.vue'
 import MeltFlask  from './melt/MeltFlask.vue'
 import MeltBurner from './melt/MeltBurner.vue'
 import MeltThermo from './melt/MeltThermo.vue'
+import MeltZoom   from './melt/MeltZoom.vue'
 import './melt/melt.css'
 
 const emit = defineEmits(['complete'])
@@ -52,6 +53,7 @@ const layoutJson = computed(() => {
 // 按当前画布尺寸算默认布局（SVG 装置几何见各组件注释）：
 // flask 自带三脚架（viewBox 200×420，石棉网底距 baseline 186.5 单位），
 // lamp 高 212 单位、火焰尖距 baseline 208 单位 —— 取 lampW 使火焰尖刚好舔到石棉网。
+// thermo 底部（球泡）提到试管内容物上方（270 单位处），杆身略伸出管口，不遮挡物质变化
 function computeDefaults(L) {
   const cx = L.W * 0.24
   const baseY = L.H - 70
@@ -61,7 +63,7 @@ function computeDefaults(L) {
   const thermoW = Math.min(24, flaskW * 0.13)
   return {
     flask:  { x: cx, baseline: baseY, w: flaskW },
-    thermo: { x: cx, baseline: baseY - 229 * s, w: thermoW },
+    thermo: { x: cx, baseline: baseY - 275 * s, w: thermoW },
     lamp:   { x: cx, baseline: baseY, w: lampW },
   }
 }
@@ -175,26 +177,41 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
 function setupCanvas() {
   const canvas = canvasRef.value
+  const st = stageRef.value
   ctx = canvas.getContext('2d')
-  canvas.width = 1800
-  canvas.height = 1040
-  ctx.setTransform(2, 0, 0, 2, 0, 0)
+  // 画布铺满整个舞台（板面背景全幅），T-t 图等设计内容在渲染时居中平移绘制
+  const w = Math.max(1, st.clientWidth)
+  const h = Math.max(1, st.clientHeight)
+  const d = dpr()
+  canvas.width = Math.round(w * d)
+  canvas.height = Math.round(h * d)
+  canvas.style.width = w + 'px'
+  canvas.style.height = h + 'px'
+  ctx.setTransform(d, 0, 0, d, 0, 0)
 }
 function dims() {
   return { W: 900, H: 520 }
 }
 // 设计层等比缩放：画布与装置图共用 900×520 逻辑坐标，
-// 手机端整体缩到容器宽度，装置图片（烧杯/酒精灯）随画布同步缩小，不再保持原始像素尺寸
+// 最大 1.0（杜绝大屏放大感），宽屏时设计层在舞台内水平居中
 const DESIGN_W = 900
 const DESIGN_H = 520
 const stageRef = ref(null)
 const scaleRef = ref(null)
+// 视口状态：设计层缩放与水平偏移（canvas 渲染与编辑态坐标换算共用）
+const view = { s: 1, offX: 0 }
 function layoutStage() {
   const st = stageRef.value, sc = scaleRef.value
   if (!st || !sc) return
-  const s = Math.max(0.25, Math.min(st.clientWidth / DESIGN_W, 1.6))
+  // 等比缩放，最大 1.0（杜绝大屏放大感）；宽屏时场景在面板内水平居中。
+  // 任何分辨率下：场景相对布局一致、画面大小适中、酒精灯底部完整可见
+  const s = Math.max(0.25, Math.min(st.clientWidth / DESIGN_W, 1))
+  const offX = Math.max(0, (st.clientWidth - DESIGN_W * s) / 2)
+  view.s = s
+  view.offX = offX
   sc.style.transform = `scale(${s})`
-  st.style.height = Math.round(DESIGN_H * s) + 'px'
+  sc.style.left = `${offX}px`
+  st.style.height = `${Math.round(DESIGN_H * s)}px`
 }
 function rr(x, y, w, h, r) {
   if (ctx.roundRect) {
@@ -224,6 +241,22 @@ function drawSetup(L) {
 const isOn    = computed(() => state.value === 'running' || state.value === 'done')
 const isHot   = computed(() => isOn.value)               // 灯亮即有对流/微颤
 const steamOn = computed(() => isOn.value && temp.value >= 58)
+
+// ===== 试管放大观察 =====
+const zoomOn = ref(false)
+const zoomCaption = computed(() => {
+  const mat = isCrystal.value ? '海波' : '石蜡'
+  const f = meltFrac.value
+  if (state.value === 'ready') return `${mat}：固态，待加热`
+  if (isCrystal.value) {
+    if (f <= 0.01) return `${mat}：吸热升温（固态）`
+    if (f >= 0.99) return `${mat}：完全熔化（液态）`
+    return `${mat}：熔化平台 · 固液共存`
+  }
+  if (f <= 0.01) return `${mat}：受热软化（固态）`
+  if (f >= 0.99) return `${mat}：完全熔化（液态）`
+  return `${mat}：逐渐软化熔化`
+})
 
 // 右侧 T-t 图
 function drawGraph(L) {
@@ -329,10 +362,19 @@ function drawGraph(L) {
 
 function render() {
   if (!ctx) return
+  const st = stageRef.value
+  const W = st ? st.clientWidth : DESIGN_W
+  const H = st ? st.clientHeight : DESIGN_H
+  // 板面背景铺满整个舞台（任何分辨率下格子背景不留空）
+  paintBoard(ctx, W, H, 'chalk')
+  // 设计内容（装置标签 + T-t 图）居中平移绘制，与 SVG 装置层对齐
+  ctx.save()
+  ctx.translate(view.offX, 0)
+  ctx.scale(view.s, view.s)
   const L = dims()
-  paintBoard(ctx, L.W, L.H, 'chalk')
   drawSetup(L)
   drawGraph(L)
+  ctx.restore()
 }
 
 // ===== 摆放编辑器：交互（拖动 / 滚轮缩放 / 方向键微调）=====
@@ -346,9 +388,8 @@ let dragStart = null
 
 function toLogical(e) {
   const rect = canvasRef.value.getBoundingClientRect()
-  const { W, H } = dims()
-  // 画布为固定逻辑分辨率 + CSS 等比缩放：把显示坐标映射回逻辑坐标
-  return { x: (e.clientX - rect.left) * (W / rect.width), y: (e.clientY - rect.top) * (H / rect.height) }
+  // 画布铺满舞台，设计内容按 view.s 缩放并水平偏移：逆向映射回 900×520 逻辑坐标
+  return { x: (e.clientX - rect.left - view.offX) / view.s, y: (e.clientY - rect.top) / view.s }
 }
 function onPiecePointerDown(name, e) {
   if (!editMode.value) return
@@ -481,8 +522,8 @@ function loop(now) {
 
 function resizeCanvas() {
   if (!canvasRef.value) return
+  layoutStage()     // 先定舞台尺寸（高度），再按最终尺寸重建画布
   setupCanvas()
-  layoutStage()
   if (!editMode.value) applyDefaults()   // 非编辑态随画布自适应；编辑态保留手动微调
   render()
 }
@@ -494,21 +535,39 @@ watch(material, () => {
 })
 
 let resizeObs = null
+let lastStageW = 0
+let sizePoll = null
+function onWinResize() { resizeCanvas() }
 onMounted(() => {
+  layoutStage()            // 先定舞台尺寸，画布按最终尺寸创建
   setupCanvas()
   loadSaved()              // 先读已保存的摆放
-  layoutStage()            // 先按容器宽度算好缩放，再摆默认布局
   applyDefaults()          // 首次渲染前算好布局（有保存则用保存值）
   render()
+  lastStageW = stageRef.value ? stageRef.value.clientWidth : 0
   window.addEventListener('keydown', onKey)
+  window.addEventListener('resize', onWinResize)   // 兜底：RO 未触发时也重排
   if (window.ResizeObserver) {
     resizeObs = new ResizeObserver(resizeCanvas)
     resizeObs.observe(stageRef.value)   // 观察外层容器（缩放层宽度固定 900，观察它不会触发）
   }
+  // 终极兜底：极少数环境（如嵌入式视口）RO 与 resize 事件都不可靠，
+  // 低频轮询容器宽度，宽度变了立即重排，杜绝任何分辨率下位置漂移
+  sizePoll = setInterval(() => {
+    const st = stageRef.value
+    if (!st) return
+    const w = st.clientWidth
+    if (w && Math.abs(w - lastStageW) > 1) {
+      lastStageW = w
+      resizeCanvas()
+    }
+  }, 400)
 })
 onBeforeUnmount(() => {
   stopLoop()
   if (resizeObs) resizeObs.disconnect()
+  if (sizePoll) clearInterval(sizePoll)
+  window.removeEventListener('resize', onWinResize)
   window.removeEventListener('keydown', onKey)
   window.removeEventListener('pointermove', onWinPointerMove)
   window.removeEventListener('pointerup', onWinPointerUp)
@@ -520,14 +579,13 @@ onBeforeUnmount(() => {
   <div class="lab-stage">
     <div class="lab-left">
       <div class="lab-panel" style="padding:0;position:relative">
-        <!-- 外层容器：高度由 JS 按缩放比例设定，内部为 900×520 设计层整体缩放 -->
+        <!-- 外层容器：高度由 JS 按缩放比例设定；画布铺满舞台绘制板面，装置层按设计坐标居中缩放 -->
         <div class="melt-stage" ref="stageRef">
+          <canvas
+            class="logic-canvas" ref="canvasRef"
+            style="position:absolute;inset:0;display:block;touch-action:none"
+          ></canvas>
           <div class="melt-scale" ref="scaleRef">
-        <canvas
-          class="logic-canvas" ref="canvasRef"
-          style="display:block;width:900px;height:520px;touch-action:none;border-radius:8px"
-        ></canvas>
-
         <!-- 装置区（SVG 组件层），绝对覆盖在 canvas 之上；lamp 最先画（位于脚架后方），thermo 最前 -->
         <div
           class="melt-rig"
@@ -553,7 +611,19 @@ onBeforeUnmount(() => {
             @pointerdown="(e) => onPiecePointerDown('thermo', e)"
           />
         </div>
+
+        <!-- 试管放大观察小框（在设计层内随场景等比缩放，任何分辨率下相对位置不变） -->
+        <transition name="zoompop">
+          <div v-if="zoomOn" class="melt-zoom">
+            <div class="mz-head">
+              <span>试管内部 ×2.2</span>
+              <strong class="mz-temp">{{ temp.toFixed(1) }}℃</strong>
+            </div>
+            <MeltZoom :melt-frac="meltFrac" :material="material" :hot="isHot" />
+            <div class="mz-caption">{{ zoomCaption }}</div>
           </div>
+        </transition>
+      </div>
         </div>
 
         <!-- 摆放编辑器浮层（在缩放层之外，保持可读尺寸） -->
@@ -601,6 +671,7 @@ onBeforeUnmount(() => {
         </div>
         <button v-if="state !== 'running'" class="btn btn-primary" @click="startRun">{{ startBtn }}</button>
         <button class="btn" @click="resetAll">重置</button>
+        <button class="btn" :class="{ 'btn-primary': zoomOn }" @click="zoomOn = !zoomOn">🔍 放大观察</button>
         <button v-if="isAdmin" class="btn" :class="{ 'btn-primary': editMode }" @click="toggleEditMode">{{ editMode ? '完成摆放' : '编辑摆放位置' }}</button>
         <span class="feedback" :class="completed ? 'ok' : 'no'">{{ hint }}</span>
         <FullscreenBtn />
@@ -760,5 +831,49 @@ onBeforeUnmount(() => {
   padding: 6px;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+/* ===== 试管放大观察小框（装置与 T-t 图之间的空档，不遮挡任何设备） ===== */
+.melt-zoom {
+  position: absolute;
+  left: 322px;
+  top: 104px;
+  width: 142px;
+  padding: 9px 10px 8px;
+  background: #fffef5;
+  border: 2px solid #2a2a2a;
+  border-radius: 8px;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.25);
+  z-index: 6;
+}
+.mz-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  font-weight: 800;
+  color: #2a2a2a;
+}
+.mz-temp {
+  color: #e85a4f;
+  font-size: 18px;
+  font-weight: 900;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.mz-caption {
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #444;
+}
+.zoompop-enter-active,
+.zoompop-leave-active {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  transform-origin: 0 100%;
+}
+.zoompop-enter-from,
+.zoompop-leave-to {
+  transform: scale(0.6);
+  opacity: 0;
 }
 </style>

@@ -46,10 +46,6 @@
         </g>
       </g>
     </svg>
-    <!-- 实时读数（数字显示在管右侧） -->
-    <div class="thermo-readout" :style="{ left: size.w + 4 + 'px', top: (size.h * 0.25) + 'px' }">
-      <span class="num">{{ Math.round(temp) }}</span><span class="unit">℃</span>
-    </div>
     <div v-if="hover && tip" class="melt-tip" :style="{ left: size.w / 2 + 'px', top: '0px' }">{{ tip }}</div>
   </div>
 </template>
@@ -107,18 +103,4 @@ const tip = computed(() => `温度计：${props.temp.toFixed(1)} ℃`)
 </script>
 
 <style scoped>
-.thermo-readout {
-  position: absolute;
-  background: #fff7c2;
-  border: 2px solid #2a2a2a;
-  border-radius: 5px;
-  padding: 2px 6px;
-  font: 700 13px/1.1 system-ui, sans-serif;
-  color: #2a2a2a;
-  box-shadow: 2px 2px 0 #2a2a2a;
-  white-space: nowrap;
-  pointer-events: none;
-}
-.thermo-readout .num { color: #e85a4f; font-size: 15px; margin-right: 1px; }
-.thermo-readout .unit { font-size: 10px; opacity: 0.7; }
 </style>

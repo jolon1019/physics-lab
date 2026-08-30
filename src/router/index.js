@@ -33,6 +33,12 @@ const routes = [
     name: 'resources',
     component: () => import('../views/ResourcesView.vue'),
     meta: { title: '试卷资料库' }
+  },
+  {
+    path: '/admin',
+    name: 'admin',
+    component: () => import('../views/AdminView.vue'),
+    meta: { title: '管理后台', requiresAuth: true }
   }
 ]
 

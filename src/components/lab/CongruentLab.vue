@@ -72,6 +72,53 @@ const tris = computed(() =>
 
 const poly = (t) => [t.A, t.B, t.C].map((p) => { const s = toSvg(p); return `${s.x},${s.y}` }).join(' ')
 
+/* ===== 已知条件的 A / S 标注：S=边（加粗描边+刻度线），A=角（弧形扇区） ===== */
+function sideMark(p1, p2, n) {
+  const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2
+  const len = Math.max(Math.hypot(p2.x - p1.x, p2.y - p1.y), 0.001)
+  const ux = (p2.x - p1.x) / len, uy = (p2.y - p1.y) / len
+  const nx = -uy, ny = ux
+  const ticks = []
+  for (let j = 0; j < n; j++) {
+    const off = (j - (n - 1) / 2) * 7
+    const cx = mx + ux * off, cy = my + uy * off
+    ticks.push({ x1: cx - nx * 6, y1: cy - ny * 6, x2: cx + nx * 6, y2: cy + ny * 6 })
+  }
+  return { p1, p2, ticks, sLabel: { x: mx + nx * 22, y: my + ny * 22 + 4 } }
+}
+function angMark(v, r1, r2) {
+  const a1 = Math.atan2(r1.y - v.y, r1.x - v.x)
+  let d = Math.atan2(r2.y - v.y, r2.x - v.x) - a1
+  while (d > Math.PI) d -= 2 * Math.PI
+  while (d < -Math.PI) d += 2 * Math.PI
+  const steps = 12, r = 36
+  const pts = []
+  for (let i = 0; i <= steps; i++) {
+    const a = a1 + (d * i) / steps
+    pts.push(`${(v.x + r * Math.cos(a)).toFixed(1)},${(v.y + r * Math.sin(a)).toFixed(1)}`)
+  }
+  const mid = a1 + d / 2
+  return {
+    path: `M ${v.x} ${v.y} L ${pts[0]} ` + pts.slice(1).map((p) => `L ${p}`).join(' ') + ' Z',
+    aLabel: { x: v.x + (r + 17) * Math.cos(mid), y: v.y + (r + 17) * Math.sin(mid) + 4 }
+  }
+}
+const asm = computed(() => {
+  const empty = { sides: [], angles: [], counter: false }
+  const t = tris.value[0]
+  if (!t) return empty
+  const sides = []
+  const angles = []
+  const S = (p1, p2, n) => sides.push({ ...sideMark(toSvg(p1), toSvg(p2), n) })
+  const A = (v, r1, r2) => angles.push(angMark(toSvg(v), toSvg(r1), toSvg(r2)))
+  if (mode.value === 'sss') { S(t.B, t.C, 1); S(t.C, t.A, 2); S(t.A, t.B, 3) }
+  if (mode.value === 'sas') { S(t.C, t.A, 2); S(t.A, t.B, 3); A(t.A, t.B, t.C) }
+  if (mode.value === 'asa') { A(t.A, t.B, t.C); A(t.B, t.A, t.C); S(t.A, t.B, 3) }
+  if (mode.value === 'aaa') { A(t.A, t.B, t.C); A(t.B, t.A, t.C); A(t.C, t.A, t.B) }
+  if (mode.value === 'ssa') { S(t.A, t.B, 3); A(t.B, t.A, t.C); S(t.C, t.A, 2) }
+  return { sides, angles, counter: mode.value === 'aaa' || mode.value === 'ssa' }
+})
+
 /* ===== 模式切换 ===== */
 const MODES = {
   sss: { name: '三边 SSS', hint: '拖动滑块改变「三边」，观察三角形是否还能变形' },
@@ -143,6 +190,28 @@ const formula = computed(() => ({
           <polygon v-if="tris.length === 2" class="tri-alt" :points="poly(tris[1])" />
           <!-- 主三角形 -->
           <polygon v-if="tris.length" class="tri-main" :points="poly(tris[0])" />
+
+          <!-- 已知条件标注：S=边（加粗+刻度），A=角（弧） -->
+          <g v-if="tris.length" :class="['given', asm.counter ? 'counter' : '']">
+            <g v-for="(s, i) in asm.sides" :key="'gs' + i">
+              <line class="given-side" :x1="s.p1.x" :y1="s.p1.y" :x2="s.p2.x" :y2="s.p2.y" />
+              <line v-for="(tk, j) in s.ticks" :key="'tk' + j" class="tick" :x1="tk.x1" :y1="tk.y1" :x2="tk.x2" :y2="tk.y2" />
+              <text class="mark-t" :x="s.sLabel.x" :y="s.sLabel.y" text-anchor="middle">S</text>
+            </g>
+            <g v-for="(a, i) in asm.angles" :key="'ga' + i">
+              <path class="given-arc" :d="a.path" />
+              <text class="mark-t" :x="a.aLabel.x" :y="a.aLabel.y" text-anchor="middle">A</text>
+            </g>
+          </g>
+
+          <!-- A / S 图例 -->
+          <g v-if="tris.length" class="as-legend">
+            <rect :x="VW - 240" y="20" width="220" height="30" rx="6" />
+            <text :x="VW - 226" y="40">
+              <tspan class="lg-s">〓 S = 已知边（刻度）</tspan>
+              <tspan class="lg-a">⌒ A = 已知角（弧）</tspan>
+            </text>
+          </g>
 
           <!-- 顶点与标注 -->
           <template v-if="tris.length">
@@ -228,4 +297,18 @@ const formula = computed(() => ({
 .no-sol { fill: var(--bb-red); font-size: 18px; font-weight: 800; text-anchor: middle; }
 .legend rect { fill: var(--bb-surface, rgba(255,255,255,0.85)); stroke: var(--bb-fg-dim); stroke-width: 1.5; }
 .legend text { font-size: 14px; font-weight: 700; font-family: var(--mono); }
+/* 已知条件 A/S 标注：琥珀色 = 能判定，红色 = 反例模式 */
+.given-side { stroke: var(--bb-amber); stroke-width: 5.5; stroke-linecap: round; opacity: 0.85; }
+.tick { stroke: var(--bb-amber); stroke-width: 2.4; }
+.given-arc { fill: rgba(184, 121, 21, 0.30); stroke: var(--bb-amber); stroke-width: 2; }
+.mark-t { fill: var(--bb-amber); font-size: 14px; font-weight: 900; font-family: var(--mono); pointer-events: none; }
+.given.counter .given-side { stroke: var(--bb-red); }
+.given.counter .tick { stroke: var(--bb-red); }
+.given.counter .given-arc { fill: rgba(217, 33, 53, 0.22); stroke: var(--bb-red); }
+.given.counter .mark-t { fill: var(--bb-red); }
+.as-legend rect { fill: var(--bb-surface, rgba(255,255,255,0.85)); stroke: var(--bb-fg-dim); stroke-width: 1.5; }
+.as-legend .lg-s { fill: var(--bb-amber); font-size: 13.5px; font-weight: 800; font-family: var(--mono); }
+.as-legend .lg-a { fill: var(--bb-amber); font-size: 13.5px; font-weight: 800; font-family: var(--mono); }
+.given.counter ~ .as-legend .lg-s,
+.given.counter ~ .as-legend .lg-a { fill: var(--bb-red); }
 </style>

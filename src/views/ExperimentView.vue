@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { findExperiment } from '../data/experiments'
 import { getExperiment } from '../data/experimentDetails'
 import { useProgressStore } from '../stores/progress'
+import { useAuthStore } from '../stores/auth'
 import LensLab from '../components/lab/LensLab.vue'
 import SpeedLab from '../components/lab/SpeedLab.vue'
 import SoundLab from '../components/lab/SoundLab.vue'
@@ -35,12 +36,33 @@ import GeometryLab from '../components/lab/GeometryLab.vue'
 import CongruentLab from '../components/lab/CongruentLab.vue'
 import PythagorasLab from '../components/lab/PythagorasLab.vue'
 import MultFormulaLab from '../components/lab/MultFormulaLab.vue'
+import QuadraticLab from '../components/lab/QuadraticLab.vue'
+import QuadEqLab from '../components/lab/QuadEqLab.vue'
+import CircleLab from '../components/lab/CircleLab.vue'
+import InverseFuncLab from '../components/lab/InverseFuncLab.vue'
+import SimilarLab from '../components/lab/SimilarLab.vue'
+import TrigLab from '../components/lab/TrigLab.vue'
+import ProbabilityLab from '../components/lab/ProbabilityLab.vue'
+import BlockViewsLab from '../components/lab/BlockViewsLab.vue'
+import NumberLineLab from '../components/lab/NumberLineLab.vue'
+import AuxLineLab from '../components/lab/AuxLineLab.vue'
+import BalanceLab from '../components/lab/BalanceLab.vue'
+import CoordPlaneLab from '../components/lab/CoordPlaneLab.vue'
+import ParallelLinesLab from '../components/lab/ParallelLinesLab.vue'
+import DataChartsLab from '../components/lab/DataChartsLab.vue'
+import TriAnglesLab from '../components/lab/TriAnglesLab.vue'
+import TriSidesLab from '../components/lab/TriSidesLab.vue'
+import LinearFuncLab from '../components/lab/LinearFuncLab.vue'
 
 const route = useRoute()
 const progress = useProgressStore()
+const auth = useAuthStore()
 
 const info = computed(() => findExperiment(route.params.id))
 const detail = computed(() => getExperiment(route.params.id))
+
+// 付费门禁：实验被设为会员专享且当前用户非会员/管理员 → 锁定动手操作区（理论仍可看）
+const locked = computed(() => auth.isLocked(route.params.id))
 
 const showCognition = ref(false)
 const showChallenge = ref(false)
@@ -131,8 +153,19 @@ function nextQuiz() {
       </header>
 
       <div class="exp-detail-body">
-        <!-- 操作台阶（默认窗口） -->
+        <!-- 操作台阶（默认窗口）；会员专享实验对非会员锁定 -->
         <section>
+          <div v-if="locked" class="panel lock-panel">
+            <p class="lock-icon">🔒</p>
+            <p class="lock-title">该实验为会员专享</p>
+            <p class="lock-sub">开通会员后即可动手操作，实验理论与巩固练习仍然免费开放</p>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 14px">
+              <button v-if="!auth.isLoggedIn" class="btn btn-primary" @click="auth.openLogin(route.fullPath)">登录 / 注册</button>
+              <RouterLink v-else to="/resources" class="btn btn-primary">了解会员</RouterLink>
+              <RouterLink to="/" class="btn">返回首页</RouterLink>
+            </div>
+          </div>
+          <template v-else>
           <LensLab v-if="detail && detail.id === 'e-lens-camera'" @complete="onLabComplete" />
           <SpeedLab v-else-if="detail && detail.id === 'e-speed'" @complete="onLabComplete" />
           <SoundLab v-else-if="detail && detail.id === 'e-sound'" @complete="onLabComplete" />
@@ -164,7 +197,40 @@ function nextQuiz() {
           <CongruentLab v-else-if="detail && detail.id === 'e-congruent-tri'" @complete="onLabComplete" />
           <PythagorasLab v-else-if="detail && detail.id === 'e-pythagoras'" @complete="onLabComplete" />
           <MultFormulaLab v-else-if="detail && detail.id === 'e-mult-formula'" @complete="onLabComplete" />
+          <QuadraticLab v-else-if="detail && detail.id === 'e-quadratic-func'" @complete="onLabComplete" />
+          <QuadEqLab v-else-if="detail && detail.id === 'e-quad-eq'" @complete="onLabComplete" />
+          <CircleLab v-else-if="detail && detail.id === 'e-circle'" @complete="onLabComplete" />
+          <InverseFuncLab v-else-if="detail && detail.id === 'e-inverse-func'" @complete="onLabComplete" />
+          <SimilarLab v-else-if="detail && detail.id === 'e-similar-tri'" @complete="onLabComplete" />
+          <TrigLab v-else-if="detail && detail.id === 'e-trig-func'" @complete="onLabComplete" />
+          <ProbabilityLab v-else-if="detail && detail.id === 'e-probability'" @complete="onLabComplete" />
+          <BlockViewsLab v-else-if="detail && detail.id === 'e-block-views'" @complete="onLabComplete" />
+          <NumberLineLab v-else-if="detail && detail.id === 'e-num-line'" @complete="onLabComplete" />
+          <AuxLineLab v-else-if="detail && detail.id === 'e-aux-lines'" @complete="onLabComplete" />
+          <BalanceLab v-else-if="detail && detail.id === 'e-linear-eq'" @complete="onLabComplete" />
+          <CoordPlaneLab v-else-if="detail && detail.id === 'e-coord-plane'" @complete="onLabComplete" />
+          <ParallelLinesLab v-else-if="detail && detail.id === 'e-parallel-lines'" @complete="onLabComplete" />
+          <DataChartsLab v-else-if="detail && detail.id === 'e-data-charts'" @complete="onLabComplete" />
+          <TriAnglesLab v-else-if="detail && detail.id === 'e-tri-angles'" @complete="onLabComplete" />
+          <TriSidesLab v-else-if="detail && detail.id === 'e-tri-sides'" @complete="onLabComplete" />
+          <LinearFuncLab v-else-if="detail && detail.id === 'e-linear-func'" @complete="onLabComplete" />
+          <!-- 会员门禁：后台勾选为"会员专享"的实验，对非会员锁定 -->
+          <div v-else-if="auth.isLocked(route.params.id)" class="panel lock-panel">
+            <div class="lock-icon">🔒</div>
+            <h3>该实验为会员专享</h3>
+            <p class="lock-desc">当前实验仅对会员账号开放。免费账号可浏览实验理论与巩固练习，动手实验需要会员权限。</p>
+            <div class="lock-status">
+              <template v-if="!auth.isLoggedIn">
+                <button class="btn btn-primary" @click="auth.openLogin(route.fullPath)">登录账号</button>
+                <span class="lock-tip">登录后若仍为免费账号，请联系管理员开通会员</span>
+              </template>
+              <template v-else>
+                <span class="lock-tip">当前账号：{{ auth.user?.email }}（免费用户）——请联系管理员升级为会员</span>
+              </template>
+            </div>
+          </div>
           <p v-else>该实验仿真打磨中，先进入「巩固练习」。</p>
+          </template>
         </section>
 
         <RouterLink to="/record" class="btn btn-block" style="margin-top:24px">查看学习记录 →</RouterLink>
@@ -276,6 +342,14 @@ function nextQuiz() {
 </template>
 
 <style scoped>
+/* 会员专享锁定面板 */
+.lock-panel {
+  padding: 42px 20px;
+  text-align: center;
+}
+.lock-icon { font-size: 44px; margin: 0; }
+.lock-title { font-size: 20px; font-weight: 900; margin: 10px 0 6px; }
+.lock-sub { color: var(--text-dim); font-size: 13.5px; margin: 0; }
 .stage-pop-mask {
   position: fixed;
   inset: 0;
@@ -330,6 +404,29 @@ function nextQuiz() {
   border-top: 2px solid var(--line);
   background: var(--surface-3);
 }
+
+/* 会员专享锁定面板 */
+.lock-panel {
+  text-align: center;
+  padding: 42px 24px;
+}
+.lock-icon { font-size: 44px; margin-bottom: 8px; }
+.lock-panel h3 { font-size: 19px; font-weight: 900; }
+.lock-desc {
+  font-size: 13.5px;
+  color: var(--text-dim, #777);
+  max-width: 420px;
+  margin: 8px auto 16px;
+  line-height: 1.7;
+}
+.lock-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.lock-tip { font-size: 13px; color: var(--text-2, #888); }
 
 /* 背景切换按钮已移至全局顶栏（App.vue） */
 </style>
