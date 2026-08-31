@@ -422,7 +422,7 @@ function drawWaveMode() {
   }
 
   ctx.fillStyle = textH; ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'left'
-  ctx.fillText('🌊 声波是疏密相间的纵波，靠介质振动传播', 40, 40)
+  ctx.fillText('声波是疏密相间的纵波，靠介质振动传播', 40, 40)
   ctx.fillStyle = textCol; ctx.font = '13px sans-serif'
   ctx.fillText(
     wavePlay.value ? '粒子只在原地往复，振动沿介质向右“传”出去（不是粒子在飞）' : '点「▶ 播放」，再切换固体/液体/气体看传播快慢',

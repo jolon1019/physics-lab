@@ -144,7 +144,7 @@ const results = computed(() => [
           <span class="qb-hint">先沿 x 轴找 {{ target.x }}，再沿 y 方向找 {{ target.y }} · {{ quadName(target.x, target.y) }}</span>
         </template>
         <template v-else>
-          <span class="qb-target qb-idle">{{ done ? '🎉 挑战完成！连对 5 题' : '点「开始挑战」出第一题' }}</span>
+          <span class="qb-target qb-idle">{{ done ? '挑战完成！连对 5 题' : '点「开始挑战」出第一题' }}</span>
         </template>
       </div>
 

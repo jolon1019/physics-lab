@@ -4,15 +4,35 @@ import { useRoute } from 'vue-router'
 import { SUBJECTS, findExperiment, gradesBySubject } from '../data/experiments'
 import { useProgressStore } from '../stores/progress'
 import { useLayoutStore } from '../stores/layout'
+import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
 const progress = useProgressStore()
 const layout = useLayoutStore()
+const auth = useAuthStore()
 
 const subject = ref('physics')
 const openGrades = ref(new Set())
 
 const grades = computed(() => gradesBySubject(subject.value))
+
+// 「免费实验」分组：存在会员专享且当前用户非会员（游客/免费用户）时，
+// 在年级列表最上方聚合当前学科的全部免费实验（学科 tab 切换时同步跟随，数学物理分开）
+const FREE_KEY = '__free__'
+const freeGrade = computed(() => {
+  if (!auth.paidExperiments.length || auth.isMember) return null
+  const exps = grades.value.flatMap((g) => g.experiments).filter((e) => !auth.paidExperiments.includes(e.id))
+  return exps.length ? { grade: FREE_KEY, label: '免费实验', experiments: exps, free: true } : null
+})
+const navGrades = computed(() => (freeGrade.value ? [freeGrade.value, ...grades.value] : grades.value))
+
+// 默认展开：有免费分组 → 只展开免费分组；否则展开第一个年级
+function defaultOpen() {
+  const s = new Set()
+  if (freeGrade.value) s.add(FREE_KEY)
+  else if (grades.value.length) s.add(grades.value[0].grade)
+  return s
+}
 
 function totalCount() {
   return grades.value.reduce((s, g) => s + g.experiments.length, 0)
@@ -21,8 +41,7 @@ function totalCount() {
 function pickSubject(id) {
   if (subject.value === id) return
   subject.value = id
-  const list = gradesBySubject(id)
-  if (list.length) openGrades.value = new Set([list[0].grade])
+  openGrades.value = defaultOpen()
 }
 
 function syncOpen() {
@@ -30,12 +49,28 @@ function syncOpen() {
   const hit = id ? findExperiment(id) : null
   if (hit) {
     subject.value = hit.grade.subject || 'physics'
-    openGrades.value.add(hit.grade.grade)
+    // 直达实验：展开它所在的年级；免费分组（若在）也一并展开，方便回到免费列表
+    const set = openGrades.value.has(hit.grade.grade) ? new Set(openGrades.value) : new Set([hit.grade.grade])
+    if (freeGrade.value && freeGrade.value.experiments.some((e) => e.id === id)) set.add(FREE_KEY)
+    openGrades.value = set
   } else {
-    const first = gradesBySubject(subject.value)[0]
-    if (first) openGrades.value.add(first.grade)
+    openGrades.value = defaultOpen()
   }
-  openGrades.value = new Set(openGrades.value)
+}
+
+// 免费分组异步出现时（付费名单加载完成）：非实验页重新应用默认展开；
+// 实验页仅在该实验属于免费分组时补充展开免费分组。不改 subject，
+// 避免在实验页手动切学科 tab 时 freeGrade 重算把学科弹回实验所属学科
+function reapplyDefault() {
+  if (!freeGrade.value) return
+  const id = route.params.id
+  if (!id) {
+    openGrades.value = defaultOpen()
+  } else if (freeGrade.value.experiments.some((e) => e.id === id)) {
+    if (!openGrades.value.has(FREE_KEY)) {
+      openGrades.value = new Set([...openGrades.value, FREE_KEY])
+    }
+  }
 }
 
 function toggleGrade(gradeId) {
@@ -58,10 +93,19 @@ function isDone(expId) {
   return !!(progress.records[expId] && progress.records[expId].completed)
 }
 
+// 会员专享实验：列表可见，但非会员/游客不可点击（管理员与会员可进）
+function isLocked(expId) {
+  return auth.isLocked(expId)
+}
+
 watch(
   () => route.params.id,
   () => syncOpen()
 )
+
+// 付费名单异步加载完成后免费分组才出现：仅在首页等非实验页重新应用默认展开。
+// 实验页不调 syncOpen——否则切学科 tab 时 freeGrade 重算会把 subject 弹回实验所属学科
+watch(freeGrade, reapplyDefault)
 
 onMounted(syncOpen)
 </script>
@@ -100,7 +144,7 @@ onMounted(syncOpen)
         </button>
       </div>
 
-      <div v-for="(g, gi) in grades" :key="g.grade" class="nav-module">
+      <div v-for="(g, gi) in navGrades" :key="g.grade" class="nav-module" :class="{ 'is-free': g.free }">
         <button class="nav-module-btn" :class="{ open: openGrades.has(g.grade) }" @click="toggleGrade(g.grade)">
           <span class="rail-index">{{ String(gi + 1).padStart(2, '0') }}</span>
           <span class="nav-module-label">{{ g.label }}</span>
@@ -108,22 +152,30 @@ onMounted(syncOpen)
         </button>
 
         <div v-if="openGrades.has(g.grade)" class="nav-exps">
-          <RouterLink
-            v-for="e in g.experiments"
-            :key="e.id"
-            :to="`/experiment/${e.id}`"
-            class="nav-exp"
-            :class="{ active: isActive(e.id) }"
-          >
-            <span class="nav-exp-state">{{ isDone(e.id) ? '✓' : '' }}</span>
-            <span class="nav-exp-title">{{ e.title }}</span>
-          </RouterLink>
+          <template v-for="e in g.experiments" :key="e.id">
+            <!-- 会员专享且无权限：保留条目但不可点击 -->
+            <span
+              v-if="isLocked(e.id)"
+              class="nav-exp locked"
+              :class="{ active: isActive(e.id) }"
+              title="会员专享实验，开通会员后可用"
+              aria-disabled="true"
+            >
+              <span class="nav-exp-state">{{ isDone(e.id) ? '✓' : '' }}</span>
+              <span class="nav-exp-title">{{ e.title }}</span>
+              <span class="nav-lock-tag">会员</span>
+            </span>
+            <RouterLink
+              v-else
+              :to="`/experiment/${e.id}`"
+              class="nav-exp"
+              :class="{ active: isActive(e.id) }"
+            >
+              <span class="nav-exp-state">{{ isDone(e.id) ? '✓' : '' }}</span>
+              <span class="nav-exp-title">{{ e.title }}</span>
+            </RouterLink>
+          </template>
         </div>
-      </div>
-
-      <div class="side-nav-foot">
-        <RouterLink to="/" class="side-nav-link" :class="{ 'router-link-active': route.path === '/' }">首页</RouterLink>
-        <RouterLink to="/record" class="side-nav-link" :class="{ 'router-link-active': route.path === '/record' }">学习记录</RouterLink>
       </div>
     </template>
 
@@ -131,7 +183,7 @@ onMounted(syncOpen)
     <template v-else>
       <div class="rail-grades">
         <button
-          v-for="(g, gi) in grades"
+          v-for="(g, gi) in navGrades"
           :key="g.grade"
           class="rail-grade"
           :title="g.label"

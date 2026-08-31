@@ -84,7 +84,7 @@ const leftItems = computed(() => {
 const rows = computed(() => [
   { label: '当前方程', value: eqText.value },
   { label: '操作步数', value: `${log.value.length}` },
-  { label: '天平状态', value: '平衡 ⚖️（两边同操作，始终平衡）' }
+  { label: '天平状态', value: '平衡（两边同操作，始终平衡）' }
 ])
 const results = computed(() => solved.value
   ? [

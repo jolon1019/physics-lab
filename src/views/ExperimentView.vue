@@ -156,7 +156,6 @@ function nextQuiz() {
         <!-- 操作台阶（默认窗口）；会员专享实验对非会员锁定 -->
         <section>
           <div v-if="locked" class="panel lock-panel">
-            <p class="lock-icon">🔒</p>
             <p class="lock-title">该实验为会员专享</p>
             <p class="lock-sub">开通会员后即可动手操作，实验理论与巩固练习仍然免费开放</p>
             <div style="display: flex; gap: 10px; justify-content: center; margin-top: 14px">
@@ -216,7 +215,6 @@ function nextQuiz() {
           <LinearFuncLab v-else-if="detail && detail.id === 'e-linear-func'" @complete="onLabComplete" />
           <!-- 会员门禁：后台勾选为"会员专享"的实验，对非会员锁定 -->
           <div v-else-if="auth.isLocked(route.params.id)" class="panel lock-panel">
-            <div class="lock-icon">🔒</div>
             <h3>该实验为会员专享</h3>
             <p class="lock-desc">当前实验仅对会员账号开放。免费账号可浏览实验理论与巩固练习，动手实验需要会员权限。</p>
             <div class="lock-status">
@@ -232,8 +230,6 @@ function nextQuiz() {
           <p v-else>该实验仿真打磨中，先进入「巩固练习」。</p>
           </template>
         </section>
-
-        <RouterLink to="/record" class="btn btn-block" style="margin-top:24px">查看学习记录 →</RouterLink>
       </div>
     </section>
 
@@ -285,7 +281,7 @@ function nextQuiz() {
     <div v-if="showChallenge" class="stage-pop-mask" @click.self="showChallenge = false">
       <div class="stage-pop-modal" role="dialog" aria-modal="true">
         <header class="stage-pop-head">
-          <h3 style="font-size:18px">🏆 巩固练习 · 实验挑战</h3>
+          <h3 style="font-size:18px">巩固练习 · 实验挑战</h3>
           <button class="btn btn-sm" @click="showChallenge = false">关闭 ✕</button>
         </header>
 
@@ -347,7 +343,6 @@ function nextQuiz() {
   padding: 42px 20px;
   text-align: center;
 }
-.lock-icon { font-size: 44px; margin: 0; }
 .lock-title { font-size: 20px; font-weight: 900; margin: 10px 0 6px; }
 .lock-sub { color: var(--text-dim); font-size: 13.5px; margin: 0; }
 .stage-pop-mask {
@@ -410,7 +405,6 @@ function nextQuiz() {
   text-align: center;
   padding: 42px 24px;
 }
-.lock-icon { font-size: 44px; margin-bottom: 8px; }
 .lock-panel h3 { font-size: 19px; font-weight: 900; }
 .lock-desc {
   font-size: 13.5px;

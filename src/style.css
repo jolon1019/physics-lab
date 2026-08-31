@@ -202,6 +202,16 @@ p { margin: 0; }
   min-width: 0;
 }
 
+/* 品牌区（logo+文字）整体可点击回首页 */
+.brand-home {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
 .brand-mark {
   width: 40px;
   height: 40px;
@@ -483,14 +493,6 @@ p { margin: 0; }
   font-weight: 900;
 }
 
-.side-nav-foot {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 2px solid var(--line);
-}
-
 /* 学科分类切换（物理 / 数学） */
 .subject-tabs {
   display: grid;
@@ -666,24 +668,47 @@ p { margin: 0; }
   text-overflow: ellipsis;
 }
 
-.side-nav-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-  border: 2px solid var(--line);
-  border-radius: var(--radius-sm);
+/* 会员专享实验：目录可见但不可点击（悬停提示开通会员） */
+.nav-exp.locked {
+  cursor: not-allowed;
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+.nav-exp.locked:hover {
   background: var(--surface-3);
-  color: var(--text-h);
-  font-size: 13px;
-  font-weight: 800;
-  text-decoration: none;
-  transition: background 120ms ease, box-shadow 120ms ease;
+  color: var(--text-dim);
+}
+.nav-exp.locked.active {
+  background: var(--accent);
+  color: #ffffff;
+  opacity: 1;
+}
+/* 「免费实验」分组：置顶聚合，金色高亮与年级分组区分 */
+.nav-module.is-free > .nav-module-btn {
+  background: var(--accent-soft, #ffe9a8);
+}
+.nav-module.is-free > .nav-module-btn .rail-index {
+  background: var(--accent-strong, #b8860b);
+  border-color: var(--accent-strong, #b8860b);
+  color: #ffffff;
+}
+.nav-module.is-free > .nav-module-btn .nav-module-label {
+  color: var(--accent-strong, #8a6410);
+  font-weight: 900;
 }
 
-.side-nav-link:hover {
-  background: var(--accent-soft);
-  box-shadow: 3px 3px 0 #050505;
+.nav-lock-tag {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: var(--accent-soft, #ffe9a8);
+  color: var(--accent-strong, #b8860b);
+}
+.nav-exp.locked.active .nav-lock-tag {
+  background: rgba(255, 255, 255, 0.9);
 }
 
 /* ===== 移动端抽屉遮罩与悬浮按钮（桌面端隐藏） ===== */

@@ -671,7 +671,7 @@ onBeforeUnmount(() => {
         </div>
         <button v-if="state !== 'running'" class="btn btn-primary" @click="startRun">{{ startBtn }}</button>
         <button class="btn" @click="resetAll">重置</button>
-        <button class="btn" :class="{ 'btn-primary': zoomOn }" @click="zoomOn = !zoomOn">🔍 放大观察</button>
+        <button class="btn" :class="{ 'btn-primary': zoomOn }" @click="zoomOn = !zoomOn">放大观察</button>
         <button v-if="isAdmin" class="btn" :class="{ 'btn-primary': editMode }" @click="toggleEditMode">{{ editMode ? '完成摆放' : '编辑摆放位置' }}</button>
         <span class="feedback" :class="completed ? 'ok' : 'no'">{{ hint }}</span>
         <FullscreenBtn />

@@ -106,6 +106,6 @@ onBeforeUnmount(() => {
     @click="toggleFullscreen"
     :title="isFullscreen ? '退出全屏' : '进入横屏全屏（动画 + 右侧参数面板）'"
   >
-    {{ isFullscreen ? '✕ 退出全屏' : '⛶ 全屏' }}
+    {{ isFullscreen ? '退出全屏' : '全屏' }}
   </button>
 </template>

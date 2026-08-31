@@ -175,16 +175,19 @@ function pathLen(pts) {
   return s
 }
 
-// 生成「过桥」坐标候选（横/竖母线位置），并过滤掉会让导线 U 形折返的非法值
+// 生成「过桥」坐标候选（横/竖母线位置）。
+// 严格模式：过桥线必须沿两端法向「向前」走满引线长度（无 16px 回折抖动，
+// 且从元件外侧进入端子）；无合法候选时退回宽松模式（只保证不 U 形折返）。
 function crossbarCandidates(A, B, nA, nB, axis) {
   const set = new Set()
   const a = axis === 'x' ? A.x : A.y
   const b = axis === 'x' ? B.x : B.y
-  const dir = axis === 'x' ? 'x' : 'y'
+  const na = axis === 'x' ? nA[0] : nA[1]
+  const nb = axis === 'x' ? nB[0] : nB[1]
   set.add(a)
   set.add(b)
   set.add((a + b) / 2)
-  for (let k = 1; k <= 6; k++) {
+  for (let k = 1; k <= 8; k++) {
     set.add(a + k * LANE)
     set.add(a - k * LANE)
     set.add(b + k * LANE)
@@ -192,46 +195,50 @@ function crossbarCandidates(A, B, nA, nB, axis) {
     set.add((a + b) / 2 + k * LANE)
     set.add((a + b) / 2 - k * LANE)
   }
-  const out = []
+  const strict = []
+  const relaxed = []
   for (const v of set) {
-    if (axis === 'x') {
-      // 保证 A 端先沿 nA.x 离场、B 端最后沿 nB.x 进场（不折返）
-      if ((v - A.x) * nA.x >= -0.01 && (B.x - v) * nB.x >= -0.01) out.push(v)
-    } else {
-      if ((v - A.y) * nA.y >= -0.01 && (B.y - v) * nB.y >= -0.01) out.push(v)
-    }
+    // 严格：A 端沿法向向前（P1 之后）、B 端从外侧（P2 = B + nB*STUB 之外）进入
+    const okAS = (v - (a + na * STUB)) * na >= -0.01
+    const okBS = (b + nb * STUB - v) * nb <= 0.01
+    // 宽松：只保证不 U 形折返
+    const okAR = (v - a) * na >= -0.01
+    const okBR = (b - v) * nb >= -0.01
+    if (okAS && okBS) strict.push(v)
+    if (okAR && okBR) relaxed.push(v)
   }
-  return out
+  return strict.length ? strict : relaxed
 }
 
 // 组装一条折线（含端子引线），pts 顺序：A → P1 → … → B
+// A 端沿法向向外引出；B 端从元件外侧（B + nB*STUB）进入端子
 function buildPath(kind, A, nA, B, nB, cb) {
   if (kind === 'hzv') {
     // 横-竖-横（两条端子都水平）：过桥母线为竖线 x = cb
     const P1 = [A.x + nA[0] * STUB, A.y]
-    const P2 = [B.x - nB[0] * STUB, B.y]
+    const P2 = [B.x + nB[0] * STUB, B.y]
     return simplify([[A.x, A.y], P1, [cb, A.y], [cb, B.y], P2, [B.x, B.y]])
   }
   if (kind === 'vhv') {
     // 竖-横-竖（两条端子都垂直）：过桥母线为横线 y = cb
     const P1 = [A.x, A.y + nA[1] * STUB]
-    const P2 = [B.x, B.y - nB[1] * STUB]
+    const P2 = [B.x, B.y + nB[1] * STUB]
     return simplify([[A.x, A.y], P1, [A.x, cb], [B.x, cb], P2, [B.x, B.y]])
   }
   // L 形（一横一竖）：拐点在 (B.x, A.y) 或 (A.x, B.y)
   if (kind === 'L-hv') {
     // A 横出、B 竖进 → 拐点 (B.x, A.y)
     const P1 = [A.x + nA[0] * STUB, A.y]
-    const P2 = [B.x, B.y - nB[1] * STUB]
+    const P2 = [B.x, B.y + nB[1] * STUB]
     return simplify([[A.x, A.y], P1, [B.x, A.y], P2, [B.x, B.y]])
   }
   // A 竖出、B 横进 → 拐点 (A.x, B.y)
   const P1 = [A.x, A.y + nA[1] * STUB]
-  const P2 = [B.x - nB[0] * STUB, B.y]
+  const P2 = [B.x + nB[0] * STUB, B.y]
   return simplify([[A.x, A.y], P1, [A.x, B.y], P2, [B.x, B.y]])
 }
 
-function routeOneWire(w, comps, wires) {
+function routeOneWire(w, comps, wires, softWires) {
   const ca = comps.find((c) => c.id === w.a.comp)
   const cb = comps.find((c) => c.id === w.b.comp)
   if (!ca || !cb) return [[0, 0], [0, 0]]
@@ -242,56 +249,96 @@ function routeOneWire(w, comps, wires) {
   if (Math.hypot(B.x - A.x, B.y - A.y) < 1) return [[A.x, A.y], [B.x, B.y]]
 
   const rects = comps.filter((c) => c.id !== w.a.comp && c.id !== w.b.comp).map(compAABB)
+  return routeBetween(A, nA, B, [nB], rects, wires, softWires) || [[A.x, A.y], [B.x, B.y]]
+}
 
-  const aH = nA[0] !== 0 // A 端为水平法向
-  const bH = nB[0] !== 0 // B 端为水平法向
-
-  let candidates = []
-  if (aH && bH) {
-    // 两条都水平 → 横-竖-横，过桥竖线 x 取候选车道
-    const xs = crossbarCandidates(A, B, nA, nB, 'x')
-    for (const x of xs) candidates.push({ kind: 'hzv', cb: x })
-  } else if (!aH && !bH) {
-    // 两条都垂直 → 竖-横-竖，过桥横线 y 取候选车道
-    const ys = crossbarCandidates(A, B, nA, nB, 'y')
-    for (const y of ys) candidates.push({ kind: 'vhv', cb: y })
-  } else if (aH && !bH) {
-    // A 横、B 竖 → L(横-竖)，拐点 (B.x, A.y)
-    candidates.push({ kind: 'L-hv', cb: 0 })
-  } else {
-    // A 竖、B 横 → L(竖-横)，拐点 (A.x, B.y)
-    candidates.push({ kind: 'L-vh', cb: 0 })
+// 收集候选折线：nbList 提供多组进线方向（普通导线 1 组；搭接支线给垂直方向供择优）
+function collectCandidates(A, nA, B, nbList) {
+  const out = []
+  for (const nB of nbList) {
+    const aH = nA[0] !== 0 // A 端为水平法向
+    const bH = nB[0] !== 0 // B 端为水平法向
+    if (aH && bH) {
+      // 两条都水平 → 横-竖-横，过桥竖线 x 取候选车道
+      for (const x of crossbarCandidates(A, B, nA, nB, 'x')) out.push({ kind: 'hzv', cb: x, nB })
+    } else if (!aH && !bH) {
+      // 两条都垂直 → 竖-横-竖，过桥横线 y 取候选车道
+      for (const y of crossbarCandidates(A, B, nA, nB, 'y')) out.push({ kind: 'vhv', cb: y, nB })
+    } else if (aH && !bH) {
+      // A 横、B 竖 → L(横-竖)，拐点 (B.x, A.y)
+      out.push({ kind: 'L-hv', cb: 0, nB })
+    } else {
+      // A 竖、B 横 → L(竖-横)，拐点 (A.x, B.y)
+      out.push({ kind: 'L-vh', cb: 0, nB })
+    }
   }
+  return out
+}
 
-  // 评分：优先"完全不撞"；同级优先拐点在两端子中点的（最短/最居中）；再比总长
+// 评分择优：硬障碍（元件盒 + 非共享导线）撞上重罚；
+// 软障碍（共享端子的导线，同端引出的短重合难以避免）按重合段数轻度惩罚，促使分道
+function routeBetween(A, nA, B, nbList, rects, wires, softWires) {
   let best = null
   let bestScore = Infinity
-  for (const c of candidates) {
-    const pts = buildPath(c.kind, A, nA, B, nB, c.cb)
+  const cands = collectCandidates(A, nA, B, nbList)
+  // 两端子共线（同水平 / 同垂直）时补充"直线"候选：正对时最自然，优先择优
+  if (Math.abs(A.x - B.x) < 1 || Math.abs(A.y - B.y) < 1) {
+    cands.push({ kind: 'straight', cb: 0, nB: nbList[0] })
+  }
+  for (const c of cands) {
+    const pts = c.kind === 'straight' ? [[A.x, A.y], [B.x, B.y]] : buildPath(c.kind, A, nA, B, c.nB, c.cb)
     const hit = pathCollides(pts, rects, wires)
+    let soft = 0
+    for (const sw of softWires || []) {
+      for (let i = 1; i < pts.length; i++) {
+        if (segNearWire(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], sw, CLEAR_WIRE)) soft++
+      }
+    }
     const mid = c.kind === 'hzv' ? Math.abs(c.cb - (A.x + B.x) / 2)
       : c.kind === 'vhv' ? Math.abs(c.cb - (A.y + B.y) / 2)
       : 0
-    const score = (hit ? 100000 : 0) + mid * 4 + pathLen(pts) * 0.05
+    const score = (hit ? 100000 : 0) + soft * 60 + mid * 4 + pathLen(pts) * 0.05
     if (score < bestScore) {
       bestScore = score
       best = pts
     }
   }
-  return best || [[A.x, A.y], [B.x, B.y]]
+  return best
 }
 
 // 主入口：返回 Map<wireId, [[x,y], ...]>（每条导线最多 2 个 90° 弯）
 export function routeAllWires(comps, wires) {
   const map = new Map()
   for (const w of wires) {
-    // 顺序布线：后布的线会主动避开先布好的导线折线
-    const routed = []
-    for (const id of map.keys()) routed.push(map.get(id))
-    const pts = routeOneWire(w, comps, routed)
+    // 顺序布线：后布的线主动避开先布好的导线折线；
+    // 与本线共享端子的导线降级为"软障碍"——促使走线分道，不再严格贴着重合
+    const hard = []
+    const soft = []
+    for (const [id, pts] of map) {
+      const x = wires.find((v) => v.id === id)
+      const shares =
+        x &&
+        ((x.a.comp === w.a.comp && x.a.term === w.a.term) ||
+          (x.a.comp === w.b.comp && x.a.term === w.b.term) ||
+          (x.b.comp === w.a.comp && x.b.term === w.a.term) ||
+          (x.b.comp === w.b.comp && x.b.term === w.b.term))
+      ;(shares ? soft : hard).push(pts)
+    }
+    const pts = routeOneWire(w, comps, hard, soft)
     map.set(w.id, pts && pts.length >= 2 ? pts : [[0, 0], [0, 0]])
   }
   return map
+}
+
+// 搭接支线布线：终点浮动在目标导线中点 B；进线方向在 nbList（垂直于目标线走向）中择优，
+// 呈 T 形接入。wires 为障碍折线（调用方需排除目标导线自身）。
+export function routeTapWire(comps, wires, softWires, aComp, aTerm, B, nbList) {
+  const ca = comps.find((c) => c.id === aComp)
+  if (!ca) return [[B.x, B.y], [B.x, B.y]]
+  const A = terminalWorld(ca, aTerm)
+  const nA = terminalNormal(ca.type, aTerm, ca.rot || 0)
+  const rects = comps.filter((c) => c.id !== aComp).map(compAABB)
+  return routeBetween(A, nA, B, nbList, rects, wires, softWires) || [[A.x, A.y], [B.x, B.y]]
 }
 
 export function toPathD(pts) {

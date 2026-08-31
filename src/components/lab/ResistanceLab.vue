@@ -460,7 +460,7 @@ onBeforeUnmount(() => {
           </div>
           <div class="r-temp-row">
             <button class="btn" :class="{ 'btn-primary': !hot }" :disabled="hotLocked" @click="hot = false">常温</button>
-            <button class="btn" :class="{ 'btn-primary': hot }" :disabled="hotLocked" @click="hot = true">加热 🔥</button>
+            <button class="btn" :class="{ 'btn-primary': hot }" :disabled="hotLocked" @click="hot = true">加热</button>
           </div>
           <p v-if="hotLocked" class="r-lock-note">已锁定：探究本变量时需保持温度不变</p>
         </div>

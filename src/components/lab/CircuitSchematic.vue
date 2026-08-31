@@ -1,8 +1,11 @@
 <script setup>
-// 自动生成的电路图：与搭建台共享同一份 netlist，渲染为标准电路符号 + 正交走线。
+// 自动生成的电路图：与搭建台共享同一份 netlist 与同一套路由（store.wirePaths），
+// 渲染为标准电路符号 + 正交走线；电子流动画与导线完全贴合。
 // 连接关系正确建立（闭合回路）后自动点亮，并标注"已生成电路图"。
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { META, schematicArt, routeWirePath, terminalNormal, pointOnPolyline } from '../../circuit/components'
+import { schematicArt, pointOnPolyline } from '../../circuit/components'
+import { toPathD } from '../../circuit/wireRouter'
+import { catmullRomSpline } from '../../circuit/smoothWire'
 import { useCircuitStore } from '../../stores/circuit'
 
 const store = useCircuitStore()
@@ -10,9 +13,6 @@ const phase = ref(0)
 let raf = null
 let last = 0
 
-function terminalWorldPos(compId, term) {
-  return store.terminalWorld(`${compId}:${term}`)
-}
 function artState(c) {
   const r = store.readouts[c.id] || {}
   const p = c.params
@@ -26,22 +26,31 @@ function artState(c) {
     reading: r.reading
   }
 }
-function normOf(compId, term) {
-  const c = store.compById(compId)
-  return terminalNormal(c ? c.type : 'bulb', term, c ? c.rot : 0)
-}
+// 与搭建台完全一致的导线折线（含关节点与搭接支线），电子严格贴线
 function wirePathD(w) {
-  const a = terminalWorldPos(w.a.comp, w.a.term)
-  const b = terminalWorldPos(w.b.comp, w.b.term)
-  const na = normOf(w.a.comp, w.a.term)
-  const nb = normOf(w.b.comp, w.b.term)
-  return routeWirePath(a.x, a.y, na[0], na[1], b.x, b.y, nb[0], nb[1])
+  const pts = store.wirePaths.get(w.id)
+  if (!pts || pts.length < 2) return ''
+  const hasDragged = w.joints && w.joints.some(j => Array.isArray(j))
+  return toPathD(hasDragged ? catmullRomSpline(pts) : pts)
 }
 function polylineLen(pts) {
   let s = 0
   for (let i = 1; i < pts.length; i++) s += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])
   return s
 }
+// 搭接支线的 T 形接点位置：直接取支线最终渲染曲线终点（与搭建台一致，接头无缝）
+const tapDots = computed(() => {
+  const out = []
+  for (const w of store.wires) {
+    if (!w.tap) continue
+    const pts = store.wirePaths.get(w.id)
+    if (!pts || pts.length < 2) continue
+    const hasDragged = w.joints && w.joints.some(j => Array.isArray(j))
+    const smooth = hasDragged ? catmullRomSpline(pts) : pts
+    out.push({ id: w.id, p: smooth[smooth.length - 1] })
+  }
+  return out
+})
 const electrons = computed(() => {
   const out = []
   const ph = phase.value
@@ -79,6 +88,7 @@ onBeforeUnmount(() => {
     <svg class="schem-svg" viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid meet">
       <rect x="0" y="0" width="1000" height="640" fill="#0b0e13" rx="10" />
       <path v-for="w in store.wires" :key="w.id" :d="wirePathD(w)" class="s-wire" />
+      <circle v-for="d in tapDots" :key="'td' + d.id" :cx="d.p[0]" :cy="d.p[1]" r="5" class="s-tapdot" />
       <circle v-for="(e, i) in electrons" :key="'e' + i" :cx="e.x" :cy="e.y" r="3" class="s-electron" :opacity="e.a" />
       <g
         v-for="c in store.components"
@@ -110,6 +120,9 @@ onBeforeUnmount(() => {
   stroke-width: 3;
   stroke-linejoin: round;
   stroke-linecap: round;
+}
+.s-tapdot {
+  fill: #9aa7b6;
 }
 .s-switch {
   cursor: pointer;

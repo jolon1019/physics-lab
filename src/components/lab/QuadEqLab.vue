@@ -67,7 +67,7 @@ const kind = computed(() => {
 
 /* 黑板解题步骤（随系数实时更新） */
 const steps = computed(() => {
-  if (kind.value === 'linear') return ['⚠ a = 0：二次项消失，这是一元一次方程', '一次方程 bx + c = 0 的解是 x = −c/b']
+  if (kind.value === 'linear') return ['a = 0：二次项消失，这是一元一次方程', '一次方程 bx + c = 0 的解是 x = −c/b']
   const l1 = `① 判别式　Δ = b² − 4ac = (${b.value})² − 4×${a.value}×${c.value} = ${delta.value}`
   const l2 = `② 判断　Δ ${delta.value > 0 ? '>' : delta.value < 0 ? '<' : '='} 0 → ${
     kind.value === 'two' ? '两个不相等的实根' : kind.value === 'double' ? '两个相等的实根（重根）' : '无实数根'

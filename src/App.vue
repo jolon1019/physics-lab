@@ -7,6 +7,7 @@ import { useLayoutStore } from './stores/layout'
 import { boardTheme, toggleBoardVariant } from './lib/boardTheme'
 import SideNav from './components/SideNav.vue'
 import LoginModal from './components/LoginModal.vue'
+import { Analytics } from '@vercel/analytics/vue'
 
 const route = useRoute()
 // 试卷资料库页不展示左侧实验目录（嵌入文档需要整行宽度）
@@ -138,11 +139,13 @@ function onGlobalClick() {
   <div class="app-shell" :class="{ 'nav-collapsed': layout.navCollapsed, 'topbar-hidden': layout.topbarHidden }">
     <header class="topbar">
       <div class="brand-block">
-        <div class="brand-mark" aria-hidden="true"></div>
-        <div class="brand-text">
-          <p class="eyebrow">初中物理 · 数学</p>
-          <h1>自主自学实验平台</h1>
-        </div>
+        <RouterLink to="/" class="brand-home">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <div class="brand-text">
+            <p class="eyebrow">初中物理 · 数学</p>
+            <h1>自主自学实验平台</h1>
+          </div>
+        </RouterLink>
         <RouterLink to="/record" class="progress-chip">⑤ 已通过 {{ progress.completedCount }} 个实验</RouterLink>
       </div>
 
@@ -156,7 +159,7 @@ function onGlobalClick() {
           :aria-label="layout.navCollapsed ? '展开实验目录' : '收起实验目录'"
           @click="layout.toggleNav()"
         >
-          <span class="nav-toggle-icon">{{ layout.navCollapsed ? '☰' : '✕' }}</span>
+          <span class="nav-toggle-icon">{{ layout.navCollapsed ? '»' : '«' }}</span>
         </button>
         <!-- 资料库页时此按钮变为返回实验平台入口 -->
         <RouterLink
@@ -173,11 +176,10 @@ function onGlobalClick() {
           :title="layout.topbarHidden ? '退出沉浸模式' : '进入沉浸模式（隐藏顶栏与边栏）'"
           @click="onToggleTopbar"
         >
-          <span class="nav-toggle-icon">{{ layout.topbarHidden ? '⤢' : '⤡' }}</span>
           <span class="nav-toggle-text">{{ layout.topbarHidden ? '退出沉浸' : '沉浸模式' }}</span>
         </button>
         <button class="board-toggle" type="button" :title="boardTheme.variant === 'light' ? '切回深色黑板背景' : '切换为浅色背景'" @click="toggleBoardVariant">
-          {{ boardTheme.variant === 'light' ? '🌑 黑板' : '🟨 浅色' }}
+          {{ boardTheme.variant === 'light' ? '黑板' : '浅色' }}
         </button>
         <template v-if="auth.isLoggedIn">
           <div class="user-menu" @click.stop>
@@ -185,6 +187,9 @@ function onGlobalClick() {
               <span class="user-email" :title="auth.user?.email">{{ auth.user?.email }}</span>
             </button>
             <div v-if="showUserMenu" class="user-dropdown" @click.stop>
+              <RouterLink class="dropdown-item" to="/record" @click="showUserMenu = false">
+                学习记录
+              </RouterLink>
               <button v-if="auth.isAdmin" class="dropdown-item" @click="openUserMgmt(); showUserMenu = false">
                 用户管理
               </button>
@@ -230,6 +235,9 @@ function onGlobalClick() {
     ></div>
 
     <LoginModal v-if="auth.showLogin" />
+
+    <!-- Vercel 访问统计 -->
+    <Analytics />
 
     <!-- 修改密码弹窗 -->
     <div v-if="showChangePwd" class="modal-mask" @click.self="closeChangePwd">
@@ -497,6 +505,7 @@ function onGlobalClick() {
   font-size: 13px;
   font-weight: 700;
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
   transition: background 0.12s;
 }

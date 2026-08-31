@@ -145,7 +145,7 @@ function unitLines(sq, n) {
           <path class="right-mark" :d="`M ${geo.P.x + 14} ${geo.P.y} L ${geo.P.x + 14} ${geo.P.y - 14} L ${geo.P.x} ${geo.P.y - 14}`" />
 
           <!-- 边长标签 -->
-          <text class="lbl lbl-a" :x="geo.P.x - 10" :y="(geo.P.y + geo.R.y) / 2" text-anchor="end">a = {{ fmt(a) }}</text>
+          <text class="lbl lbl-a" :x="geo.P.x + 12" :y="(geo.P.y + geo.R.y) / 2" text-anchor="start">a = {{ fmt(a) }}</text>
           <text class="lbl lbl-b" :x="(geo.P.x + geo.Q.x) / 2 - 16" :y="geo.P.y - 8">b = {{ fmt(b) }}</text>
           <text class="lbl lbl-c" :x="(geo.Q.x + geo.R.x) / 2 + 12" :y="(geo.Q.y + geo.R.y) / 2">c = {{ geo.c.toFixed(2) }}</text>
 

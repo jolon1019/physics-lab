@@ -685,7 +685,7 @@ onBeforeUnmount(() => {
         <div v-else class="record-empty">尚无数据 — 按左侧步骤实验后点「记录本次数据」</div>
         <!-- 结论 -->
         <div class="record-concl" v-if="conclusion.length">
-          <div class="concl-title">📌 初步结论</div>
+          <div class="concl-title">初步结论</div>
           <p v-for="(c, i) in conclusion" :key="i">{{ c }}</p>
         </div>
       </div>

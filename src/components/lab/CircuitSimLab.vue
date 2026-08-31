@@ -27,11 +27,6 @@ const SCENARIOS = [
   { key: 'ohm', label: '欧姆定律' },
   { key: 'free', label: '自由搭建' }
 ]
-const TOOLS = [
-  { key: 'select', label: '选择/移动' },
-  { key: 'erase', label: '删除元件' },
-  { key: 'rotate', label: '旋转' }
-]
 
 const selectedComp = computed(() => (store.selectedId ? store.compById(store.selectedId) : null))
 
@@ -126,7 +121,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="sim">
+  <div class="sim" :class="{ 'is-free': store.scenario === 'free' }">
     <!-- 左：元件库 -->
     <aside class="col-left">
       <ComponentPalette />
@@ -145,22 +140,18 @@ onBeforeUnmount(() => {
       <CircuitBuildCanvas />
 
       <div class="sim-tools">
-        <button v-for="t in TOOLS" :key="t.key" class="tool" :class="{ on: store.tool === t.key }" @click="store.tool = t.key">
-          {{ t.label }}
-        </button>
-        <span class="tool-sep"></span>
         <button class="tool" :class="{ on: store.running }" @click="store.running = !store.running">
-          {{ store.running ? '⏸ 暂停' : '▶ 运行' }}
+          {{ store.running ? '暂停' : '运行' }}
         </button>
-        <button class="tool" @click="store.clear()">🗑 清空</button>
+        <button class="tool" @click="store.clear()">清空</button>
       </div>
-      <p class="conn-hint">💡 连线：依次单击两个元件的接线柱即可连通；右键单击电线可删除；单击空白处取消待连。</p>
+      <p class="conn-hint">连线：依次单击两个元件的接线柱即可连通；右键单击电线可删除；点选元件后可用虚线框旁的按钮旋转或删除。</p>
 
-      <p v-if="store.status.msg" class="sim-msg" :class="{ short: store.status.short }">⚠ {{ store.status.msg }}</p>
+      <p v-if="store.status.msg" class="sim-msg" :class="{ short: store.status.short }">{{ store.status.msg }}</p>
     </section>
 
-    <!-- 右：参数 + 公式 + 读数 -->
-    <aside class="col-right">
+    <!-- 右：参数 + 公式 + 读数（自由搭建场景下整体隐藏，画布占满宽度） -->
+    <aside class="col-right" v-if="store.scenario !== 'free'">
       <div class="lab-panel">
         <div class="lab-panel-head"><strong>可调变量</strong><span>实时计算</span></div>
         <ParamSlider :model-value="store.sourceVoltage" :min="1.5" :max="12" :step="0.5" :precision="1" label="电源电压 U" unit=" V" @update:modelValue="store.setVoltage" />
@@ -234,6 +225,10 @@ onBeforeUnmount(() => {
   grid-template-columns: 210px minmax(0, 1fr) 340px;
   gap: 14px;
   align-items: start;
+}
+/* 自由搭建：右栏整体隐藏，搭建台占满剩余宽度 */
+.sim.is-free {
+  grid-template-columns: 210px minmax(0, 1fr);
 }
 .col-left,
 .col-right {
@@ -313,12 +308,6 @@ onBeforeUnmount(() => {
   padding: 7px 10px;
   margin: 0;
   line-height: 1.5;
-}
-.tool-sep {
-  width: 1px;
-  height: 22px;
-  background: var(--line);
-  margin: 0 4px;
 }
 .sim-msg {
   font-size: 13px;

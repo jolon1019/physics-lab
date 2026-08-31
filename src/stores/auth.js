@@ -25,8 +25,8 @@ export const useAuthStore = defineStore('auth', {
     isLoggedIn: (s) => !!s.token,
     isAdmin: (s) => s.user?.role === 'admin',
     isMember: (s) => !!s.user && (s.user.membership === 'member' || s.user.role === 'admin'),
-    // 某实验是否对当前用户锁定（会员专享且非会员/未登录）
-    isLocked: (s) => (expId) => s.paidExperiments.includes(expId) && !s.isMember
+    // 会员专享实验：列表始终可见，游客与免费用户不可点击（字体置灰）
+    isLocked: (s) => (expId) => s.paidExperiments.includes(expId) && !s.isMember,
   },
   actions: {
     // 应用启动时校验本地 token 是否仍有效

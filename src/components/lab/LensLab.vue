@@ -445,7 +445,7 @@ function checkSeen() {
       <div class="lab-panel board-dark" style="padding:0;overflow:hidden;position:relative">
         <!-- 完全复制参考案例的 HTML 结构 -->
         <div class="lab-container" ref="labRef" id="labContainer">
-          <div class="lab-title">🔬 凸透镜成像 — 块状F形LED光源</div>
+          <div class="lab-title">凸透镜成像 — 块状F形LED光源</div>
 
           <div class="legend">
             <div><span class="l-in"></span>入射光（物→透镜）</div>
@@ -521,11 +521,11 @@ function checkSeen() {
           </div>
 
           <div class="hint hint-v" id="hintV">
-            👁 撤去光屏，从右侧透过透镜观察<br>
+            撤去光屏，从右侧透过透镜观察<br>
             可见<span style="color:#60a5fa">正立、放大的虚像</span>（与F光源在透镜同侧）
           </div>
           <div class="hint hint-n" id="hintN">
-            ⚠️ 物距 u ≈ f，光线经透镜后近似平行<br>
+            注意：物距 u ≈ f，光线经透镜后近似平行<br>
             无法会聚成像
           </div>
 
@@ -543,7 +543,7 @@ function checkSeen() {
             </div>
 
             <div class="info" style="flex:1;border:none;padding:0 10px">
-              <div class="info-title">📊 成像分析</div>
+              <div class="info-title">成像分析</div>
               <div class="info-body" id="infoB">
                 调节物距，观察块状F光源上中下三道光路经凸透镜后的成像
               </div>

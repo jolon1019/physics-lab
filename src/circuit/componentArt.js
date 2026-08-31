@@ -115,29 +115,54 @@ function artSwitch(open) {
 </g>`
 }
 
-/* ===== 滑动变阻器（金属框架 + 铜线圈 + 顶杆滑套）===== */
-function artRheostat() {
+/* ===== 滑动变阻器（金属框架 + 铜线圈 + 顶杆滑套 + 滑片；st.frac 0..1 决定滑片位置）
+        加长版：半宽 56（端子 A/B 同步外移到 ±56），滑杆行程 -45..45，滑片更易拖拽 ===== */
+function artRheostat(frac = 0.5) {
   let wind = ''
-  for (let x = -25; x <= 25; x += 2.8) {
+  for (let x = -37; x <= 37; x += 3.5) {
     wind += `<line x1="${x}" y1="-10" x2="${x}" y2="13" stroke="rgba(60,25,5,0.5)" stroke-width="1.2"/>`
   }
-  return `${shadow(0, 40, 40)}
-<line x1="-30" y1="16" x2="-35" y2="38" stroke="#39414c" stroke-width="5" stroke-linecap="round"/>
-<line x1="30" y1="16" x2="35" y2="38" stroke="#39414c" stroke-width="5" stroke-linecap="round"/>
-<line x1="-12" y1="16" x2="-12" y2="36" stroke="#39414c" stroke-width="4.5" stroke-linecap="round"/>
-<line x1="12" y1="16" x2="12" y2="36" stroke="#39414c" stroke-width="4.5" stroke-linecap="round"/>
-<rect x="-38" y="-32" width="10" height="50" rx="3" fill="url(#ca-metal)" stroke="#39414c" stroke-width="1.5"/>
-<rect x="28" y="-32" width="10" height="50" rx="3" fill="url(#ca-metal)" stroke="#39414c" stroke-width="1.5"/>
-<rect x="-30" y="-12" width="60" height="28" rx="11" fill="url(#ca-copper)" stroke="#5f2f0e" stroke-width="1.5"/>
+  // 顶杆在 (-45..45) 范围，取 frac 比例
+  const rodX = -45 + 90 * Math.max(0, Math.min(1, frac))
+  return `${shadow(0, 40, 52)}
+<line x1="-40" y1="16" x2="-46" y2="38" stroke="#39414c" stroke-width="5" stroke-linecap="round"/>
+<line x1="40" y1="16" x2="46" y2="38" stroke="#39414c" stroke-width="5" stroke-linecap="round"/>
+<line x1="-16" y1="16" x2="-16" y2="36" stroke="#39414c" stroke-width="4.5" stroke-linecap="round"/>
+<line x1="16" y1="16" x2="16" y2="36" stroke="#39414c" stroke-width="4.5" stroke-linecap="round"/>
+<rect x="-52" y="-32" width="10" height="50" rx="3" fill="url(#ca-metal)" stroke="#39414c" stroke-width="1.5"/>
+<rect x="42" y="-32" width="10" height="50" rx="3" fill="url(#ca-metal)" stroke="#39414c" stroke-width="1.5"/>
+<rect x="-42" y="-12" width="84" height="28" rx="11" fill="url(#ca-copper)" stroke="#5f2f0e" stroke-width="1.5"/>
 ${wind}
-<rect x="-27" y="-10" width="54" height="5.5" rx="2.75" fill="#fff" opacity="0.18"/>
-<rect x="-26" y="-5" width="8" height="12" rx="2" fill="url(#ca-red)" stroke="#8c1a10" stroke-width="1"/>
-<rect x="18" y="-5" width="8" height="12" rx="2" fill="url(#ca-red)" stroke="#8c1a10" stroke-width="1"/>
-<rect x="-42" y="-32" width="84" height="8" rx="4" fill="url(#ca-metal)" stroke="#39414c" stroke-width="1.5"/>
-<circle cx="-42" cy="-28" r="4" fill="#dfe7ee" stroke="#39414c" stroke-width="1.1"/>
-<circle cx="42" cy="-28" r="4" fill="#dfe7ee" stroke="#39414c" stroke-width="1.1"/>
-<rect x="-35" y="-40" width="14" height="12" rx="3" fill="url(#ca-metal)" stroke="#39414c" stroke-width="1.4"/>
-<line x1="-28" y1="-28" x2="-28" y2="-13" stroke="#8b98a7" stroke-width="3.2"/>`
+<rect x="-39" y="-10" width="78" height="5.5" rx="2.75" fill="#fff" opacity="0.18"/>
+<rect x="-37" y="-5" width="8" height="12" rx="2" fill="url(#ca-red)" stroke="#8c1a10" stroke-width="1"/>
+<rect x="29" y="-5" width="8" height="12" rx="2" fill="url(#ca-red)" stroke="#8c1a10" stroke-width="1"/>
+<rect x="-56" y="-32" width="112" height="8" rx="4" fill="url(#ca-metal)" stroke="#39414c" stroke-width="1.5"/>
+<circle cx="-56" cy="-28" r="4" fill="#dfe7ee" stroke="#39414c" stroke-width="1.1"/>
+<circle cx="56" cy="-28" r="4" fill="#dfe7ee" stroke="#39414c" stroke-width="1.1"/>
+<rect x="-46" y="-40" width="14" height="12" rx="3" fill="url(#ca-metal)" stroke="#39414c" stroke-width="1.4"/>
+<line x1="-39" y1="-28" x2="-39" y2="-13" stroke="#8b98a7" stroke-width="3.2"/>
+<g>
+  <rect x="${rodX - 4}" y="-32" width="8" height="4" rx="1.5" fill="#3a434f" stroke="#1a1f25" stroke-width="0.8"/>
+  <line x1="${rodX}" y1="-28" x2="${rodX}" y2="-13" stroke="#1a1f25" stroke-width="2.4" stroke-linecap="round"/>
+</g>`
+}
+
+/* ===== 定值电阻（陶瓷实心立柱 + 四色环 + 两引脚；st.resistance 用于可选 R 标签）===== */
+function artResistor(st = {}) {
+  const ohm = st.resistance ? `${st.resistance}Ω` : ''
+  return `${shadow(0, 32, 42)}
+<rect x="-44" y="-13" width="6" height="26" rx="2" fill="url(#ca-metal)" stroke="#39414c" stroke-width="1.2"/>
+<rect x="38" y="-13" width="6" height="26" rx="2" fill="url(#ca-metal)" stroke="#39414c" stroke-width="1.2"/>
+<line x1="-44" y1="0" x2="-30" y2="0" stroke="#77828f" stroke-width="2"/>
+<line x1="30" y1="0" x2="44" y2="0" stroke="#77828f" stroke-width="2"/>
+<rect x="-30" y="-15" width="60" height="30" rx="3" fill="#f3e6c0" stroke="#a97a2e" stroke-width="1.4"/>
+<rect x="-30" y="-15" width="60" height="6" rx="3" fill="#fff" opacity="0.45"/>
+<!-- 四色环：棕黑红金 = 1kΩ ±5%（演示色与电阻选型无关，但贴近实物） -->
+<rect x="-22" y="-16" width="4" height="32" fill="#7b3a16"/>
+<rect x="-12" y="-16" width="4" height="32" fill="#0d0d0d"/>
+<rect x="-2" y="-16" width="4" height="32" fill="#c9241b"/>
+<rect x="8" y="-16" width="4" height="32" fill="#caa233"/>
+<text x="22" y="3" text-anchor="middle" font-size="7" font-family="ui-monospace,monospace" fill="#5f2f0e" font-weight="700">${ohm}</text>`
 }
 
 /* ===== 对外接口 ===== */
@@ -147,14 +172,20 @@ const BUILDERS = {
   voltmeter: () => artMeter('V'),
   bulb: () => artBulb(),
   switch: (st) => artSwitch(!!st.open),
-  rheostat: () => artRheostat()
+  rheostat: (st) => artRheostat(st && typeof st.frac === 'number' ? st.frac : 0.5),
+  resistor: (st) => artResistor(st)
 }
 
 const CACHE = {}
 
 // 返回元件矢量图（不含渐变外的公共 defs 由本函数一起给出）
 export function componentArtSvg(type, st = {}) {
-  const key = type + (type === 'switch' && st.open ? ':open' : '')
+  // 缓存 key 必须反映 state：switch 的开合、rheostat 的 frac 都会改变形状；
+  // resistor 的 resistance 只影响标签文字，也带进 key 避免 stale
+  const openKey = type === 'switch' && st.open ? ':open' : ''
+  const fracKey = type === 'rheostat' && typeof st.frac === 'number' ? ':f' + st.frac.toFixed(3) : ''
+  const ohmKey = type === 'resistor' && st.resistance ? ':' + st.resistance : ''
+  const key = type + openKey + fracKey + ohmKey
   if (!CACHE[key]) {
     const body = BUILDERS[type] ? BUILDERS[type](st) : ''
     CACHE[key] = DEFS + body
@@ -165,7 +196,10 @@ export function componentArtSvg(type, st = {}) {
 // canvas 用：SVG → data URL（drawCircuitIcon 经 Image blit；data URL 无网络请求）
 const URL_CACHE = {}
 export function artDataUrl(type, st = {}) {
-  const key = type + (type === 'switch' && st.open ? ':open' : '')
+  const openKey = type === 'switch' && st.open ? ':open' : ''
+  const fracKey = type === 'rheostat' && typeof st.frac === 'number' ? ':f' + st.frac.toFixed(3) : ''
+  const ohmKey = type === 'resistor' && st.resistance ? ':' + st.resistance : ''
+  const key = type + openKey + fracKey + ohmKey
   if (!URL_CACHE[key]) {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="-50 -50 100 100">${componentArtSvg(type, st)}</svg>`
     URL_CACHE[key] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
