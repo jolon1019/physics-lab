@@ -153,18 +153,17 @@ onMounted(syncOpen)
 
         <div v-if="openGrades.has(g.grade)" class="nav-exps">
           <template v-for="e in g.experiments" :key="e.id">
-            <!-- 会员专享且无权限：保留条目但不可点击 -->
-            <span
+            <!-- 会员专享且无权限：可点击进入实验页，展示会员门禁界面 -->
+            <RouterLink
               v-if="isLocked(e.id)"
+              :to="`/experiment/${e.id}`"
               class="nav-exp locked"
               :class="{ active: isActive(e.id) }"
-              title="会员专享实验，开通会员后可用"
-              aria-disabled="true"
+              title="会员专享实验，点击查看详情"
             >
               <span class="nav-exp-state">{{ isDone(e.id) ? '✓' : '' }}</span>
               <span class="nav-exp-title">{{ e.title }}</span>
-              <span class="nav-lock-tag">会员</span>
-            </span>
+            </RouterLink>
             <RouterLink
               v-else
               :to="`/experiment/${e.id}`"

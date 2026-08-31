@@ -100,8 +100,11 @@ function normalizeUsers(arr) {
       u.role = i === 0 ? 'admin' : 'user'
       changed = true
     }
-    if (!u.membership) {
-      u.membership = 'free'
+    // 迁移旧版 membership（字符串）到新版（对象）
+    if (u.membership === undefined || u.membership === null || typeof u.membership === 'string') {
+      u.membership = u.membership === 'member'
+        ? { plan: 'permanent', expiresAt: null }
+        : { plan: 'free', expiresAt: null }
       changed = true
     }
   })
@@ -268,6 +271,15 @@ export const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
 }
+
+// 计算会员信息：返回 { plan, expiresAt, isMember }
+function memberInfo(membership) {
+  const m = membership || { plan: 'free', expiresAt: null }
+  const now = new Date()
+  const isMember = m.plan === 'permanent' ||
+    ((m.plan === 'monthly' || m.plan === 'yearly') && m.expiresAt && new Date(m.expiresAt) > now)
+  return { plan: m.plan, expiresAt: m.expiresAt, isMember }
+}
 function send(res, status, obj) {
   const body = JSON.stringify(obj)
   res.writeHead(status, {
@@ -393,10 +405,11 @@ export async function handleApi(req, res, url) {
       hash,
       role: isFirst ? 'admin' : 'user',
       createdAt: new Date().toISOString(),
+      membership: { plan: 'free', expiresAt: null },
       progress: defaultProgress()
     })
     await saveUsers(users)
-    return send(res, 201, { token: makeToken(email), user: { email, role: isFirst ? 'admin' : 'user', membership: 'free' } })
+    return send(res, 201, { token: makeToken(email), user: { email, role: isFirst ? 'admin' : 'user', membership: memberInfo(null) } })
   }
 
   if (url.pathname === '/api/login' && req.method === 'POST') {
@@ -421,14 +434,14 @@ export async function handleApi(req, res, url) {
     }
     loginFails.delete(ip)
     const role = user.role || 'user'
-    return send(res, 200, { token: makeToken(email), user: { email, role, membership: user.membership || 'free' } })
+    return send(res, 200, { token: makeToken(email), user: { email, role, membership: memberInfo(user.membership) } })
   }
 
   if (url.pathname === '/api/me' && req.method === 'GET') {
     const users = await loadUsers()
     const user = authUser(req, users)
     if (!user) return send(res, 200, { user: null })
-    return send(res, 200, { user: { email: user.email, role: user.role || 'user', membership: user.membership || 'free' } })
+    return send(res, 200, { user: { email: user.email, role: user.role || 'user', membership: memberInfo(user.membership) } })
   }
 
   // 无状态 token 无需服务端注销：前端删除本地 token 即失效
@@ -572,7 +585,7 @@ export async function handleApi(req, res, url) {
     const list = users.map((u) => ({
       email: u.email,
       role: u.role || 'user',
-      membership: u.membership || 'free',
+      membership: memberInfo(u.membership),
       createdAt: u.createdAt || null
     }))
     return send(res, 200, { users: list })
@@ -668,7 +681,7 @@ export async function handleApi(req, res, url) {
     return send(res, 200, { ok: true })
   }
 
-  // 管理员：设置用户会员身份
+  // 管理员：设置用户会员套餐
   if (url.pathname === '/api/admin/user-membership' && req.method === 'POST') {
     const users = await loadUsers()
     const admin = authUser(req, users)
@@ -680,13 +693,23 @@ export async function handleApi(req, res, url) {
     } catch (e) {
       return send(res, 400, { message: e.message })
     }
-    const { email, membership } = body || {}
-    if (!email || !['free', 'member'].includes(membership)) {
+    const { email, plan } = body || {}
+    if (!email || !['free', 'monthly', 'yearly', 'permanent'].includes(plan)) {
       return send(res, 400, { message: '参数不合法' })
     }
     const target = users.find((u) => u.email === String(email).trim().toLowerCase())
     if (!target) return send(res, 404, { message: '用户不存在' })
-    target.membership = membership
+    if (plan === 'free') {
+      target.membership = { plan: 'free', expiresAt: null }
+    } else if (plan === 'monthly') {
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      target.membership = { plan: 'monthly', expiresAt }
+    } else if (plan === 'yearly') {
+      const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+      target.membership = { plan: 'yearly', expiresAt }
+    } else if (plan === 'permanent') {
+      target.membership = { plan: 'permanent', expiresAt: null }
+    }
     await saveUsers(users)
     return send(res, 200, { ok: true })
   }

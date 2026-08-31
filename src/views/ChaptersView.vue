@@ -24,8 +24,13 @@ function progressOf(expId) {
 
   <div class="exp-grid">
     <template v-for="e in grade.experiments" :key="e.id">
-      <!-- 会员专享且无权限：卡片可见但不可点击 -->
-      <div v-if="auth.isLocked(e.id)" class="card exp-item locked" title="会员专享实验，开通会员后可用">
+      <!-- 会员专享且无权限：可点击进入实验页，展示会员门禁界面 -->
+      <RouterLink
+        v-if="auth.isLocked(e.id)"
+        :to="`/experiment/${e.id}`"
+        class="card exp-item locked"
+        title="会员专享实验，点击查看详情"
+      >
         <div class="exp-body">
           <h3>{{ e.title }} <span class="lock-chip">会员</span></h3>
           <p>{{ e.type }}实验 · {{ e.level }}</p>
@@ -33,7 +38,7 @@ function progressOf(expId) {
         <div class="exp-right">
           <ProgressBadge :record="progressOf(e.id)" />
         </div>
-      </div>
+      </RouterLink>
       <RouterLink
         v-else
         :to="`/experiment/${e.id}`"
@@ -53,8 +58,7 @@ function progressOf(expId) {
 
 <style scoped>
 .exp-item.locked {
-  cursor: not-allowed;
-  opacity: 0.6;
+  color: var(--text-dim);
 }
 .lock-chip {
   font-size: 11px;

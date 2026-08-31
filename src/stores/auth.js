@@ -24,7 +24,19 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isLoggedIn: (s) => !!s.token,
     isAdmin: (s) => s.user?.role === 'admin',
-    isMember: (s) => !!s.user && (s.user.membership === 'member' || s.user.role === 'admin'),
+    isMember: (s) => {
+      if (!s.user) return false
+      if (s.user.role === 'admin') return true
+      const m = s.user.membership
+      if (!m) return false
+      // 服务端已计算 isMember，本地再做兜底检查
+      if (m.isMember) return true
+      if (m.plan === 'permanent') return true
+      if ((m.plan === 'monthly' || m.plan === 'yearly') && m.expiresAt) {
+        return new Date(m.expiresAt) > new Date()
+      }
+      return false
+    },
     // 会员专享实验：列表始终可见，游客与免费用户不可点击（字体置灰）
     isLocked: (s) => (expId) => s.paidExperiments.includes(expId) && !s.isMember,
   },
@@ -106,8 +118,8 @@ export const useAuthStore = defineStore('auth', {
     async adminSetRole(email, role) {
       return api.adminSetRole(email, role)
     },
-    async adminSetMembership(email, membership) {
-      return api.adminSetMembership(email, membership)
+    async adminSetMembership(email, plan) {
+      return api.adminSetMembership(email, plan)
     },
     async adminGetSettings() {
       return api.adminGetSettings()

@@ -152,15 +152,21 @@ const steps = [
       </div>
       <div class="hp-exp-grid">
         <template v-for="e in featured" :key="e.id">
-          <div v-if="auth.isLocked(e.id)" class="hp-exp card locked" title="会员专享实验，开通会员后可用">
+          <!-- 会员专享且无权限：可点击进入实验页，展示会员门禁界面 -->
+          <RouterLink
+            v-if="auth.isLocked(e.id)"
+            :to="`/experiment/${e.id}`"
+            class="hp-exp card locked"
+            title="会员专享实验，点击查看详情"
+          >
             <div class="hp-exp-top">
               <span class="hp-exp-type">{{ e.type }}</span>
               <span :class="['tag', e.level === '核心' ? 'tag-core' : 'tag-basic']">{{ e.level }}</span>
             </div>
             <h3 class="hp-exp-title">{{ e.title }} <span class="lock-chip">会员</span></h3>
             <p class="hp-exp-meta">{{ e.grade }}</p>
-            <span class="hp-exp-go locked-go">会员专享 · 不可点击</span>
-          </div>
+            <span class="hp-exp-go locked-go">会员专享 · 查看详情</span>
+          </RouterLink>
           <RouterLink
             v-else
             :to="`/experiment/${e.id}`"
@@ -554,10 +560,9 @@ const steps = [
   }
 }
 
-/* 会员专享卡片（首页精选） */
+/* 会员专享卡片（首页精选）：可点击进入门禁详情 */
 .hp-exp.locked {
-  cursor: not-allowed;
-  opacity: 0.6;
+  color: var(--text-dim);
 }
 .lock-chip {
   font-size: 11px;

@@ -47,14 +47,18 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
+  const auth = useAuthStore()
   // 需要登录但未登录：打开登录弹窗，并记住登录后要去的页面
   if (to.meta.requiresAuth) {
-    const auth = useAuthStore()
     if (!auth.token) {
       auth.openLogin(to.fullPath)
       return { path: '/' }
     }
+  }
+  // 进入实验页前确保付费实验名单已加载，否则门禁失效
+  if (to.name === 'experiment' && !auth.paidExperiments.length) {
+    await auth.loadSettings()
   }
   // 支持 liziwuli 风格 ?experiment=slug 直达
   const slug = to.query.experiment

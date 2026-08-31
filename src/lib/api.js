@@ -61,8 +61,8 @@ export function adminResetPassword(email, newPassword) {
 export function adminSetRole(email, role) {
   return request('/admin/user-role', { method: 'POST', body: { email, role } })
 }
-export function adminSetMembership(email, membership) {
-  return request('/admin/user-membership', { method: 'POST', body: { email, membership } })
+export function adminSetMembership(email, plan) {
+  return request('/admin/user-membership', { method: 'POST', body: { email, plan } })
 }
 export function getPublicSettings() {
   return request('/settings', { method: 'GET' })

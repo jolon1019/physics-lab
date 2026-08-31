@@ -158,6 +158,24 @@ function nextQuiz() {
           <div v-if="locked" class="panel lock-panel">
             <p class="lock-title">该实验为会员专享</p>
             <p class="lock-sub">开通会员后即可动手操作，实验理论与巩固练习仍然免费开放</p>
+            <div class="pay-plans">
+              <div class="pay-plan">
+                <p class="pay-name">月卡</p>
+                <p class="pay-price">¥9.9</p>
+                <p class="pay-note">30 天全部实验</p>
+              </div>
+              <div class="pay-plan">
+                <p class="pay-name">年卡</p>
+                <p class="pay-price">¥59</p>
+                <p class="pay-note">365 天全部实验</p>
+              </div>
+              <div class="pay-plan">
+                <p class="pay-name">永久</p>
+                <p class="pay-price">¥99</p>
+                <p class="pay-note">一次买断 不过期</p>
+              </div>
+            </div>
+            <p class="pay-tip">选择套餐后，请联系管理员完成支付与开通</p>
             <div style="display: flex; gap: 10px; justify-content: center; margin-top: 14px">
               <button v-if="!auth.isLoggedIn" class="btn btn-primary" @click="auth.openLogin(route.fullPath)">登录 / 注册</button>
               <RouterLink v-else to="/resources" class="btn btn-primary">了解会员</RouterLink>
@@ -217,6 +235,24 @@ function nextQuiz() {
           <div v-else-if="auth.isLocked(route.params.id)" class="panel lock-panel">
             <h3>该实验为会员专享</h3>
             <p class="lock-desc">当前实验仅对会员账号开放。免费账号可浏览实验理论与巩固练习，动手实验需要会员权限。</p>
+            <div class="pay-plans">
+              <div class="pay-plan">
+                <p class="pay-name">月卡</p>
+                <p class="pay-price">¥9.9</p>
+                <p class="pay-note">30 天全部实验</p>
+              </div>
+              <div class="pay-plan">
+                <p class="pay-name">年卡</p>
+                <p class="pay-price">¥59</p>
+                <p class="pay-note">365 天全部实验</p>
+              </div>
+              <div class="pay-plan">
+                <p class="pay-name">永久</p>
+                <p class="pay-price">¥99</p>
+                <p class="pay-note">一次买断 不过期</p>
+              </div>
+            </div>
+            <p class="pay-tip">选择套餐后，请联系管理员完成支付与开通</p>
             <div class="lock-status">
               <template v-if="!auth.isLoggedIn">
                 <button class="btn btn-primary" @click="auth.openLogin(route.fullPath)">登录账号</button>
@@ -345,6 +381,35 @@ function nextQuiz() {
 }
 .lock-title { font-size: 20px; font-weight: 900; margin: 10px 0 6px; }
 .lock-sub { color: var(--text-dim); font-size: 13.5px; margin: 0; }
+
+/* 支付套餐提示 */
+.pay-plans {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 20px 0 4px;
+}
+.pay-plan {
+  min-width: 118px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-3);
+}
+.pay-name { font-size: 13px; font-weight: 700; color: var(--text-dim); margin: 0; }
+.pay-price {
+  font-size: 22px;
+  font-weight: 900;
+  margin: 6px 0 2px;
+  color: var(--accent-strong, #b8860b);
+}
+.pay-note { font-size: 12px; color: var(--text-dim); margin: 0; }
+.pay-tip {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  margin: 10px 0 0;
+}
 .stage-pop-mask {
   position: fixed;
   inset: 0;

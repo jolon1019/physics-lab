@@ -71,11 +71,17 @@ async function setRole(u, role) {
   }
 }
 
-async function setMembership(u, membership) {
+async function setMembership(u, plan) {
   try {
-    await auth.adminSetMembership(u.email, membership)
-    u.membership = membership
-    flashOk(`已将 ${u.email} 设为${membership === 'member' ? '会员' : '免费用户'}`)
+    await auth.adminSetMembership(u.email, plan)
+    // 乐观更新前端状态
+    const now = new Date()
+    let expiresAt = null
+    if (plan === 'monthly') expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    else if (plan === 'yearly') expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString()
+    u.membership = { plan, expiresAt, isMember: plan !== 'free' }
+    const labels = { free: '免费', monthly: '月卡', yearly: '年卡', permanent: '买断' }
+    flashOk(`已将 ${u.email} 设为${labels[plan] || plan}`)
   } catch (e) {
     flashErr(e.message || '操作失败')
   }
@@ -118,7 +124,15 @@ async function savePaid() {
 }
 
 const paidCount = computed(() => paidSet.value.size)
-const memberCount = computed(() => users.value.filter((u) => u.membership === 'member').length)
+const memberCount = computed(() => users.value.filter((u) => u.membership && u.membership.plan !== 'free').length)
+
+function planLabel(m) {
+  if (!m || !m.plan || m.plan === 'free') return '免费'
+  const labels = { monthly: '月卡', yearly: '年卡', permanent: '买断' }
+  let label = labels[m.plan] || m.plan
+  if (m.expiresAt) label += ' · ' + new Date(m.expiresAt).toLocaleDateString()
+  return label
+}
 </script>
 
 <template>
@@ -158,10 +172,13 @@ const memberCount = computed(() => users.value.filter((u) => u.membership === 'm
               </select>
             </td>
             <td>
-              <select class="cell-select" :value="u.membership" @change="setMembership(u, $event.target.value)">
+              <select class="cell-select" :value="u.membership && u.membership.plan" @change="setMembership(u, $event.target.value)">
                 <option value="free">免费</option>
-                <option value="member">会员</option>
+                <option value="monthly">月卡</option>
+                <option value="yearly">年卡</option>
+                <option value="permanent">买断</option>
               </select>
+              <span v-if="u.membership && u.membership.plan !== 'free'" class="plan-expiry">{{ planLabel(u.membership) }}</span>
             </td>
             <td class="muted">{{ u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—' }}</td>
             <td>
@@ -243,6 +260,12 @@ const memberCount = computed(() => users.value.filter((u) => u.membership === 'm
   border-radius: 6px;
   background: #fff;
   font-size: 13px;
+}
+.plan-expiry {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
 }
 .reset-box {
   display: inline-flex;
