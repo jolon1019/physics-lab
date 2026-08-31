@@ -204,13 +204,10 @@ const formula = computed(() => ({
             </g>
           </g>
 
-          <!-- A / S 图例 -->
+          <!-- 图例：解释边/角上的记号 -->
           <g v-if="tris.length" class="as-legend">
-            <rect :x="VW - 240" y="20" width="220" height="30" rx="6" />
-            <text :x="VW - 226" y="40">
-              <tspan class="lg-s">〓 S = 已知边（刻度）</tspan>
-              <tspan class="lg-a">⌒ A = 已知角（弧）</tspan>
-            </text>
+            <text :x="VW - 250" y="34" class="lg-s">边上的短横线 → 这条边长度已知</text>
+            <text :x="VW - 250" y="56" class="lg-a">角上的弧线 → 这个角大小已知</text>
           </g>
 
           <!-- 顶点与标注 -->
@@ -306,9 +303,8 @@ const formula = computed(() => ({
 .given.counter .tick { stroke: var(--bb-red); }
 .given.counter .given-arc { fill: rgba(217, 33, 53, 0.22); stroke: var(--bb-red); }
 .given.counter .mark-t { fill: var(--bb-red); }
-.as-legend rect { fill: var(--bb-surface, rgba(255,255,255,0.85)); stroke: var(--bb-fg-dim); stroke-width: 1.5; }
-.as-legend .lg-s { fill: var(--bb-amber); font-size: 13.5px; font-weight: 800; font-family: var(--mono); }
-.as-legend .lg-a { fill: var(--bb-amber); font-size: 13.5px; font-weight: 800; font-family: var(--mono); }
+.as-legend .lg-s { fill: var(--bb-amber); font-size: 13.5px; font-weight: 800; }
+.as-legend .lg-a { fill: var(--bb-amber); font-size: 13.5px; font-weight: 800; }
 .given.counter ~ .as-legend .lg-s,
 .given.counter ~ .as-legend .lg-a { fill: var(--bb-red); }
 </style>

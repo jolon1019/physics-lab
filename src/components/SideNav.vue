@@ -49,10 +49,15 @@ function syncOpen() {
   const hit = id ? findExperiment(id) : null
   if (hit) {
     subject.value = hit.grade.subject || 'physics'
-    // 直达实验：展开它所在的年级；免费分组（若在）也一并展开，方便回到免费列表
-    const set = openGrades.value.has(hit.grade.grade) ? new Set(openGrades.value) : new Set([hit.grade.grade])
-    if (freeGrade.value && freeGrade.value.experiments.some((e) => e.id === id)) set.add(FREE_KEY)
-    openGrades.value = set
+    if (freeGrade.value && freeGrade.value.experiments.some((e) => e.id === id)) {
+      // 免费实验：只保证免费分组展开，不自动展开其所属年级
+      if (!openGrades.value.has(FREE_KEY)) {
+        openGrades.value = new Set([...openGrades.value, FREE_KEY])
+      }
+    } else if (!openGrades.value.has(hit.grade.grade)) {
+      // 直达实验：展开它所在的年级
+      openGrades.value = new Set([hit.grade.grade])
+    }
   } else {
     openGrades.value = defaultOpen()
   }

@@ -235,8 +235,6 @@ function onGlobalClick() {
       </main>
     </div>
 
-    <footer class="app-footer">初中物理同步实验 · 学生自主学习平台</footer>
-
     <!-- 移动端抽屉遮罩：目录展开时点击收起（资料库页无目录，不渲染） -->
     <div
       class="nav-backdrop"

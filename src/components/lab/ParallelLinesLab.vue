@@ -50,8 +50,14 @@ function dragHandle(e) {
   const svg = e.currentTarget.closest('svg')
   const move = (ev) => {
     const p = svgPoint(svg, ev.clientX, ev.clientY)
-    // 鼠标在截线中点一带：以 p1 为顶点、用"右下方"的射向算角
-    let deg = (Math.atan2(L1Y - p.y, Math.max(p.x - CX, 1)) * 180) / Math.PI
+    // 截线过 p1(CX, L1Y) 且与水平成 θ。手柄在两线之间（p1 下方），
+    // 鼠标可能落在截线的任一半段：下半段用 (vx, vy) 方向、上半段取反向向量，
+    // 统一折算出直线倾角 θ ∈ [20,160]
+    const vx = p.x - CX
+    const vy = p.y - L1Y
+    let deg = (vy >= 0
+      ? Math.atan2(vy, vx)
+      : Math.atan2(-vy, -vx)) * 180 / Math.PI
     deg = Math.round(deg)
     if (deg >= 20 && deg <= 160) theta.value = deg
   }

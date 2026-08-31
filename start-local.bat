@@ -28,7 +28,7 @@ if not exist node_modules (
 
 REM ===== 0. Cleanup: old frpc tunnel + process holding port 3001 =====
 echo [clean] stop old frpc + node backend ... >> start-local.log
-if exist "deploy\stop.bat" call "deploy\stop.bat" >> start-local.log 2>&1
+if exist "deploy\stop.bat" call "deploy\stop.bat" -q >> start-local.log 2>&1
 for /f "tokens=5" %%P in ('netstat -ano ^| findstr /r /c:":3001 .*LISTENING"') do (
   echo [clean] killing PID %%P holding :3001 >> start-local.log
   taskkill /f /pid %%P >> start-local.log 2>&1

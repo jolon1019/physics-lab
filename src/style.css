@@ -151,17 +151,17 @@ p { margin: 0; }
   pointer-events: none;
 }
 
-/* 沉浸模式下隐藏页脚，实验区独占整屏 */
-.app-shell.topbar-hidden .app-footer {
-  display: none;
-}
-
 /* 沉浸模式：实验区吃满整屏（仅留给工作区外边距 + 详情页头/正文内边距的余量），
    消除普通态为顶栏/页脚预留的 240px 留白，让浮力装置与读数整屏可见、无需滚动 */
 .app-shell.topbar-hidden .lab-left,
 .app-shell.topbar-hidden .lab-right {
   height: calc(100vh - 36px - 200px);
   max-height: calc(100vh - 36px - 200px);
+}
+
+/* 沉浸模式顶栏已隐藏，右侧栏吸附位置上移 */
+.app-shell.topbar-hidden .lab-right {
+  top: 14px;
 }
 
 /* 收起态浮动恢复按钮（常驻可点） */
@@ -1124,6 +1124,9 @@ p { margin: 0; }
   max-height: calc(100vh - var(--topbar) - 240px);
   overflow-y: auto;
   scrollbar-width: thin;
+  /* 桌面端右侧实验框吸顶：页面上下滚动时固定在顶栏下方不动 */
+  position: sticky;
+  top: calc(var(--topbar) + 14px);
 }
 
 .lab-panel {
@@ -1163,10 +1166,6 @@ p { margin: 0; }
     linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
     linear-gradient(0deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
     var(--bg);
-}
-[data-board-theme="light"] .app-footer {
-  border-top-color: rgba(0, 0, 0, 0.14);
-  color: rgba(0, 0, 0, 0.55);
 }
 [data-board-theme="light"] {
   --bb-surface: radial-gradient(130% 120% at 50% -10%, #fbfaf7 0%, #f4f1ea 55%, #ece7da 100%);
@@ -1338,10 +1337,13 @@ p { margin: 0; }
     background: var(--surface);
   }
 
-  /* 解除桌面端右侧栏内部滚动，整页才能滚动、动画才能吸顶 */
+  /* 解除桌面端右侧栏内部滚动，整页才能滚动、动画才能吸顶；
+     同时取消桌面端 sticky（移动端单列流式布局吸顶会遮挡面板） */
   .lab-right {
     max-height: none;
     overflow: visible;
+    position: static;
+    top: auto;
   }
 
   /* 动画容器：给确定高度（避免 .lab-left 高度塌缩导致动画消失）；
@@ -1451,16 +1453,6 @@ p { margin: 0; }
   .lab-left canvas.cv-velocity { aspect-ratio: 860 / 460; }
   .lab-left canvas.cv-tone     { aspect-ratio: 860 / 400; }
   .lab-left canvas.cv-sound    { aspect-ratio: 880 / 470; }
-}
-
-/* ===== 页脚 ===== */
-.app-footer {
-  margin-top: auto;
-  padding: 22px 24px;
-  border-top: 2px solid rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 13px;
-  text-align: center;
 }
 
 /* ===== 响应式 ===== */
@@ -1658,6 +1650,7 @@ p { margin: 0; }
 }
 .lab-stage.is-fullscreen .lab-right {
   display: block; /* 关键：不用 grid（grid 会把面板均分压缩+截断内容），改 block 让面板按内容高排布 */
+  position: static; /* 全屏布局固定视口、无页面滚动，取消桌面端 sticky 避免意外吸附 */
   max-height: 100%;
   overflow-y: auto;
   min-width: 0;
