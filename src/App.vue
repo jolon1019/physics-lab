@@ -19,6 +19,16 @@ const layout = useLayoutStore()
 
 const showChangePwd = ref(false)
 const showUserMenu = ref(false)
+
+// 会员信息展示
+const memberInfo = computed(() => {
+  const m = auth.user?.membership
+  if (!m || m.plan === 'free' || !m.isMember) return null
+  const labels = { monthly: '月卡', yearly: '年卡', permanent: '买断' }
+  let text = labels[m.plan] || m.plan
+  if (m.expiresAt) text += ' · 到期 ' + new Date(m.expiresAt).toLocaleDateString()
+  return text
+})
 const pwdOld = ref('')
 const pwdNew = ref('')
 const pwdConfirm = ref('')
@@ -187,6 +197,7 @@ function onGlobalClick() {
               <span class="user-email" :title="auth.user?.email">{{ auth.user?.email }}</span>
             </button>
             <div v-if="showUserMenu" class="user-dropdown" @click.stop>
+              <div v-if="memberInfo" class="dropdown-member">{{ memberInfo }}</div>
               <RouterLink class="dropdown-item" to="/record" @click="showUserMenu = false">
                 学习记录
               </RouterLink>
@@ -512,6 +523,14 @@ function onGlobalClick() {
 .dropdown-item:hover {
   background: var(--accent-soft);
   color: var(--accent-strong);
+}
+.dropdown-member {
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-strong, #b8860b);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
 }
 .dropdown-item.dropdown-danger {
   color: var(--danger);
