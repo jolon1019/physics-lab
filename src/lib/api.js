@@ -53,25 +53,25 @@ export function resetPassword(code, email, newPassword) {
   return request('/reset-password', { method: 'POST', body: { code, email, newPassword } })
 }
 export function adminListUsers() {
-  return request('/admin/users', { method: 'GET' })
+  return request('/admin-users', { method: 'GET' })
 }
 export function adminResetPassword(email, newPassword) {
-  return request('/admin/reset-password', { method: 'POST', body: { email, newPassword } })
+  return request('/admin-reset-password', { method: 'POST', body: { email, newPassword } })
 }
 export function adminSetRole(email, role) {
-  return request('/admin/user-role', { method: 'POST', body: { email, role } })
+  return request('/admin-user-role', { method: 'POST', body: { email, role } })
 }
 export function adminSetMembership(email, plan) {
-  return request('/admin/user-membership', { method: 'POST', body: { email, plan } })
+  return request('/admin-user-membership', { method: 'POST', body: { email, plan } })
 }
 export function getPublicSettings() {
   return request('/settings', { method: 'GET' })
 }
 export function adminGetSettings() {
-  return request('/admin/settings', { method: 'GET' })
+  return request('/admin-settings', { method: 'GET' })
 }
 export function adminSaveSettings(paidExperiments) {
-  return request('/admin/settings', { method: 'POST', body: { paidExperiments } })
+  return request('/admin-settings', { method: 'POST', body: { paidExperiments } })
 }
 
 // 读取/保存当前登录用户的学习进度（服务端隔离，按用户保存）

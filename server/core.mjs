@@ -577,7 +577,7 @@ export async function handleApi(req, res, url) {
   }
 
   // 管理员：获取用户列表
-  if (url.pathname === '/api/admin/users' && req.method === 'GET') {
+  if (url.pathname === '/api/admin-users' && req.method === 'GET') {
     const users = await loadUsers()
     const user = authUser(req, users)
     if (!user) return send(res, 401, { message: '未登录或登录已过期' })
@@ -592,7 +592,7 @@ export async function handleApi(req, res, url) {
   }
 
   // 管理员：直接重置某用户密码
-  if (url.pathname === '/api/admin/reset-password' && req.method === 'POST') {
+  if (url.pathname === '/api/admin-reset-password' && req.method === 'POST') {
     const users = await loadUsers()
     const admin = authUser(req, users)
     if (!admin) return send(res, 401, { message: '未登录或登录已过期' })
@@ -625,7 +625,7 @@ export async function handleApi(req, res, url) {
   }
 
   // 管理员：读取设置
-  if (url.pathname === '/api/admin/settings' && req.method === 'GET') {
+  if (url.pathname === '/api/admin-settings' && req.method === 'GET') {
     const users = await loadUsers()
     const admin = authUser(req, users)
     if (!admin) return send(res, 401, { message: '未登录或登录已过期' })
@@ -634,7 +634,7 @@ export async function handleApi(req, res, url) {
   }
 
   // 管理员：保存设置（付费实验名单）
-  if (url.pathname === '/api/admin/settings' && req.method === 'POST') {
+  if (url.pathname === '/api/admin-settings' && req.method === 'POST') {
     const users = await loadUsers()
     const admin = authUser(req, users)
     if (!admin) return send(res, 401, { message: '未登录或登录已过期' })
@@ -656,7 +656,7 @@ export async function handleApi(req, res, url) {
   }
 
   // 管理员：设置用户角色
-  if (url.pathname === '/api/admin/user-role' && req.method === 'POST') {
+  if (url.pathname === '/api/admin-user-role' && req.method === 'POST') {
     const users = await loadUsers()
     const admin = authUser(req, users)
     if (!admin) return send(res, 401, { message: '未登录或登录已过期' })
@@ -682,7 +682,7 @@ export async function handleApi(req, res, url) {
   }
 
   // 管理员：设置用户会员套餐
-  if (url.pathname === '/api/admin/user-membership' && req.method === 'POST') {
+  if (url.pathname === '/api/admin-user-membership' && req.method === 'POST') {
     const users = await loadUsers()
     const admin = authUser(req, users)
     if (!admin) return send(res, 401, { message: '未登录或登录已过期' })

@@ -73,8 +73,8 @@ const fin = await req('POST', '/api/login', { email: 'test@a.com', password: 'fi
 check('重置后密码可登录', fin.status === 200)
 
 // 9. 管理员接口
-const usersList = await req('GET', '/api/admin/users', null, { Authorization: 'Bearer ' + token })
-check('admin/users 返回列表', usersList.status === 200 && Array.isArray(usersList.j.users) && usersList.j.users.length === 1)
+const usersList = await req('GET', '/api/admin-users', null, { Authorization: 'Bearer ' + token })
+check('admin-users 返回列表', usersList.status === 200 && Array.isArray(usersList.j.users) && usersList.j.users.length === 1)
 
 // 10. 未知接口 404
 const nf = await req('GET', '/api/nope')
