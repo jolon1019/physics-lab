@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useProgressStore } from './stores/progress'
 import { useAuthStore } from './stores/auth'
@@ -12,6 +12,11 @@ import { Analytics } from '@vercel/analytics/vue'
 const route = useRoute()
 // 试卷资料库页不展示左侧实验目录（嵌入文档需要整行宽度）
 const isResources = computed(() => route.path === '/resources')
+
+// 移动端判定（与 CSS 断点 1180px 对齐）
+const isMobile = ref(typeof window !== 'undefined' && window.matchMedia('(max-width: 1180px)').matches)
+// 移动端实验页：顶栏随滚动滚走、画面贴屏幕顶端吸顶（避免 110px 高顶栏把画面下半截挤出屏幕）
+const isExpMobile = computed(() => isMobile.value && route.name === 'experiment')
 
 const progress = useProgressStore()
 const auth = useAuthStore()
@@ -117,12 +122,25 @@ function onToggleTopbar() {
 }
 
 // 实测全局顶栏渲染高度，写入 --lab-stick-top，使各实验动画舞台吸顶时
-// 恰好贴在顶栏正下方（顶栏在移动端会换行变高，无法用固定常量）
+// 恰好贴在顶栏正下方（顶栏在移动端会换行变高，无法用固定常量）。
+// 例外：移动端实验页顶栏改为随滚动滚走（见 CSS .exp-mobile .topbar），
+// 画面吸顶值设为 8px 贴屏幕顶端——否则 110px 高顶栏会把画面下半截挤出屏幕。
 function syncStickTop() {
+  const root = document.documentElement
+  if (isExpMobile.value) {
+    root.style.setProperty('--lab-stick-top', '8px')
+    return
+  }
   const tb = document.querySelector('.topbar')
-  if (tb) document.documentElement.style.setProperty('--lab-stick-top', tb.offsetHeight + 'px')
+  if (tb) root.style.setProperty('--lab-stick-top', tb.offsetHeight + 'px')
 }
-function onResize() { syncStickTop() }
+function onResize() {
+  isMobile.value = window.matchMedia('(max-width: 1180px)').matches
+  syncStickTop()
+}
+
+// 进入/离开移动端实验页时重算吸顶偏移
+watch(isExpMobile, () => syncStickTop())
 
 onMounted(() => {
   progress.startSession()
@@ -146,7 +164,7 @@ function onGlobalClick() {
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'nav-collapsed': layout.navCollapsed, 'topbar-hidden': layout.topbarHidden }">
+  <div class="app-shell" :class="{ 'nav-collapsed': layout.navCollapsed, 'topbar-hidden': layout.topbarHidden, 'exp-mobile': isExpMobile }">
     <header class="topbar">
       <div class="brand-block">
         <RouterLink to="/" class="brand-home">
