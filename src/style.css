@@ -1406,7 +1406,7 @@ p { margin: 0; }
   }
 
   /* 动画区吸顶：覆盖所有实验结构（canvas-wrap / 直挂 canvas / 面板内含
-     canvas、svg、motion-stage、bench-wrap）。
+     canvas、svg、motion-stage、bench-wrap、lab-container〔透镜/线圈〕）。
      sticky 加 !important：熔化/摩擦/透镜等面板写了行内 position:relative，
      行内样式优先级高于样式表，不加 !important 吸不住（sticky 同样能充当
      绝对定位子元素的包含块，覆盖 relative 不影响内部布局）。 */
@@ -1415,6 +1415,7 @@ p { margin: 0; }
   .lab-stage .lab-left > .lab-panel:has(> canvas),
   .lab-stage .lab-left > .lab-panel:has(> svg),
   .lab-stage .lab-left > .lab-panel:has(> .motion-stage),
+  .lab-stage .lab-left > .lab-panel:has(> .lab-container),
   .lab-stage .lab-left > .lab-panel:has(.bench-wrap) {
     position: sticky !important;
     top: var(--lab-stick-top, 76px);
