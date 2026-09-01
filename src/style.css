@@ -140,10 +140,12 @@ p { margin: 0; }
 }
 
 /* 移动端实验页：顶栏改为随滚动滚走（static），不再常驻吸顶。
-   配合 App.vue 把 --lab-stick-top 设为 8px，实验画布上滑到屏幕顶端即停留，
-   画面完整可见——否则移动端顶栏换行高达 ~110px，会把画布下半截挤出屏幕。 */
+   实验画布吸顶值在移动端断点内写死 8px，与顶栏高度解耦——否则移动端
+   顶栏换行高达 ~110px 且字体加载后还会变高，会把画布顶部盖掉一截。
+   !important：防止被其他 topbar 规则（如沉浸模式）覆盖回 sticky。 */
 .app-shell.exp-mobile .topbar {
-  position: static;
+  position: static !important;
+  top: auto !important;
   border-radius: 0 0 var(--radius) var(--radius);
 }
 
@@ -1417,12 +1419,16 @@ p { margin: 0; }
      canvas·svg / 内含 canvas 或 svg 的 lab-panel）。用 :has(canvas,svg) 精准
      识别，不依赖子元素次序——有的实验（如欧姆定律）画布前还有模式切换条，
      :first-child 会漏掉。要求含 canvas/svg 可排除纯文字面板，避免多个面板堆叠。
+     top 写死 8px、不读 --lab-stick-top：该变量由 JS 挂载时测量顶栏高度写入，
+     移动端顶栏随后因字体加载换行变高（60→110px）会让测量值过期，顶栏重新
+     盖住画面顶部几十像素（"遮挡一部分"）。本断点内顶栏已改 static 滚走，
+     画面恒定吸在距屏顶 8px 处，与顶栏实际高度解耦。
      sticky 加 !important：熔化/摩擦/透镜/欧姆等面板写了行内 position:relative，
      行内样式优先级高于样式表，不加 !important 吸不住（sticky 同样能充当
      绝对定位子元素的包含块，覆盖 relative 不影响内部布局）。 */
   .lab-stage .lab-left > :is(.canvas-wrap, canvas, svg, .lab-panel:has(canvas, svg)) {
     position: sticky !important;
-    top: var(--lab-stick-top, 8px);
+    top: 8px;
     z-index: 30;
   }
 
