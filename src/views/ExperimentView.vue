@@ -161,17 +161,17 @@ function nextQuiz() {
             <div class="pay-plans">
               <div class="pay-plan">
                 <p class="pay-name">月卡</p>
-                <p class="pay-price">¥9.9</p>
+                <p class="pay-price">¥5.9</p>
                 <p class="pay-note">30 天全部实验</p>
               </div>
               <div class="pay-plan">
                 <p class="pay-name">年卡</p>
-                <p class="pay-price">¥59</p>
+                <p class="pay-price">¥9.9</p>
                 <p class="pay-note">365 天全部实验</p>
               </div>
               <div class="pay-plan">
                 <p class="pay-name">永久</p>
-                <p class="pay-price">¥99</p>
+                <p class="pay-price">¥19.9</p>
                 <p class="pay-note">一次买断 不过期</p>
               </div>
             </div>
@@ -238,17 +238,17 @@ function nextQuiz() {
             <div class="pay-plans">
               <div class="pay-plan">
                 <p class="pay-name">月卡</p>
-                <p class="pay-price">¥9.9</p>
+                <p class="pay-price">¥5.9</p>
                 <p class="pay-note">30 天全部实验</p>
               </div>
               <div class="pay-plan">
                 <p class="pay-name">年卡</p>
-                <p class="pay-price">¥59</p>
+                <p class="pay-price">¥9.9</p>
                 <p class="pay-note">365 天全部实验</p>
               </div>
               <div class="pay-plan">
                 <p class="pay-name">永久</p>
-                <p class="pay-price">¥99</p>
+                <p class="pay-price">¥19.9</p>
                 <p class="pay-note">一次买断 不过期</p>
               </div>
             </div>

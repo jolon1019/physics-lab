@@ -364,14 +364,19 @@ p { margin: 0; }
   box-shadow: 3px 3px 0 #050505;
 }
 
+/* span 是 inline 元素，max-width/text-overflow 对其无效——必须转 inline-block
+   才能截断长邮箱，否则登录后长邮箱把顶栏撑变形 */
 .user-email {
+  display: inline-block;
   max-width: 180px;
+  min-width: 0;
   overflow: hidden;
   color: var(--text-h);
   font-size: 13px;
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
+  vertical-align: middle;
 }
 
 .meta-label {
@@ -1469,9 +1474,45 @@ p { margin: 0; }
 /* ===== 响应式 ===== */
 @media (max-width: 1180px) {
   .topbar {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    grid-template-columns: none;
     height: auto;
-    gap: 12px;
+  }
+
+  /* 移动端顶栏重排：功能按钮（资料库/后台/沉浸/黑板）拆到最上方单独一行，
+     品牌与邮箱在下一行——按钮与长邮箱同排会互相挤压把页面撑变形。
+     .user-zone 用 display:contents 把子元素提升为 .topbar 的 flex 项，
+     再用 order 分行：order 1=按钮行，order 2=品牌，order 3=邮箱（右对齐） */
+  .user-zone {
+    display: contents;
+  }
+  .topbar > .nav-toggle-top,
+  .topbar .nav-toggle-top,
+  .topbar .nav-hamburger,
+  .topbar .board-toggle {
+    order: 1;
+  }
+  .topbar .brand-block {
+    order: 2;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .topbar .user-menu,
+  .topbar > .btn-primary {
+    order: 3;
+    margin-left: auto;
+    min-width: 0;
+  }
+  /* 长邮箱截断：上限随屏宽收缩，防止撑变形 */
+  .user-trigger {
+    min-width: 0;
+    max-width: 48vw;
+  }
+  .user-email {
+    max-width: 100%;
   }
 
   /* 工作区纵向堆叠；侧栏转为可滑出的抽屉 */
@@ -1509,9 +1550,8 @@ p { margin: 0; }
     display: none;
   }
 
-  .nav-toggle-top .nav-toggle-text {
-    display: none;
-  }
+  /* 沉浸模式按钮：按钮行已独占顶栏上方，空间充足，显示完整文字
+     （此前隐藏文字只剩空白方块，无法辨识） */
 
   /* 移动端显示汉堡按钮（展开侧边栏目录抽屉） */
   .nav-hamburger {
