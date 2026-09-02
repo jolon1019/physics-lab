@@ -2,7 +2,6 @@
 import { boardText } from '../../lib/boardText'
 
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useAuthStore } from '../../stores/auth'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
@@ -14,8 +13,6 @@ import './sublimate/sublimate.css'
 import './melt/melt.css'
 
 const emit = defineEmits(['complete'])
-const auth = useAuthStore()
-const isAdmin = computed(() => auth.isAdmin)
 
 // ===== 装置渲染（纯 SVG 组件，零网络请求），视觉架构与 e-melt 完全一致 =====
 // 视觉由连续量驱动：subFrac（固态碘剩余）让晶体堆渐消、liquidFrac（熔化液层）、
@@ -484,10 +481,6 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- 摆放编辑器入口（管理员）：复用 e-melt 的微调交互由编辑器完成，这里仅保留提示 -->
-        <div v-if="isAdmin" class="admin-tip">管理员提示：装置几何在 SubRig.vue 内联，可参照 MeltFlask 的摆放编辑器方案扩展</div>
-      </div>
-
       <div class="lab-actions">
         <div style="display:flex;gap:8px">
           <button class="btn" :class="{ 'btn-primary': isBath }" @click="method = 'bath'">热水浴（正确）</button>
@@ -609,14 +602,5 @@ onBeforeUnmount(() => {
 .zoompop-leave-to {
   transform: scale(0.6);
   opacity: 0;
-}
-
-.admin-tip {
-  position: absolute;
-  left: 10px;
-  bottom: 8px;
-  font-size: 11px;
-  color: rgba(120, 130, 145, 0.75);
-  pointer-events: none;
 }
 </style>

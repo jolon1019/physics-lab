@@ -2,7 +2,6 @@
 import { boardText } from '../../lib/boardText'
 
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { useAuthStore } from '../../stores/auth'
 import ParamSlider from './ParamSlider.vue'
 import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
@@ -14,8 +13,6 @@ import './boil/boil.css'
 import './melt/melt.css'
 
 const emit = defineEmits(['complete'])
-const auth = useAuthStore()
-const isAdmin = computed(() => auth.isAdmin)
 
 // ===== 装置渲染（纯 SVG 组件，零网络请求），视觉架构与 e-melt / e-sublimate 完全一致 =====
 // 气泡/涟漪/白汽均为 CSS 动画（与 rAF 无关），温度计液柱为响应式 SVG 绑定，
@@ -442,9 +439,6 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div v-if="isAdmin" class="admin-tip">管理员提示：装置几何在 BoilBeaker.vue 内联，可参照 MeltFlask 的摆放编辑器方案扩展</div>
-      </div>
-
       <div class="lab-actions">
         <button v-if="state === 'ready' || state === 'done'" class="btn btn-primary" @click="startRun">{{ startBtn }}</button>
         <button v-else class="btn btn-primary" disabled>加热中…</button>
@@ -560,14 +554,5 @@ onBeforeUnmount(() => {
 .zoompop-leave-to {
   transform: scale(0.6);
   opacity: 0;
-}
-
-.admin-tip {
-  position: absolute;
-  left: 10px;
-  bottom: 8px;
-  font-size: 11px;
-  color: rgba(120, 130, 145, 0.75);
-  pointer-events: none;
 }
 </style>
