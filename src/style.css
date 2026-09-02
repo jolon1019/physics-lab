@@ -1118,6 +1118,11 @@ p { margin: 0; }
   max-height: calc(100vh - var(--topbar) - 240px);
   overflow-y: auto;
   height: calc(100vh - var(--topbar) - 240px);
+  /* 隐藏滚动条（浮动式滚动条会在点击/滚动时浮现）：保留滚轮滚动功能 */
+  scrollbar-width: none;
+}
+.lab-left::-webkit-scrollbar {
+  display: none;
 }
 
 .lab-left .lab-panel {
@@ -1138,10 +1143,14 @@ p { margin: 0; }
   min-width: 0;
   max-height: calc(100vh - var(--topbar) - 240px);
   overflow-y: auto;
-  scrollbar-width: thin;
+  /* 隐藏滚动条（浮动式滚动条会在点击/滚动时浮现）：保留滚轮滚动功能 */
+  scrollbar-width: none;
   /* 桌面端右侧实验框吸顶：页面上下滚动时固定在顶栏下方不动 */
   position: sticky;
   top: calc(var(--topbar) + 14px);
+}
+.lab-right::-webkit-scrollbar {
+  display: none;
 }
 
 .lab-panel {

@@ -18,6 +18,12 @@ function getImg(key) {
   return cache[key]
 }
 
+// 预解码全部状态图（含开关开/合两态）：否则首次切换状态时该图才创建并异步解码，
+// blit 因 im.complete=false 跳过绘制，元件会消失几帧再弹出（画面闪跳）
+export function preloadCircuitIcons() {
+  ;['battery', 'switchOpen', 'switchClosed', 'ammeter', 'bulb', 'rheostat', 'voltmeter'].forEach(getImg)
+}
+
 const DEFAULT_LABEL = {
   battery: '电源',
   switch: '开关',

@@ -7,7 +7,7 @@ import FormulaPanel from './FormulaPanel.vue'
 import { paintBoard } from '../../lib/boardBg'
 // 通用电路元件图标（PNG 路径统一在 src/circuit/pngAssets.js / src/lib/drawCircuitIcon.js
 // 集中，本文件不再 import 任何 PNG 文件；同图不同页直接调用 drawCircuitIcon 即可）。
-import { drawCircuitIcon } from '../../lib/drawCircuitIcon'
+import { drawCircuitIcon, preloadCircuitIcons } from '../../lib/drawCircuitIcon'
 import FullscreenBtn from './FullscreenBtn.vue'
 
 const emit = defineEmits(['complete'])
@@ -457,6 +457,7 @@ function resizeCanvas() {
 }
 let resizeObs = null
 onMounted(() => {
+  preloadCircuitIcons()
   initElectrons()
   setupCanvas()
   render()
@@ -514,7 +515,7 @@ onBeforeUnmount(() => {
           <span class="r-readout-item">电流 I <strong>{{ I.toFixed(2) }} A</strong></span>
         </span>
         <button class="btn" :class="{ 'btn-on': switchOn }" @click="switchOn = !switchOn">
-          {{ switchOn ? '⏸ 断开开关' : '▶ 闭合开关' }}
+          {{ switchOn ? '断开开关' : '闭合开关' }}
         </button>
         <button class="btn" @click="addSnapshot">＋ 记录对比</button>
         <FullscreenBtn />

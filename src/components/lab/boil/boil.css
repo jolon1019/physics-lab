@@ -1,0 +1,73 @@
+/* e-boil 装置组件（SVG）公共样式，结构与约定同 sublimate.css / melt.css */
+:root {
+  --bf-glass-line: #5f7588;
+}
+
+.bf-rig {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* 子组件按需开启 */
+  z-index: 2;           /* 在 canvas (z=1) 之上 */
+}
+.bf-rig > * { pointer-events: auto; }
+
+/* SVG 装置通用：绝对定位，根据 layout 计算 left/top/width */
+.bf-piece {
+  position: absolute;
+  user-select: none;
+  touch-action: none;
+  outline: none;
+}
+.bf-piece svg { display: block; pointer-events: none; user-select: none; }
+
+/* ===== 沸腾前：小气泡升起途中变小消失（遇冷收缩 + 溶解水汽化） ===== */
+@keyframes bfPre {
+  0%   { transform: translateY(0)     scale(1);    opacity: 0; }
+  15%  { opacity: 0.9; }
+  65%  { transform: translateY(-46px) scale(0.5); opacity: 0.45; }
+  100% { transform: translateY(-60px) scale(0);    opacity: 0; }
+}
+.bf-pre { transform-box: fill-box; animation: bfPre 2.6s ease-out infinite; }
+.bf-pre.p1 { animation-delay: 0s; }
+.bf-pre.p2 { animation-delay: 0.6s; animation-duration: 3s; }
+.bf-pre.p3 { animation-delay: 1.2s; }
+.bf-pre.p4 { animation-delay: 1.8s; animation-duration: 2.8s; }
+.bf-pre.p5 { animation-delay: 2.2s; }
+
+/* ===== 沸腾时：大气泡升起不断变大，直达水面 ===== */
+@keyframes bfBoil {
+  0%   { transform: translateY(0)    scale(0.45); opacity: 0; }
+  10%  { opacity: 0.95; }
+  90%  { transform: translateY(-70px) scale(1.35); opacity: 0.95; }
+  100% { transform: translateY(-76px) scale(1.5);  opacity: 0; }
+}
+.bf-boil { transform-box: fill-box; animation: bfBoil 1.4s linear infinite; }
+.bf-boil.b1 { animation-delay: 0s; }
+.bf-boil.b2 { animation-delay: 0.25s; animation-duration: 1.6s; }
+.bf-boil.b3 { animation-delay: 0.5s; }
+.bf-boil.b4 { animation-delay: 0.75s; animation-duration: 1.55s; }
+.bf-boil.b5 { animation-delay: 1s; }
+.bf-boil.b6 { animation-delay: 1.2s; animation-duration: 1.7s; }
+.bf-boil.b7 { animation-delay: 0.4s; animation-duration: 1.5s; }
+.bf-boil.b8 { animation-delay: 0.9s; animation-duration: 1.65s; }
+
+/* ===== 水面破裂涟漪 ===== */
+@keyframes bfRip {
+  0%   { transform: scale(0.3);  opacity: 0.85; }
+  100% { transform: scale(1.7);  opacity: 0; }
+}
+.bf-rip { transform-box: fill-box; transform-origin: 50% 50%; animation: bfRip 1.3s ease-out infinite; }
+.bf-rip.r1 { animation-delay: 0s; }
+.bf-rip.r2 { animation-delay: 0.45s; }
+.bf-rip.r3 { animation-delay: 0.9s; }
+
+/* ===== 杯口白汽 ===== */
+@keyframes bfSteam {
+  0%   { transform: translateY(0) scaleX(1);      opacity: 0; }
+  18%  { opacity: 0.6; }
+  100% { transform: translateY(-34px) scaleX(1.5); opacity: 0; }
+}
+.bf-steam { transform-box: fill-box; transform-origin: 50% 100%; animation: bfSteam 2.4s ease-out infinite; }
+.bf-steam.d1 { animation-delay: 0s; }
+.bf-steam.d2 { animation-delay: 0.8s; }
+.bf-steam.d3 { animation-delay: 1.6s; }

@@ -1,0 +1,38 @@
+/* e-temp 装置组件（SVG）公共样式，结构与约定同 boil.css / sublimate.css / melt.css */
+:root {
+  --tp-glass-line: #5f7588;
+}
+
+.tp-rig {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* 子组件按需开启 */
+  z-index: 2;           /* 在 canvas (z=1) 之上 */
+}
+.tp-rig > * { pointer-events: auto; }
+
+/* SVG 装置通用：绝对定位 */
+.tp-piece {
+  position: absolute;
+  user-select: none;
+  touch-action: none;
+  outline: none;
+}
+.tp-piece svg { display: block; pointer-events: none; user-select: none; }
+
+/* 温度计在水杯之间平滑滑动 */
+.tp-thermo { transition: left 0.7s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* 汞柱升降（顶端平移，裁剪在管+球泡内） */
+.tp-hg { transition: transform 1s cubic-bezier(0.4, 0, 0.2, 1); }
+
+/* ===== 热水杯白汽 ===== */
+@keyframes tpSteam {
+  0%   { transform: translateY(0) scaleX(1);      opacity: 0; }
+  18%  { opacity: 0.6; }
+  100% { transform: translateY(-18px) scaleX(1.5); opacity: 0; }
+}
+.tp-steam { transform-box: fill-box; transform-origin: 50% 100%; animation: tpSteam 2.4s ease-out infinite; }
+.tp-steam.d1 { animation-delay: 0s; }
+.tp-steam.d2 { animation-delay: 0.8s; }
+.tp-steam.d3 { animation-delay: 1.6s; }

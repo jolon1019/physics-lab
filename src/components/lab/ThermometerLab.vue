@@ -1,11 +1,20 @@
 <script setup>
 import { boardFg, boardText } from '../../lib/boardText'
 
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { paintBoard } from '../../lib/boardBg'
 import FullscreenBtn from './FullscreenBtn.vue'
+import FormulaPanel from './FormulaPanel.vue'
+import TempCups from './temp/TempCups.vue'
+import TempThermo from './temp/TempThermo.vue'
+import TempZoom from './temp/TempZoom.vue'
+import './temp/temp.css'
 
 const emit = defineEmits(['complete'])
+
+// ===== 装置渲染（纯 SVG 组件，零网络请求），视觉架构与 e-melt / e-sublimate / e-boil 完全一致 =====
+// 白汽为 CSS 动画（与 rAF 无关），温度计液柱/位置为响应式 SVG 绑定 + CSS transition，
+// canvas 只负责板面背景与标题，空闲时零重绘。
 
 // ===== 三个水杯（冷/温/热水，固定真实温度便于读数练习）=====
 const cups = [
@@ -13,382 +22,113 @@ const cups = [
   { name: '温水', temp: 53, color: '#f3cc9f', deep: '#d8a56e', steam: false },
   { name: '热水', temp: 87, color: '#e79a86', deep: '#cf6f58', steam: true }
 ]
+// 水杯中心在设计层（900×520）中的 x 坐标（TempCups 放置在 left:30）
+const CUP_X = [110, 270, 430]
+
 const selected = ref(0)
 const readings = reactive([null, null, null])
 const results = reactive([null, null, null]) // true / false / null
 const submitted = ref(false)
-let completed = false
-const hint = ref('点击左侧某个水杯，温度计会浸入并升起汞柱，请在右侧读出温度')
+const done = ref(false)
+const hint = ref('点击左侧某个水杯，温度计会移过去浸入水中，请在右侧读出温度')
+const zoomOn = ref(false)
 
-// 汞柱实际显示的温度（向所选水杯真实温度平滑过渡）
-const mercury = ref(cups[0].temp)
+const curCup = computed(() => cups[selected.value])
 
-const T_MIN = -20
-const T_MAX = 110
-
-function tempToFrac(t) {
-  return (t - T_MIN) / (T_MAX - T_MIN)
+function selectCup(i) {
+  if (selected.value === i) return
+  selected.value = i
+  hint.value = `正在测量${cups[i].name}：视线与汞柱上表面相平，读数时估读到 0.1℃`
 }
 
-// ===== Canvas =====
+// ===== 放大观察 =====
+const zoomCaption = computed(() => {
+  const t = curCup.value.temp
+  if (t >= 70) return `${curCup.value.name}：液柱升得很高，注意视线相平`
+  if (t >= 35) return `${curCup.value.name}：液柱位置适中，估读到 0.1℃`
+  return `${curCup.value.name}：液柱偏低，注意分辨刻度`
+})
+
+// ===== 读数要点面板 =====
+const measureRows = computed(() => [
+  { label: '当前测量', value: curCup.value.name },
+  { label: '该杯真实温度', value: `${curCup.value.temp} ℃` }
+])
+const formulaResults = computed(() => {
+  if (!submitted.value) return []
+  return cups.map((c, i) => ({
+    label: c.name,
+    value: results[i] === true ? '✓ 读数正确' : '✗ 有偏差'
+  }))
+})
+const verifySteps = [
+  '玻璃泡要全部浸入被测液体，不碰容器底和壁',
+  '待温度计示数稳定后再读数',
+  '读数时视线与液柱上表面相平，不能俯视或仰视',
+  '估读到分度值（1℃）的下一位，如 53.0℃'
+]
+
+// ===== Canvas（只画板面背景与标题）=====
 const canvasRef = ref(null)
 let ctx = null
-let raf = null
-let lastT = null
 const dpr = () => Math.min(window.devicePixelRatio || 1, 2)
-const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
 function setupCanvas() {
   const canvas = canvasRef.value
+  const st = stageRef.value
   ctx = canvas.getContext('2d')
-  canvas.width = 1800
-  canvas.height = 1040
-  ctx.setTransform(2, 0, 0, 2, 0, 0)
+  const w = Math.max(1, st.clientWidth)
+  const h = Math.max(1, st.clientHeight)
+  const d = dpr()
+  canvas.width = Math.round(w * d)
+  canvas.height = Math.round(h * d)
+  canvas.style.width = w + 'px'
+  canvas.style.height = h + 'px'
+  ctx.setTransform(d, 0, 0, d, 0, 0)
 }
 function dims() {
   return { W: 900, H: 520 }
 }
-function rr(x, y, w, h, r) {
-  if (ctx.roundRect) {
-    ctx.beginPath()
-    ctx.roundRect(x, y, w, h, r)
-    return
-  }
-  ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.arcTo(x + w, y, x + w, y + h, r)
-  ctx.arcTo(x + w, y + h, x, y + h, r)
-  ctx.arcTo(x, y + h, x, y, r)
-  ctx.arcTo(x, y, x + w, y, r)
-  ctx.closePath()
+// 设计层等比缩放（与 e-melt / e-boil 相同约定）：最大 1.0，宽屏水平居中
+const DESIGN_W = 900
+const DESIGN_H = 520
+const stageRef = ref(null)
+const scaleRef = ref(null)
+const view = { s: 1, offX: 0 }
+function layoutStage() {
+  const st = stageRef.value, sc = scaleRef.value
+  if (!st || !sc) return
+  const s = Math.max(0.25, Math.min(st.clientWidth / DESIGN_W, 1))
+  const offX = Math.max(0, (st.clientWidth - DESIGN_W * s) / 2)
+  view.s = s
+  view.offX = offX
+  sc.style.transform = `scale(${s})`
+  sc.style.left = `${offX}px`
+  st.style.height = `${Math.round(DESIGN_H * s)}px`
 }
 
-// 布局：烧杯整体居中，底坐在桌面线上
-function beakerRects(W, H) {
-  const n = cups.length
-  const baseY = H - 52
-  const areaW = W * 0.62
-  const bw = Math.min(118, (areaW - (n - 1) * 32) / n)
-  const gap = (areaW - bw * n) / (n - 1)
-  const bx = (W - (bw * n + gap * (n - 1))) / 2
-  const bh = 150
-  const top = baseY - bh
-  return cups.map((_, i) => ({ x: bx + i * (bw + gap), y: top, w: bw, h: bh, baseY }))
-}
-
-// 热水杯的上升蒸汽团
-function drawSteam(cx, topY, now) {
-  for (let i = 0; i < 4; i++) {
-    const ph = i * 1.7
-    const cycle = (now * 0.018 + ph * 30) % 72
-    const yy = topY - 10 - cycle
-    const xx = cx + Math.sin(now * 0.003 + ph) * 8 + (i - 1.5) * 9
-    const r = 6 + (i % 3)
-    const a = Math.max(0, 0.32 * (1 - cycle / 72))
-    ctx.fillStyle = `rgba(238,243,248,${a.toFixed(3)})`
-    ctx.beginPath()
-    ctx.arc(xx, yy, r, 0, Math.PI * 2)
-    ctx.fill()
-  }
-}
-
-function drawBeaker(L, r, idx, now) {
-  const cup = cups[idx]
-  const sel = idx === selected.value
-  const cx = r.x + r.w / 2
-  const baseY = r.baseY
-  // 桌面
-  ctx.save()
-  const tg = ctx.createLinearGradient(0, baseY, 0, L.H)
-  tg.addColorStop(0, 'rgba(122,94,64,0.42)')
-  tg.addColorStop(1, 'rgba(80,60,40,0.56)')
-  ctx.fillStyle = tg
-  ctx.fillRect(0, baseY, L.W, L.H - baseY)
-  ctx.strokeStyle = 'rgba(58,44,30,0.65)'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(0, baseY)
-  ctx.lineTo(L.W, baseY)
-  ctx.stroke()
-  ctx.restore()
-  // 烧杯投影
-  ctx.save()
-  ctx.fillStyle = 'rgba(0,0,0,0.16)'
-  ctx.beginPath()
-  ctx.ellipse(cx, baseY + 3, r.w * 0.62, 6, 0, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.restore()
-
-  // 玻璃杯身（半透明 + 高光）
-  const glassGrad = ctx.createLinearGradient(r.x, 0, r.x + r.w, 0)
-  glassGrad.addColorStop(0, 'rgba(255,255,255,0.18)')
-  glassGrad.addColorStop(0.5, 'rgba(220,235,245,0.07)')
-  glassGrad.addColorStop(1, 'rgba(255,255,255,0.24)')
-  ctx.fillStyle = glassGrad
-  rr(r.x, r.y, r.w, r.h, 12)
-  ctx.fill()
-
-  // 水（渐变 + 波动水面）
-  const fillFrac = 0.6
-  const wy0 = r.y + r.h * (1 - fillFrac)
-  const surfY = (x) => wy0 + Math.sin(x * 0.09 + now * 0.004) * 1.3
-  ctx.save()
-  rr(r.x + 3, r.y + 3, r.w - 6, r.h - 6, 10)
-  ctx.clip()
-  const grad = ctx.createLinearGradient(0, wy0, 0, r.y + r.h)
-  grad.addColorStop(0, cup.color)
-  grad.addColorStop(1, cup.deep)
-  ctx.fillStyle = grad
-  ctx.beginPath()
-  ctx.moveTo(r.x + 3, r.y + r.h - 3)
-  ctx.lineTo(r.x + 3, surfY(r.x + 3))
-  for (let x = r.x + 3; x <= r.x + r.w - 3; x += 6) ctx.lineTo(x, surfY(x))
-  ctx.lineTo(r.x + r.w - 3, r.y + r.h - 3)
-  ctx.closePath()
-  ctx.fill()
-  // 水面亮线
-  ctx.strokeStyle = 'rgba(255,255,255,0.45)'
-  ctx.lineWidth = 1.5
-  ctx.beginPath()
-  for (let x = r.x + 3; x <= r.x + r.w - 3; x += 6) {
-    const y = surfY(x)
-    x === r.x + 3 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
-  }
-  ctx.stroke()
-  ctx.restore()
-
-  // 杯口
-  ctx.strokeStyle = 'rgba(255,255,255,0.55)'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(r.x, r.y + 5)
-  ctx.lineTo(r.x + 7, r.y)
-  ctx.lineTo(r.x + r.w - 7, r.y)
-  ctx.lineTo(r.x + r.w, r.y + 5)
-  ctx.stroke()
-
-  // 杯壁描边（选中发光）
-  ctx.save()
-  if (sel) {
-    ctx.shadowColor = '#3b6fd4'
-    ctx.shadowBlur = 14
-    ctx.strokeStyle = '#3b6fd4'
-    ctx.lineWidth = 3
-  } else {
-    ctx.strokeStyle = 'rgba(80,80,90,0.55)'
-    ctx.lineWidth = 2
-  }
-  rr(r.x, r.y, r.w, r.h, 12)
-  ctx.stroke()
-  ctx.restore()
-
-  // 蒸汽（热水）
-  if (cup.steam) drawSteam(cx, r.y, now)
-
-  // 名称
-  ctx.fillStyle = boardText(ctx.canvas)
-  ctx.font = '700 14px system-ui, sans-serif'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'top'
-  ctx.fillText(cup.name, cx, baseY + 8)
-  if (sel) {
-    // 测量指示
-    ctx.fillStyle = '#3b6fd4'
-    ctx.font = '600 12px system-ui, sans-serif'
-    ctx.fillText('▼ 正在测量', cx, r.y - 24)
-  }
-}
-
-function drawThermometer(L) {
-  // 温度计插入选中的杯子：刻度段在杯口上方，球部浸入水中
-  const r = beakerRects(L.W, L.H)[selected.value]
-  const cx = r.x + r.w / 2
-  const topY = r.y - 150 // 刻度段顶端
-  const rimY = r.y - 14 // 刻度段底端（杯口上方）
-  const wy0 = r.y + r.h * 0.4 // 水面
-  const bulbY = wy0 + 26 // 球部中心（水中，不碰杯底）
-  const tubeW = 16
-  const tx = cx - tubeW / 2
-  const mx = cx
-  const frac = tempToFrac(mercury.value)
-  const mercuryTopY = rimY - (rimY - topY) * frac
-
-  // 玻璃管（刻度段 → 杯中 → 球部）
-  const tubeGrad = ctx.createLinearGradient(tx, 0, tx + tubeW, 0)
-  tubeGrad.addColorStop(0, 'rgba(255,255,255,0.95)')
-  tubeGrad.addColorStop(0.5, 'rgba(240,246,250,0.85)')
-  tubeGrad.addColorStop(1, 'rgba(220,230,238,0.9)')
-  ctx.fillStyle = tubeGrad
-  rr(tx, topY, tubeW, bulbY - topY + 22, tubeW / 2)
-  ctx.fill()
-  ctx.strokeStyle = 'rgba(90,90,100,0.6)'
-  ctx.lineWidth = 1.5
-  rr(tx, topY, tubeW, bulbY - topY + 22, tubeW / 2)
-  ctx.stroke()
-  // 管身左侧高光
-  ctx.fillStyle = 'rgba(255,255,255,0.85)'
-  rr(tx + 2, topY + 2, 3, bulbY - topY + 14, 1.5)
-  ctx.fill()
-
-  // 球部（浸在水中）
-  const bulbGrad = ctx.createRadialGradient(mx - 6, bulbY - 6, 2, mx, bulbY, 22)
-  bulbGrad.addColorStop(0, 'rgba(255,255,255,0.95)')
-  bulbGrad.addColorStop(0.6, 'rgba(240,246,250,0.9)')
-  bulbGrad.addColorStop(1, 'rgba(210,222,232,0.9)')
-  ctx.fillStyle = bulbGrad
-  ctx.beginPath()
-  ctx.arc(mx, bulbY, 20, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.strokeStyle = 'rgba(90,90,100,0.6)'
-  ctx.lineWidth = 1.5
-  ctx.stroke()
-
-  // 汞柱（圆头，从刻度段延伸到球部）
-  const hg = ctx.createLinearGradient(mx - 5, 0, mx + 5, 0)
-  hg.addColorStop(0, '#f26a5a')
-  hg.addColorStop(0.5, '#ff8a72')
-  hg.addColorStop(1, '#e0483c')
-  ctx.fillStyle = hg
-  ctx.beginPath()
-  ctx.moveTo(mx - 5, mercuryTopY + 5)
-  ctx.quadraticCurveTo(mx - 5, mercuryTopY, mx, mercuryTopY)
-  ctx.quadraticCurveTo(mx + 5, mercuryTopY, mx + 5, mercuryTopY + 5)
-  ctx.lineTo(mx + 5, bulbY + 14)
-  ctx.lineTo(mx - 5, bulbY + 14)
-  ctx.closePath()
-  ctx.fill()
-  // 球内汞
-  const bulbHg = ctx.createRadialGradient(mx - 4, bulbY - 4, 1, mx, bulbY, 16)
-  bulbHg.addColorStop(0, '#ff8a72')
-  bulbHg.addColorStop(1, '#e0483c')
-  ctx.fillStyle = bulbHg
-  ctx.beginPath()
-  ctx.arc(mx, bulbY, 15, 0, Math.PI * 2)
-  ctx.fill()
-
-  // 刻度尺（每 10℃ 标注，每 2℃ 一短线；全部在杯口上方）
-  ctx.strokeStyle = 'rgba(60,60,70,0.65)'
-  ctx.fillStyle = boardText(ctx.canvas)
-  ctx.font = '600 11px system-ui, sans-serif'
-  ctx.textAlign = 'right'
-  ctx.textBaseline = 'middle'
-  for (let t = T_MIN; t <= T_MAX; t += 2) {
-    const y = rimY - (rimY - topY) * tempToFrac(t)
-    const major = t % 10 === 0
-    const x1 = tx - 4
-    const x2 = tx - (major ? 15 : 9)
-    ctx.lineWidth = major ? 1.6 : 1
-    ctx.beginPath()
-    ctx.moveTo(x1, y)
-    ctx.lineTo(x2, y)
-    ctx.stroke()
-    if (major) ctx.fillText(String(t), x2 - 4, y)
-  }
-  // 单位
-  ctx.fillStyle = boardText(ctx.canvas)
-  ctx.font = '700 13px system-ui, sans-serif'
-  ctx.textAlign = 'right'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('℃', tx - 20, topY + 12)
-
-  // 大号温度数字屏（杯口上方右侧）
-  const dispW = 128
-  const dispH = 36
-  const dx = cx + tubeW / 2 + 14
-  const dy = topY - 8
-  ctx.save()
-  ctx.shadowColor = 'rgba(0,0,0,0.35)'
-  ctx.shadowBlur = 10
-  ctx.shadowOffsetY = 3
-  ctx.fillStyle = 'rgba(18,22,32,0.88)'
-  rr(dx, dy, dispW, dispH, 9)
-  ctx.fill()
-  ctx.restore()
-  ctx.strokeStyle = 'rgba(255,255,255,0.14)'
-  ctx.lineWidth = 1
-  rr(dx, dy, dispW, dispH, 9)
-  ctx.stroke()
-  ctx.fillStyle = '#ff5a48'
-  ctx.font = '700 20px ui-monospace, Consolas, monospace'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(`${mercury.value.toFixed(1)} ℃`, dx + dispW / 2, dy + dispH / 2 + 1)
-
-  // 视线标线（与汞柱上表面相平，只显示在杯口上方）
-  if (mercuryTopY >= topY) {
-    ctx.strokeStyle = '#3b6fd4'
-    ctx.lineWidth = 1.5
-    ctx.setLineDash([4, 4])
-    ctx.beginPath()
-    ctx.moveTo(tx - 20, mercuryTopY)
-    ctx.lineTo(tx + tubeW + 34, mercuryTopY)
-    ctx.stroke()
-    ctx.setLineDash([])
-    // 视线小三角
-    ctx.fillStyle = '#3b6fd4'
-    ctx.beginPath()
-    ctx.moveTo(tx + tubeW + 8, mercuryTopY)
-    ctx.lineTo(tx + tubeW + 16, mercuryTopY - 5)
-    ctx.lineTo(tx + tubeW + 16, mercuryTopY + 5)
-    ctx.closePath()
-    ctx.fill()
-    ctx.fillStyle = '#3b6fd4'
-    ctx.font = '600 11px system-ui, sans-serif'
-    ctx.textAlign = 'left'
-    ctx.textBaseline = 'bottom'
-    ctx.fillText('视线相平', tx + tubeW + 20, mercuryTopY - 2)
-  }
-}
-
-function render(now) {
+function render() {
   if (!ctx) return
+  const st = stageRef.value
+  const W = st ? st.clientWidth : DESIGN_W
+  const H = st ? st.clientHeight : DESIGN_H
+  paintBoard(ctx, W, H, 'chalk')
+  ctx.save()
+  ctx.translate(view.offX, 0)
+  ctx.scale(view.s, view.s)
   const L = dims()
-  paintBoard(ctx, L.W, L.H, 'chalk')
-  // 标题
-  ctx.fillStyle = boardText(ctx.canvas)
+  ctx.fillStyle = boardFg(ctx.canvas)
   ctx.font = '700 15px system-ui, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
   ctx.fillText('温度计的读数练习', L.W / 2, 18)
-  const rects = beakerRects(L.W, L.H)
-  rects.forEach((r, i) => drawBeaker(L, r, i, now))
-  drawThermometer(L)
+  ctx.fillStyle = boardText(ctx.canvas)
+  ctx.font = '600 12px system-ui, sans-serif'
+  ctx.fillText('点击水杯切换测量 · 液柱稳定后读数', L.W / 2, 42)
+  ctx.restore()
 }
 
-function loop(now) {
-  if (!lastT) lastT = now
-  const dt = Math.min((now - lastT) / 1000, 0.05)
-  lastT = now
-  // 汞柱平滑过渡到所选水温
-  const target = cups[selected.value].temp
-  mercury.value += (target - mercury.value) * Math.min(1, dt * 4)
-  render(now)
-  raf = requestAnimationFrame(loop)
-}
-
-function resizeCanvas() {
-  if (!canvasRef.value) return
-  setupCanvas()
-  render(performance.now())
-}
-
-function onCanvasClick(e) {
-  const rect = canvasRef.value.getBoundingClientRect()
-  const { W, H } = dims()
-  // 画布为固定逻辑分辨率 + CSS 等比缩放：把显示坐标映射回逻辑坐标
-  const x = (e.clientX - rect.left) * (W / rect.width)
-  const y = (e.clientY - rect.top) * (H / rect.height)
-  const rects = beakerRects(W, H)
-  for (let i = 0; i < rects.length; i++) {
-    const r = rects[i]
-    if (x >= r.x - 6 && x <= r.x + r.w + 6 && y >= r.y - 24 && y <= r.y + r.h + 24) {
-      selected.value = i
-      hint.value = `正在测量${cups[i].name}，请视线与汞柱上表面相平，在右侧读出温度`
-      return
-    }
-  }
-}
-
+// ===== 校验 =====
 function submit() {
   submitted.value = true
   let allOk = true
@@ -400,8 +140,8 @@ function submit() {
   }
   if (allOk) {
     hint.value = '全部读数正确！读数时视线与液柱上表面相平、估读到分度值下一位。'
-    if (!completed) {
-      completed = true
+    if (!done.value) {
+      done.value = true
       emit('complete')
     }
   } else {
@@ -415,42 +155,87 @@ function resetAll() {
     readings[i] = null
     results[i] = null
   }
-  hint.value = '点击左侧某个水杯，温度计会浸入并升起汞柱，请在右侧读出温度'
+  hint.value = '点击左侧某个水杯，温度计会移过去浸入水中，请在右侧读出温度'
 }
 
 const allFilled = computed(() => readings.every((r) => r !== null && r !== ''))
 
-let resizeObs = null
-onMounted(() => {
+function resizeCanvas() {
+  if (!canvasRef.value) return
+  layoutStage()
   setupCanvas()
-  render(performance.now())
+  render()
+}
+
+let resizeObs = null
+let lastStageW = 0
+let sizePoll = null
+function onWinResize() { resizeCanvas() }
+onMounted(() => {
+  layoutStage()
+  setupCanvas()
+  render()
+  lastStageW = stageRef.value ? stageRef.value.clientWidth : 0
+  window.addEventListener('resize', onWinResize)
   if (window.ResizeObserver) {
     resizeObs = new ResizeObserver(resizeCanvas)
-    resizeObs.observe(canvasRef.value.parentElement)
+    resizeObs.observe(stageRef.value)
   }
-  raf = requestAnimationFrame(loop)
+  // 兜底轮询（同 e-melt / e-boil）：极端环境下 RO/resize 不可靠时防位置漂移
+  sizePoll = setInterval(() => {
+    const st = stageRef.value
+    if (!st) return
+    const w = st.clientWidth
+    if (w && Math.abs(w - lastStageW) > 1) {
+      lastStageW = w
+      resizeCanvas()
+    }
+  }, 400)
 })
 onBeforeUnmount(() => {
-  if (raf) cancelAnimationFrame(raf)
   if (resizeObs) resizeObs.disconnect()
+  if (sizePoll) clearInterval(sizePoll)
+  window.removeEventListener('resize', onWinResize)
 })
 </script>
 
 <template>
   <div class="lab-stage">
     <div class="lab-left">
-      <div class="lab-panel" style="padding:0">
-        <canvas
-          class="logic-canvas" ref="canvasRef"
-          style="display:block;width:100%;height:520px;touch-action:none;border-radius:8px;cursor:pointer"
-          @click="onCanvasClick"
-        ></canvas>
+      <div class="lab-panel" style="padding:0;position:relative">
+        <!-- 外层容器：高度由 JS 按缩放比例设定；画布铺满舞台绘制板面，装置层按设计坐标居中缩放 -->
+        <div class="tp-stage" ref="stageRef">
+          <canvas
+            class="logic-canvas" ref="canvasRef"
+            style="position:absolute;inset:0;display:block;touch-action:none"
+          ></canvas>
+          <div class="tp-scale" ref="scaleRef">
+            <!-- 装置区（SVG 组件层） -->
+            <div class="tp-rig">
+              <TempCups :cups="cups" :selected="selected" @select="selectCup" />
+              <TempThermo :temp="curCup.temp" :x="CUP_X[selected]" />
+            </div>
+
+            <!-- 放大读数小框（设计层内随场景等比缩放） -->
+            <transition name="zoompop">
+              <div v-if="zoomOn" class="tp-zoom">
+                <div class="tz-head">
+                  <span>温度计液柱 ×3.7</span>
+                  <strong class="tz-temp">{{ curCup.temp.toFixed(1) }}℃</strong>
+                </div>
+                <TempZoom :temp="curCup.temp" />
+                <div class="tz-caption">{{ zoomCaption }}</div>
+              </div>
+            </transition>
+          </div>
+        </div>
       </div>
 
       <div class="lab-actions">
         <button class="btn btn-primary" @click="submit" :disabled="!allFilled">记录并校验读数</button>
         <button class="btn" @click="resetAll">重置</button>
-        <span class="feedback" :class="completed ? 'ok' : 'no'">{{ hint }}</span>
+        <button class="btn" :class="{ 'btn-primary': zoomOn }" @click="zoomOn = !zoomOn">放大观察</button>
+        <span class="feedback" :class="done ? 'ok' : 'no'">{{ hint }}</span>
         <FullscreenBtn />
       </div>
     </div>
@@ -480,15 +265,77 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div class="lab-panel">
-        <div class="lab-panel-head">
-          <strong>读数要点</strong>
-          <span>不碰底壁</span>
-        </div>
-        <p style="font-size:14px;line-height:1.7;color:var(--text)">
-          玻璃泡要<b>全部浸入</b>液体、<b>不碰容器底和壁</b>；待示数稳定后，<b>视线与液柱上表面相平</b>读数，并估读到分度值（1℃）的下一位。
-        </p>
-      </div>
+      <FormulaPanel
+        title="读数要点"
+        formula="视线 ↔ 液柱上表面 相平"
+        desc="玻璃泡要全部浸入液体、不碰容器底和壁；待示数稳定后读数。"
+        :rows="measureRows"
+        :result="formulaResults"
+        :verify="verifySteps"
+      />
     </aside>
   </div>
 </template>
+
+<style scoped>
+/* 外层容器：宽度铺满，高度由 JS 按 900:520 缩放比设定（与 e-melt / e-boil 相同） */
+.tp-stage {
+  position: relative;
+  width: 100%;
+  height: 520px;
+  overflow: hidden;
+}
+/* 设计层：固定 900×520 逻辑坐标，整体等比缩放（左上角为原点） */
+.tp-scale {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 900px;
+  height: 520px;
+  transform-origin: top left;
+}
+
+/* ===== 放大读数小框（样式同 e-boil 的放大框） ===== */
+.tp-zoom {
+  position: absolute;
+  left: 560px;
+  top: 110px;
+  width: 240px;
+  padding: 9px 10px 8px;
+  background: #fffef5;
+  border: 2px solid #2a2a2a;
+  border-radius: 8px;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.25);
+  z-index: 6;
+}
+.tz-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  font-weight: 800;
+  color: #2a2a2a;
+}
+.tz-temp {
+  color: #e0584f;
+  font-size: 18px;
+  font-weight: 900;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.tz-caption {
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #444;
+}
+.zoompop-enter-active,
+.zoompop-leave-active {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  transform-origin: 0 100%;
+}
+.zoompop-enter-from,
+.zoompop-leave-to {
+  transform: scale(0.6);
+  opacity: 0;
+}
+</style>

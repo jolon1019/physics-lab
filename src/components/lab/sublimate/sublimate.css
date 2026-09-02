@@ -1,0 +1,76 @@
+/* e-sublimate 装置组件（SVG）公共样式，结构与约定同 melt.css：
+   玻璃蓝灰描边 + 渐变体 + 高光，与黑板/纸面底色都协调 */
+:root {
+  --sv-glass-line: #5f7588;
+  --sv-iodine:     #6b3fa0;
+}
+
+.sub-rig {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* 子组件按需开启 */
+  z-index: 2;           /* 在 canvas (z=1) 之上 */
+}
+.sub-rig > * { pointer-events: auto; }
+
+/* SVG 装置通用：绝对定位，根据 layout 计算 left/top/width */
+.sub-piece {
+  position: absolute;
+  user-select: none;
+  touch-action: none;
+  outline: none;
+}
+.sub-piece svg { display: block; pointer-events: none; user-select: none; }
+
+/* ===== 水浴加热气泡（SubRig 烧杯内）===== */
+@keyframes svBubble {
+  0%   { transform: translateY(0)    scale(0.7); opacity: 0; }
+  12%  { opacity: 0.85; }
+  85%  { opacity: 0.6; }
+  100% { transform: translateY(-88px) scale(1); opacity: 0; }
+}
+.sv-bubble { transform-box: fill-box; animation: svBubble 2.4s linear infinite; }
+.sv-bubble.b1 { animation-delay: 0s; }
+.sv-bubble.b2 { animation-delay: 0.5s; animation-duration: 2.8s; }
+.sv-bubble.b3 { animation-delay: 1.05s; animation-duration: 2.1s; }
+.sv-bubble.b4 { animation-delay: 0.28s; animation-duration: 3s; }
+.sv-bubble.b5 { animation-delay: 1.5s; animation-duration: 2.6s; }
+.sv-bubble.b6 { animation-delay: 0.82s; animation-duration: 2.3s; }
+
+/* ===== 杯口白汽 ===== */
+@keyframes svSteam {
+  0%   { transform: translateY(0) scaleX(1);    opacity: 0; }
+  18%  { opacity: 0.55; }
+  100% { transform: translateY(-30px) scaleX(1.45); opacity: 0; }
+}
+.sv-steam { transform-box: fill-box; transform-origin: 50% 100%; animation: svSteam 2.6s ease-out infinite; }
+.sv-steam.d1 { animation-delay: 0s; }
+.sv-steam.d2 { animation-delay: 0.9s; }
+.sv-steam.d3 { animation-delay: 1.7s; }
+
+/* ===== 碘蒸气上升（管内，从晶体堆升至管顶）===== */
+@keyframes svVapor {
+  0%   { transform: translateY(0)    scale(0.65); opacity: 0; }
+  15%  { opacity: 0.95; }
+  80%  { opacity: 0.7; }
+  100% { transform: translateY(-210px) scale(1.15); opacity: 0; }
+}
+.sv-vapor { transform-box: fill-box; animation: svVapor 3.2s linear infinite; }
+.sv-vapor.v1 { animation-delay: 0s; }
+.sv-vapor.v2 { animation-delay: 0.4s; animation-duration: 3.6s; }
+.sv-vapor.v3 { animation-delay: 0.8s; }
+.sv-vapor.v4 { animation-delay: 1.2s; animation-duration: 2.9s; }
+.sv-vapor.v5 { animation-delay: 1.6s; animation-duration: 3.4s; }
+.sv-vapor.v6 { animation-delay: 2s; }
+.sv-vapor.v7 { animation-delay: 2.4s; animation-duration: 3.1s; }
+.sv-vapor.v8 { animation-delay: 2.8s; animation-duration: 3.7s; }
+
+/* ===== 固态碘晶体受热微颤 ===== */
+@keyframes svJiggle {
+  0%, 100% { transform: translate(0, 0); }
+  25%      { transform: translate(0.5px, -0.6px); }
+  50%      { transform: translate(-0.5px, 0.4px); }
+  75%      { transform: translate(0.4px, 0.5px); }
+}
+.sv-grains { transform-box: fill-box; transform-origin: 50% 100%; }
+.sv-grains.is-hot { animation: svJiggle 0.55s linear infinite; }
