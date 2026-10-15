@@ -3,12 +3,31 @@
 import { META, COMP_TYPES } from '../../circuit/components'
 import { componentArtSvg } from '../../circuit/componentArt'
 import { useCircuitStore } from '../../stores/circuit'
+import voltmeterTex from '../../assets/lab-components/circuit/voltmeter.png'
 
 const store = useCircuitStore()
 
+// 与画布一致的 PNG 贴图（CircuitBuildCanvas.ART_TEXTURES 同源配置）：
+// 有贴图的元件缩略图直接用贴图；vb = 贴图放置区，保证完整显示不裁切
+const TEXTURES = {
+  voltmeter: { url: voltmeterTex, rect: { x: -92.6, y: -132.5, w: 185.3, h: 185.3 } },
+}
+
 function art(t) {
+  const tex = TEXTURES[t]
+  if (tex) {
+    return `<image href="${tex.url}" x="${tex.rect.x}" y="${tex.rect.y}" width="${tex.rect.w}" height="${tex.rect.h}" preserveAspectRatio="xMidYMid meet" />`
+  }
   // 缩略图默认展示闭合开关 + 中点滑片
   return componentArtSvg(t, t === 'switch' ? { open: false } : { frac: 0.5 })
+}
+
+function viewBox(t) {
+  const tex = TEXTURES[t]
+  if (!tex) return '-60 -52 120 104'
+  const r = tex.rect
+  const pad = r.w * 0.04
+  return `${r.x - pad} ${r.y - pad} ${r.w + pad * 2} ${r.h + pad * 2}`
 }
 
 function onDragStart(e, type) {
@@ -35,13 +54,13 @@ function onClick(type) {
         @dragstart="onDragStart($event, t)"
         @click="onClick(t)"
       >
-        <svg viewBox="-60 -52 120 104" class="pal-art">
+        <svg :viewBox="viewBox(t)" class="pal-art">
           <g v-html="art(t)"></g>
         </svg>
         <span>{{ META[t].label }}</span>
       </button>
     </div>
-    <p class="pal-hint">把元件拖到右侧画布；点击元件可拖动，拖动端子间的连线即可接通电路。</p>
+    <p class="pal-hint">把元件拖到右侧画布；点击元件可拖动，拖动端子间的连线即可接通电路。画布右上角可放大/缩小，鼠标滚轮直接缩放画布，空白处拖拽平移，双指捏合同理。</p>
   </div>
 </template>
 

@@ -480,6 +480,7 @@ onBeforeUnmount(() => {
             </transition>
           </div>
         </div>
+      </div>
 
       <div class="lab-actions">
         <div style="display:flex;gap:8px">

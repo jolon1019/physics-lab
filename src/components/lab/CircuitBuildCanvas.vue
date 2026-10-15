@@ -7,9 +7,32 @@ import { catmullRomSpline, pathFromPolyline, polylineLength, pointOnPolyline } f
 import { componentArtSvg } from '../../circuit/componentArt'
 import { useCircuitStore } from '../../stores/circuit'
 import BlackBoardBg from './BlackBoardBg.vue'
+import voltmeterTex from '../../assets/lab-components/circuit/voltmeter.png'
 
 const store = useCircuitStore()
 const svgRef = ref(null)
+
+// ---------- 元件 PNG 贴图（lab-components/README.md 规范） ----------
+// 有贴图的元件优先渲染 PNG 实物图，缺图回退矢量 componentArt。
+// rect：贴图在元件局部坐标系的放置区（x/y 左上角，w/h 尺寸）。贴图不是按
+// 120×104 美术框出图时，按「接线柱旋钮中心 = META 端子 (±44,0)」实测标定 rect，
+// 换素材只需重测 rect，导线/端子/物理逻辑零改动。
+const ART_TEXTURES = {
+  voltmeter: {
+    url: voltmeterTex,
+    // 写实贴图（豆包 voltmeter_final 2048×2048）：旋钮中心 nx = 0.2623 / 0.4998 / 0.7373，cy ≈ 0.715，
+    // 左黑旋钮(−)对齐端子 a(-44,0)、右红旋钮(15V)对齐端子 b(44,0)
+    rect: { x: -92.6, y: -132.5, w: 185.3, h: 185.3 },
+    labelY: 56, // 数字读数基线（表体下方）
+    // 表盘动态指针（贴图指针是静止的，叠加一层随电压偏转的针）：
+    // 轴心/针长为局部坐标，0V → -sweep/2，15V（满量程）→ +sweep/2
+    gauge: { px: 0.6, py: -52.4, len: 45.5, sweep: 138 },
+  },
+}
+function artTex(type) {
+  return ART_TEXTURES[type] || null
+}
+const texComps = computed(() => store.components.filter((c) => artTex(c.type)))
 
 const dragComp = ref(null) // { id, offX, offY }
 const dragJoint = ref(null) // { id, idx } 正在拖拽的导线关节
@@ -27,14 +50,90 @@ const phase = ref(0)
 let raf = null
 let last = 0
 
-function toSvg(evt) {
+function toViewRaw(evt) {
+  // 屏幕 → viewBox 原始坐标（不含视图缩放平移），供缩放/平移手势用
   const svg = svgRef.value
   const pt = svg.createSVGPoint()
   pt.x = evt.clientX
   pt.y = evt.clientY
-  const m = svg.getScreenCTM().inverse()
-  const p = pt.matrixTransform(m)
-  return { x: p.x, y: p.y }
+  return pt.matrixTransform(svg.getScreenCTM().inverse())
+}
+
+function toSvg(evt) {
+  // 屏幕 → 世界坐标（扣除视图的平移与缩放），所有交互数学保持世界系不变
+  const p = toViewRaw(evt)
+  const v = view.value
+  return { x: (p.x - v.x) / v.zoom, y: (p.y - v.y) / v.zoom }
+}
+
+// ---------- 画布视图缩放/平移 ----------
+// 默认整图适配（zoom=1, 平移 0）；放大便于看清表盘刻度/读数，图标始终等比不压缩。
+// 入口：右上角按钮 / Ctrl(⌘)+滚轮（触控板捏合同理）/ 双指捏合 / 空白处拖拽平移。
+const view = ref({ zoom: 1, x: 0, y: 0 })
+const ZOOM_MIN = 0.6
+const ZOOM_MAX = 3
+const pointers = new Map() // 活动指针（双指捏合用）
+let pinch = null // { d0, z0, w0 } 起始双指间距 / 起始缩放 / 锚点世界坐标
+let panning = null // { sx, sy, px, py } 背景拖拽平移会话
+
+// 平移夹取：保证世界 (0..1000, 0..640) 至少部分可见；zoom<1 时居中
+function clampPan(v, span) {
+  const lo = span * (1 - view.value.zoom) - 120
+  const hi = 120
+  return lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, v))
+}
+function applyView(zoom, x, y) {
+  view.value = { zoom, x: clampPan(x, 1000), y: clampPan(y, 640) }
+}
+function zoomAt(vx, vy, factor) {
+  // viewBox 点 (vx,vy) 为锚点缩放：其对应的世界点缩放前后保持不动
+  const v = view.value
+  const z2 = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, v.zoom * factor))
+  const wx = (vx - v.x) / v.zoom
+  const wy = (vy - v.y) / v.zoom
+  applyView(z2, vx - wx * z2, vy - wy * z2)
+}
+function zoomStep(factor) {
+  zoomAt(500, 320, factor) // 以画布中心为锚
+}
+function resetView() {
+  view.value = { zoom: 1, x: 0, y: 0 }
+}
+function onWheel(evt) {
+  // 鼠标滚轮直接缩放画布（Ctrl/⌘+滚轮、触控板捏合同样走这里），锚点为鼠标位置；
+  // 悬停画布时滚轮不再滚动页面
+  evt.preventDefault()
+  const p = toViewRaw(evt)
+  zoomAt(p.x, p.y, evt.deltaY < 0 ? 1.12 : 1 / 1.12)
+}
+// capture 阶段记录所有指针：第二根手指落下即进入捏合缩放，并取消进行中的拖拽/连线。
+// 注意：单指时不得 capture —— capture 会把后续 pointerup 重定向到 svg，导致
+// click 目标变成 svg 而非接线柱，接线柱的 @click（连线流程）将失效。
+function onCapturePointer(evt) {
+  pointers.set(evt.pointerId, { x: evt.clientX, y: evt.clientY })
+  if (pointers.size === 2) {
+    dragComp.value = null
+    dragJoint.value = null
+    dragSlider.value = null
+    pendingTerm.value = null
+    pendingRewire.value = null
+    pendingTapWire.value = null
+    panning = null
+    // 捏合期间把两根手指都 capture 到 svg，保证抬指/移动事件始终送达
+    for (const id of pointers.keys()) {
+      try {
+        svgRef.value.setPointerCapture(id)
+      } catch (e) {}
+    }
+    const [a, b] = [...pointers.values()]
+    const m = toViewRaw({ clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 })
+    const v = view.value
+    pinch = {
+      d0: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+      z0: v.zoom,
+      w0: { x: (m.x - v.x) / v.zoom, y: (m.y - v.y) / v.zoom }
+    }
+  }
 }
 
 function terminalWorldPos(compId, term) {
@@ -57,6 +156,7 @@ function artState(c) {
     frac: p.frac,
     V: c.type === 'battery' ? store.sourceVoltage : p.E,
     R: p.R,
+    volts: c.type === 'voltmeter' ? r.U || 0 : 0, // 被测电压：驱动指针偏转
     reading
   }
 }
@@ -66,12 +166,25 @@ function artState(c) {
 // 返回 SVG 标记字符串，用 v-html 注入到组件 <g> 内（与 buildArt 同模式）。
 // 灯泡辉光使用根 SVG 里定义的径向渐变 #g-bulb-glow / #g-bulb-core。
 function pngArtHtml(type, st) {
-  const art = componentArtSvg(type, {
-    open: !!st.open,
-    frac: typeof st.frac === 'number' ? st.frac : 0.5,
-    resistance: st.resistance
-  })
+  const tex = artTex(type)
+  // PNG 贴图元件：实物画面在贴图底层（导线之下）渲染，主层只出数字读数等附加标注
+  let art = tex
+    ? ''
+    : componentArtSvg(type, {
+        open: !!st.open,
+        frac: typeof st.frac === 'number' ? st.frac : 0.5,
+        resistance: st.resistance,
+        volts: st.volts
+      })
   let extra = ''
+  // 贴图电压表：叠加动态指针（0..15V → -sweep/2..+sweep/2），数字读数由下方 voltmeter 分支输出
+  if (tex && type === 'voltmeter' && tex.gauge) {
+    const g = tex.gauge
+    const a = -g.sweep / 2 + g.sweep * Math.max(0, Math.min(1, (st.volts || 0) / 15))
+    art += `<g transform="translate(${g.px} ${g.py}) rotate(${a.toFixed(2)})">`
+    art += `<path d="M -1.7 7 L 0 ${-g.len} L 1.7 7 Z" fill="#171a1e"/>`
+    art += `<circle r="3.4" fill="#2a2f36" stroke="#0b0d10" stroke-width="1"/></g>`
+  }
   if (type === 'bulb') {
     const g = st.glow || 0
     if (g > 0.04) {
@@ -95,10 +208,15 @@ function pngArtHtml(type, st) {
     // 滑片已由 componentArt 矢量绘出（位置由 frac 驱动），此处只画 Ω 标签
     const rOhm = Math.round((typeof st.frac === 'number' ? st.frac : 0.5) * 20)
     extra += `<text x="0" y="40" font-size="10" font-weight="700" fill="var(--bb-blue)" text-anchor="middle" font-family="system-ui">R=${rOhm} Ω</text>`
-  } else if (type === 'ammeter' || type === 'voltmeter') {
+  } else if (type === 'ammeter') {
     // 表体上部深色屏（局部 y ≈ -38..-4），数字读数画在屏内
-    const txt = st.reading || (type === 'ammeter' ? '0.00A' : '0.00V')
+    const txt = st.reading || '0.00A'
     extra += `<text x="0" y="-21" font-size="13" font-weight="800" fill="#ff5b67" text-anchor="middle" font-family="ui-monospace,monospace">${txt}</text>`
+  } else if (type === 'voltmeter') {
+    // 电压表：数字读数标注在表体下方（贴图模式 y 由 rect 实测决定）
+    const txt = st.reading || '0.00V'
+    const ly = tex ? tex.labelY : 41
+    extra += `<text x="0" y="${ly}" font-size="10" font-weight="700" fill="var(--bb-fg-dim)" text-anchor="middle" font-family="system-ui">${txt}</text>`
   }
   return art + extra
 }
@@ -162,6 +280,16 @@ function wirePort(w) {
 }
 function wireEndPos(w, end) {
   return store.terminalWorld(`${w[end].comp}:${w[end].term}`)
+}
+// 端点接线环：半圆环从下方抵住接线柱（T 形搭接支线的 b 端是搭接点，由 tap-dot 表达，不画环）
+function ringEnds(w) {
+  return w.tap ? ['a'] : ['a', 'b']
+}
+// 半圆接线环路径：圆心 p、半径 r，θ 从 10° 扫到 170°（y 向下坐标系），弧底抵住柱下缘、双臂贴柱两侧
+function lugD(p, r) {
+  const c = Math.cos(Math.PI / 18)
+  const s = Math.sin(Math.PI / 18)
+  return `M ${(p.x + r * c).toFixed(2)} ${(p.y + r * s).toFixed(2)} A ${r} ${r} 0 0 1 ${(p.x - r * c).toFixed(2)} ${(p.y + r * s).toFixed(2)}`
 }
 function wireStyle(w) {
   return w.color ? { '--wire-color': w.color } : undefined
@@ -330,6 +458,12 @@ function onBgDown(evt) {
   pendingRewire.value = null
   pendingTapWire.value = null
   activeWireId.value = null
+  // 空白处开始拖拽平移会话（点按不动 = 仅取消选择）；capture 保证拖出画布也能持续平移
+  const p = toViewRaw(evt)
+  panning = { sx: p.x, sy: p.y, px: view.value.x, py: view.value.y }
+  try {
+    svgRef.value.setPointerCapture(evt.pointerId)
+  } catch (e) {}
 }
 
 function onBgContext(evt) {
@@ -338,6 +472,22 @@ function onBgContext(evt) {
 }
 
 function onMove(evt) {
+  // 双指捏合缩放：围绕起始中点对应的世界点缩放，中点始终压住该点
+  if (pinch && pointers.size >= 2) {
+    if (pointers.has(evt.pointerId)) pointers.set(evt.pointerId, { x: evt.clientX, y: evt.clientY })
+    const [a, b] = [...pointers.values()]
+    const d = Math.hypot(a.x - b.x, a.y - b.y) || 1
+    const z = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, pinch.z0 * (d / pinch.d0)))
+    const m = toViewRaw({ clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 })
+    applyView(z, m.x - pinch.w0.x * z, m.y - pinch.w0.y * z)
+    return
+  }
+  // 空白处拖拽平移
+  if (panning) {
+    const p = toViewRaw(evt)
+    applyView(view.value.zoom, panning.px + (p.x - panning.sx), panning.py + (p.y - panning.sy))
+    return
+  }
   // 拖拽滑动变阻器滑片：世界坐标 → 元件局部坐标（考虑旋转），映射为 frac
   if (dragSlider.value) {
     const c = store.compById(dragSlider.value)
@@ -360,8 +510,8 @@ function onMove(evt) {
   }
   if (dragComp.value) {
     const pos = toSvg(evt)
-    // 超过阈值判定为拖动，否则保持"未移动"→ 抬起时按开关处理
-    if (Math.hypot(pos.x - dragComp.value.sx, pos.y - dragComp.value.sy) > 4) dragComp.value.moved = true
+    // 超过阈值判定为拖动，否则保持"未移动"→ 抬起时按开关处理（阈值随缩放折算，保持屏幕手感一致）
+    if (Math.hypot(pos.x - dragComp.value.sx, pos.y - dragComp.value.sy) > 4 / view.value.zoom) dragComp.value.moved = true
     store.moveComponent(dragComp.value.id, pos.x - dragComp.value.offX, pos.y - dragComp.value.offY)
     mousePos.value = pos
   } else if (pendingRewire.value || pendingTerm.value || pendingTapWire.value) {
@@ -370,6 +520,16 @@ function onMove(evt) {
 }
 
 function onUp(evt) {
+  pointers.delete(evt.pointerId)
+  if (pointers.size < 2) pinch = null
+  // 平移会话结束
+  if (panning) {
+    panning = null
+    try {
+      svgRef.value.releasePointerCapture(evt.pointerId)
+    } catch (e) {}
+    return
+  }
   // 线头改接：拖到接线柱上松开即完成；未落在接线柱上则取消（也可用"点线头→点接线柱"两段式）
   if (pendingRewire.value) {
     const pr = pendingRewire.value
@@ -450,9 +610,11 @@ onBeforeUnmount(() => {
       preserveAspectRatio="xMidYMid meet"
       @dragover.prevent
       @drop="onDrop"
+      @pointerdown.capture="onCapturePointer"
       @pointermove="onMove"
       @pointerup="onUp"
       @pointercancel="onUp"
+      @wheel="onWheel"
     >
       <defs>
         <radialGradient id="g-bulb-glow">
@@ -465,7 +627,27 @@ onBeforeUnmount(() => {
           <stop offset="1" stop-color="#fff6cc" stop-opacity="0"/>
         </radialGradient>
       </defs>
+      <!-- 背景层不随视图变换：任何缩放下整块画布都可点按取消/平移 -->
       <rect x="0" y="0" width="1000" height="640" fill="transparent" pointer-events="all" @pointerdown="onBgDown($event)" @contextmenu.prevent="onBgContext" />
+
+      <!-- 视图变换组：缩放/平移只作用于电路内容，元件等比缩放不压缩 -->
+      <g :transform="`translate(${view.x} ${view.y}) scale(${view.zoom})`">
+
+      <!-- 贴图底层：贴图元件的实物图整体画在导线之下，导线末端可见地"插入"接线柱旋钮
+           （贴图元件的旋钮在表体轮廓内，若贴图盖在导线上，接线看起来悬空断开）。
+           交互（拖拽/接线柱/选中）仍在下方主元件层，不在此层 -->
+      <image
+        v-for="c in texComps"
+        :key="'tex' + c.id"
+        :href="artTex(c.type).url"
+        :x="artTex(c.type).rect.x"
+        :y="artTex(c.type).rect.y"
+        :width="artTex(c.type).rect.w"
+        :height="artTex(c.type).rect.h"
+        :transform="`translate(${c.x},${c.y}) rotate(${c.rot || 0})`"
+        preserveAspectRatio="xMidYMid meet"
+        pointer-events="none"
+      />
 
       <!-- 导线：三层描边模拟真实绝缘导线圆管质感（暗边 + 绝缘皮 + 高光），颜色可换、通电芯线提亮；
            点选导线后：2 个关节点 + 中点接线口（T 形搭接）+ 两端线头手柄（拿起改接）+ 工具条（颜色/删除） -->
@@ -489,6 +671,15 @@ onBeforeUnmount(() => {
           @contextmenu.stop.prevent="onWireContext($event, w)"
         />
         <path :d="wirePathD(w)" class="wire-sheen" />
+
+        <!-- 端点接线：半圆环从下方抵住接线柱（外缘描边 + 环体 + 内缘描边），中心金属帽盖住线头 -->
+        <g v-for="end in ringEnds(w)" :key="'wr' + end">
+          <path :d="lugD(wireEndPos(w, end), 10.6)" class="wire-lug-edge" />
+          <path :d="lugD(wireEndPos(w, end), 8.8)" class="wire-lug" />
+          <path :d="lugD(wireEndPos(w, end), 7)" class="wire-lug-edge" />
+          <circle :cx="wireEndPos(w, end).x" :cy="wireEndPos(w, end).y" r="5.2" class="wire-cap" />
+          <ellipse :cx="wireEndPos(w, end).x" :cy="wireEndPos(w, end).y" rx="2.6" ry="1.1" class="wire-cap-slot" />
+        </g>
 
         <template v-if="activeWireId === w.id">
           <!-- 工具条：绝缘皮颜色 + 删除（位于导线中点上方） -->
@@ -556,7 +747,8 @@ onBeforeUnmount(() => {
       <!-- 电子流动（电流方向；通电时为红色） -->
       <circle v-for="(e, i) in electrons" :key="'e' + i" :cx="e.x" :cy="e.y" r="4.4" class="electron" :opacity="e.a" />
 
-      <!-- 元件 -->
+      <!-- 元件（主层，在导线之上）：贴图元件在此层只保留交互件（命中区/端子/选中态），
+           画面本身由贴图底层渲染，避免盖住接入的导线 -->
       <g
         v-for="c in store.components"
         :key="c.id"
@@ -564,6 +756,16 @@ onBeforeUnmount(() => {
         :class="{ 'is-switch': c.type === 'switch' }"
         @pointerdown="onCompDown($event, c)"
       >
+        <!-- 贴图元件的拖拽命中区（透明，覆盖整个贴图；置于本组最底层，
+             保证选中态按钮/端子都叠在其上可点） -->
+        <rect
+          v-if="artTex(c.type)"
+          :x="artTex(c.type).rect.x"
+          :y="artTex(c.type).rect.y"
+          :width="artTex(c.type).rect.w"
+          :height="artTex(c.type).rect.h"
+          class="tex-hit"
+        />
         <template v-if="c.id === store.selectedId">
           <rect x="-64" y="-54" width="128" height="108" rx="10" class="sel-outline" />
           <!-- 选中态浮动操作钮：逆旋转保持图标水平；删除在右上、旋转在左上 -->
@@ -598,6 +800,7 @@ onBeforeUnmount(() => {
           r="7"
           class="term"
           :class="{
+            'term-bare': c.type === 'voltmeter',
             pending: pendingTerm && pendingTerm.comp === c.id && pendingTerm.term === t.id,
             armed: !!pendingTerm || !!pendingRewire || !!pendingTapWire
           }"
@@ -607,7 +810,15 @@ onBeforeUnmount(() => {
           @click.stop="onTermClick($event, c, t)"
         />
       </g>
+      </g><!-- /视图变换组 -->
     </svg>
+
+    <!-- 缩放工具条：固定文字按钮（等宽，不用图标避免样式跳动） -->
+    <div class="zoom-bar">
+      <button class="zoom-btn" title="放大画布（鼠标滚轮 / 双指捏合同理）" @click="zoomStep(1.25)">放大</button>
+      <button class="zoom-btn" title="缩小画布" @click="zoomStep(1 / 1.25)">缩小</button>
+      <button class="zoom-btn" title="恢复整图适配视图" @click="resetView">复位</button>
+    </div>
   </div>
 </template>
 
@@ -627,6 +838,32 @@ onBeforeUnmount(() => {
   width: 100%;
   height: clamp(380px, 56vh, 600px);
   touch-action: none;
+}
+/* ---------- 画布缩放工具条（右上角悬浮） ---------- */
+.zoom-bar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+}
+.zoom-btn {
+  padding: 4px 11px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  background: rgba(29, 36, 46, 0.92);
+  border: 1.5px solid #4a5462;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+.zoom-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-h);
 }
 /* ---------- 真实导线：三层描边模拟绝缘圆管（暗轮廓 + 皮线 + 顶部高光） ---------- */
 .wire-edge {
@@ -661,6 +898,30 @@ onBeforeUnmount(() => {
 }
 .is-live .wire-sheen {
   stroke: rgba(255, 255, 255, 0.32);
+}
+/* 导线端点半圆接线环：从下方抵住接线柱（金属色，不随通电变色；不拦截点击） */
+.wire-lug {
+  fill: none;
+  stroke: #c9ced6;
+  stroke-width: 3.4;
+  pointer-events: none;
+}
+.wire-lug-edge {
+  fill: none;
+  stroke: rgba(20, 24, 30, 0.55);
+  stroke-width: 1;
+  pointer-events: none;
+}
+/* 柱顶金属帽：盖住导线线头，模拟 U 形接线片压在螺柱下 */
+.wire-cap {
+  fill: #d7dbe1;
+  stroke: #707784;
+  stroke-width: 1;
+  pointer-events: none;
+}
+.wire-cap-slot {
+  fill: #2a2e35;
+  pointer-events: none;
 }
 /* 导线关节：金属圆点 + 大命中区；悬停提示可拖 */
 .joint-hit {
@@ -810,5 +1071,18 @@ onBeforeUnmount(() => {
   fill: #ffd34d;
   stroke: #0e1116;
   r: 9;
+}
+/* 电压表：接线柱本体就是立体旋钮，默认不叠加金属圆点遮挡旋钮；
+   悬停/待连高亮态不受影响（.term:hover / .armed / .pending 优先级更高） */
+.term-bare {
+  fill: transparent;
+  stroke: none;
+}
+/* 贴图元件拖拽命中区：透明矩形盖住整张贴图，承接拖拽/选中（画面本体在贴图底层） */
+.tex-hit {
+  fill: transparent;
+  stroke: none;
+  pointer-events: all;
+  cursor: grab;
 }
 </style>

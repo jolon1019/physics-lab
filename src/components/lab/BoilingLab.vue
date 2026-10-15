@@ -438,6 +438,7 @@ onBeforeUnmount(() => {
             </transition>
           </div>
         </div>
+      </div>
 
       <div class="lab-actions">
         <button v-if="state === 'ready' || state === 'done'" class="btn btn-primary" @click="startRun">{{ startBtn }}</button>

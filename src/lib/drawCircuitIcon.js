@@ -8,14 +8,18 @@
 import { artDataUrl } from '../circuit/componentArt'
 
 const cache = {}
-function getImg(key) {
-  if (!cache[key]) {
+function getImg(key, st) {
+  const type = key === 'switchOpen' || key === 'switchClosed' ? 'switch' : key
+  const opts = key === 'switchOpen' ? { open: true } : st || {}
+  // 电压表指针随电压偏转：按 0.1V 量化缓存（与 componentArtSvg 的 key 规则一致）
+  const voltk = type === 'voltmeter' && opts.volts != null ? ':v' + Math.round(opts.volts * 10) : ''
+  const k = key + voltk
+  if (!cache[k]) {
     const im = new Image()
-    im.src = artDataUrl(key === 'switchClosed' ? 'switch' : key === 'switchOpen' ? 'switch' : key,
-      key === 'switchOpen' ? { open: true } : {})
-    cache[key] = im
+    im.src = artDataUrl(type, opts)
+    cache[k] = im
   }
-  return cache[key]
+  return cache[k]
 }
 
 // 预解码全部状态图（含开关开/合两态）：否则首次切换状态时该图才创建并异步解码，
@@ -207,13 +211,15 @@ export function drawCircuitIcon(ctx, type, cx, cy, w, h, st = {}) {
   }
 
   if (type === 'voltmeter') {
-    // 并联引线由调用方绘制（需连接被并元件两端）
-    blit(ctx, getImg('voltmeter'), cx, cy, w, h, 0)
-    const readingY = cy - 21 * scale
-    ctx.fillStyle = '#ff5b67'
-    ctx.font = '800 14px ui-monospace, monospace'
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText((st.voltage != null ? st.voltage : 0).toFixed(1) + ' V', cx, readingY)
+    // 并联引线由调用方绘制（需连接被并元件两端）；指针随 st.voltage 偏转（15V 量程）
+    blit(ctx, getImg('voltmeter', { volts: st.voltage || 0 }), cx, cy, w, h, 0)
+    if (st.voltage != null) {
+      // 数字读数标注在表体上方（表体已是白底表盘，不再有深色屏）
+      ctx.fillStyle = '#ff5b67'
+      ctx.font = '800 12px ui-monospace, monospace'
+      ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'
+      ctx.fillText(st.voltage.toFixed(1) + ' V', cx, cy - h / 2 - 5)
+    }
     if (lbl !== null) {
       ctx.fillStyle = '#3a3026'
       ctx.font = '800 10px system-ui'
