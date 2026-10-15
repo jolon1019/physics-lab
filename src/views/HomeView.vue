@@ -51,7 +51,7 @@ const steps = [
         <div class="hp-cta">
           <RouterLink to="/experiment/e-motion-desc" class="btn btn-primary hp-btn-lg">开始第一个实验 →</RouterLink>
           <RouterLink to="/record" class="btn hp-btn-lg">查看学习记录</RouterLink>
-          <RouterLink to="/resources" class="btn hp-btn-lg">试卷资料库</RouterLink>
+          <RouterLink to="/resources" class="btn hp-btn-lg hp-cta-res">试卷资料库</RouterLink>
         </div>
         <ul class="hp-stats">
           <li><strong>{{ totalExps }}</strong><span>个同步实验</span></li>
@@ -113,8 +113,23 @@ const steps = [
       </div>
     </section>
 
+    <!-- ===== 试卷资料库入口（移动端突出展示，桌面端隐藏） ===== -->
+    <RouterLink to="/resources" class="hp-res-card">
+      <span class="hp-res-ico">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 3h9l3 3v15H6z" />
+          <path d="M9 9h6M9 13h6M9 17h4" />
+        </svg>
+      </span>
+      <span class="hp-res-copy">
+        <strong class="hp-res-title">试卷资料库</strong>
+        <span class="hp-res-desc">历年真题 · 分章试卷 · 随时下载练习</span>
+      </span>
+      <span class="hp-res-go">进入 →</span>
+    </RouterLink>
+
     <!-- ===== 平台能力 ===== -->
-    <section class="hp-section">
+    <section class="hp-section hp-sec-features">
       <div class="hp-section-head">
         <span class="hp-eyebrow">平台能力</span>
         <h2>一套工具，覆盖实验全流程</h2>
@@ -185,7 +200,7 @@ const steps = [
     </section>
 
     <!-- ===== 上手流程 ===== -->
-    <section class="hp-section">
+    <section class="hp-section hp-sec-steps">
       <div class="hp-section-head">
         <span class="hp-eyebrow">上手流程</span>
         <h2>几分钟就能完成一次探究</h2>
@@ -529,20 +544,84 @@ const steps = [
   box-shadow: 4px 4px 0 #050505;
 }
 
+/* ===== 试卷资料库入口（移动端专用，桌面隐藏） ===== */
+.hp-res-card {
+  display: none;
+}
+
 /* ===== 响应式 ===== */
 @media (max-width: 860px) {
   .hp-hero {
     grid-template-columns: 1fr;
     padding: 30px 24px;
     gap: 24px;
+    margin-bottom: 26px;
   }
-  .hp-hero-art {
-    order: -1;
-    max-width: 300px;
-    margin: 0 auto;
+  /* 移动端做减法：去装饰插画与次要说明区块，聚焦实验与资料库入口 */
+  .hp-hero-art,
+  .hp-cta-res,
+  .hp-sec-features,
+  .hp-sec-steps {
+    display: none;
+  }
+  .hp-exp-grid > *:nth-child(n + 7) {
+    display: none;
   }
   .hp-feature-grid {
     grid-template-columns: 1fr;
+  }
+  /* 试卷资料库：大号醒目入口卡片 */
+  .hp-res-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--accent);
+    color: #fff;
+    border: 2px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 8px 0 rgba(0, 0, 0, 0.18);
+    padding: 18px;
+    text-decoration: none;
+    margin-bottom: 30px;
+    transition: transform 0.15s ease;
+  }
+  .hp-res-card:active {
+    transform: translateY(2px);
+  }
+  .hp-res-ico {
+    width: 46px;
+    height: 46px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(0, 0, 0, 0.35);
+    border-radius: 12px;
+  }
+  .hp-res-ico svg {
+    width: 24px;
+    height: 24px;
+  }
+  .hp-res-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+  .hp-res-title {
+    font-size: 19px;
+    font-weight: 900;
+    color: #fff;
+  }
+  .hp-res-desc {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.92);
+  }
+  .hp-res-go {
+    margin-left: auto;
+    font-weight: 900;
+    font-size: 14px;
+    white-space: nowrap;
   }
 }
 
