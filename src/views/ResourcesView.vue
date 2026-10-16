@@ -20,10 +20,6 @@ onBeforeUnmount(() => document.documentElement.classList.remove('res-lock'))
       loading="lazy"
       allow="clipboard-write"
     ></iframe>
-    <p class="res-tip">
-      资料库由腾讯文档承载：手机端可点击右上角「登录腾讯文档」收藏后离线查看；
-      网盘链接复制到浏览器打开即可转存。
-    </p>
   </section>
 </template>
 
@@ -38,13 +34,6 @@ onBeforeUnmount(() => document.documentElement.classList.remove('res-lock'))
   height: min(72vh, 760px);
   border: 0;
   background: #fff;
-}
-.res-tip {
-  margin: 0;
-  padding: 10px 16px 14px;
-  font-size: 12px;
-  color: var(--text-2);
-  border-top: 2px solid var(--line);
 }
 @media (max-width: 720px) {
   .res-frame {
