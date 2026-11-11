@@ -232,6 +232,68 @@ async function savePendingCodes(list) {
   writeFileSync(PENDING_FILE, json)
 }
 
+// ===== 试卷资料库（papers.json / Blob）：静态 resources.js 之外的新增与修订，
+// 前端把两者按 id 合并展示，新增试卷走 API 写入，无需改代码重新部署 =====
+const PAPERS_FILE = join(DATA_DIR, 'papers.json')
+
+async function loadPapers() {
+  let raw = null
+  if (BLOB_MODE) {
+    try {
+      const r = await get('papers.json', { access: 'private', useCache: false })
+      if (r) raw = JSON.parse(await new Response(r.stream).text())
+    } catch {
+      /* 还没有 papers.json */
+    }
+  } else if (existsSync(PAPERS_FILE)) {
+    try {
+      raw = JSON.parse(readFileSync(PAPERS_FILE, 'utf8'))
+    } catch {
+      raw = null
+    }
+  }
+  if (!Array.isArray(raw)) return []
+  return raw
+}
+
+async function savePapers(list) {
+  const json = JSON.stringify(list, null, 2)
+  if (BLOB_MODE) {
+    await put('papers.json', json, {
+      access: 'private',
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType: 'application/json'
+    })
+    return
+  }
+  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true })
+  writeFileSync(PAPERS_FILE, json)
+}
+
+// 条目清洗：只保留白名单字段，id/title 必填
+function normalizePaper(p) {
+  if (!p || typeof p !== 'object') return null
+  const id = String(p.id || '').trim()
+  const title = String(p.title || '').trim()
+  if (!id || !title) return null
+  const pick = (v) => (v === undefined || v === null ? '' : String(v).trim())
+  return {
+    id,
+    title,
+    category: pick(p.category) || 'all',
+    subject: pick(p.subject),
+    grade: pick(p.grade),
+    term: pick(p.term),
+    tone: pick(p.tone) || 'dark',
+    cover: pick(p.cover),
+    section: pick(p.section),
+    brand: pick(p.brand),
+    downloadUrl: pick(p.downloadUrl),
+    passcode: pick(p.passcode)
+  }
+}
+
 // ===== 密码哈希（scrypt）=====
 function hashPassword(password, salt = randomBytes(16).toString('hex')) {
   const hash = scryptSync(password, salt, 64).toString('hex')
@@ -574,6 +636,61 @@ export async function handleApi(req, res, url) {
     user.resetExpires = null
     await saveUsers(users)
     return send(res, 200, { ok: true })
+  }
+
+  // ===== 试卷资料库 =====
+  // 公开读取：返回 Blob 里的增量条目，前端与静态 resources.js 按 id 合并
+  if (url.pathname === '/api/papers' && req.method === 'GET') {
+    const papers = await loadPapers()
+    return send(res, 200, { papers })
+  }
+
+  // 管理端写入：body 为单个条目或 { papers: [...] }，按 id 覆盖/追加（upsert）
+  if (url.pathname === '/api/admin-papers' && req.method === 'POST') {
+    const users = await loadUsers()
+    const user = authUser(req, users)
+    if (!user) return send(res, 401, { message: '未登录或登录已过期' })
+    if (user.role !== 'admin') return send(res, 403, { message: '仅管理员可访问' })
+    let body
+    try {
+      body = await readBody(req)
+    } catch (e) {
+      return send(res, 400, { message: e.message })
+    }
+    const list = Array.isArray(body.papers) ? body.papers : [body]
+    const norm = []
+    for (const p of list) {
+      const n = normalizePaper(p)
+      if (!n) return send(res, 400, { message: '条目缺少 id 或 title，已跳过整批写入' })
+      norm.push(n)
+    }
+    if (!norm.length) return send(res, 400, { message: '没有可写入的试卷条目' })
+    const papers = await loadPapers()
+    const idx = new Map(papers.map((p, i) => [p.id, i]))
+    for (const n of norm) {
+      if (idx.has(n.id)) papers[idx.get(n.id)] = n
+      else {
+        idx.set(n.id, papers.length)
+        papers.push(n)
+      }
+    }
+    await savePapers(papers)
+    return send(res, 200, { ok: true, upserted: norm.length, total: papers.length })
+  }
+
+  // 管理端删除：/api/admin-papers?id=p-161
+  if (url.pathname === '/api/admin-papers' && req.method === 'DELETE') {
+    const users = await loadUsers()
+    const user = authUser(req, users)
+    if (!user) return send(res, 401, { message: '未登录或登录已过期' })
+    if (user.role !== 'admin') return send(res, 403, { message: '仅管理员可访问' })
+    const id = url.searchParams.get('id')
+    if (!id) return send(res, 400, { message: '缺少 id 参数' })
+    const papers = await loadPapers()
+    const next = papers.filter((p) => p.id !== id)
+    if (next.length === papers.length) return send(res, 404, { message: '条目不存在或不在数据库中' })
+    await savePapers(next)
+    return send(res, 200, { ok: true, total: next.length })
   }
 
   // 管理员：获取用户列表

@@ -1,10 +1,26 @@
 <script setup>
 // 试卷资料库（卡片墙）：分类 + 学科 + 搜索三级筛选，点「下载」跳转网盘
-// 数据由腾讯文档表格自动生成，见 src/data/resources.js
-import { computed, reactive, ref, watch } from 'vue'
+// 数据 = 静态 resources.js（基础库）+ /api/papers 数据库增量（按 id 合并，API 优先）
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { RESOURCE_CATEGORIES, RESOURCES } from '../data/resources'
+import { getPublicPapers } from '../lib/api'
 
 const PAGE_SIZE = 24
+
+// 试卷列表：先用静态数据渲染，挂载后拉取数据库增量合并（数据库条目按 id 覆盖静态条目）
+const papers = ref(RESOURCES)
+onMounted(async () => {
+  try {
+    const { papers: remote } = await getPublicPapers()
+    if (Array.isArray(remote) && remote.length) {
+      const map = new Map(RESOURCES.map((r) => [r.id, r]))
+      for (const p of remote) map.set(p.id, { ...p })
+      papers.value = [...map.values()]
+    }
+  } catch {
+    /* 接口不可用时保持静态数据 */
+  }
+})
 
 const activeCat = ref('all')
 const activeSubject = ref('all')
@@ -39,14 +55,14 @@ function kindOf(r) {
 
 // 分类计数
 const counts = computed(() => {
-  const m = { all: RESOURCES.length }
-  for (const r of RESOURCES) m[r.category] = (m[r.category] || 0) + 1
+  const m = { all: papers.value.length }
+  for (const r of papers.value) m[r.category] = (m[r.category] || 0) + 1
   return m
 })
 
 // 当前分类下的资料（用于二级筛选计数）
 const inCat = computed(() =>
-  activeCat.value === 'all' ? RESOURCES : RESOURCES.filter((r) => r.category === activeCat.value)
+  activeCat.value === 'all' ? papers.value : papers.value.filter((r) => r.category === activeCat.value)
 )
 
 // 学科筛选：按当前分类动态生成
@@ -84,7 +100,7 @@ const kinds = computed(() => {
 
 const filtered = computed(() => {
   const k = keyword.value.trim().toLowerCase()
-  return RESOURCES.filter((r) => {
+  return papers.value.filter((r) => {
     if (activeCat.value !== 'all' && r.category !== activeCat.value) return false
     if (activeSubject.value !== 'all' && (r.subject || '其他') !== activeSubject.value) return false
     if (activeSection.value !== 'all' && r.section !== activeSection.value) return false
@@ -137,7 +153,7 @@ async function copyPasscode(r) {
       <p class="pp-kicker">资料库 · 同步更新</p>
       <h2 class="page-title">试卷资料库</h2>
       <p class="pp-sub">
-        共 <strong>{{ RESOURCES.length }}</strong> 份资料，按年级与学科分类，点「下载」跳转网盘保存。
+        共 <strong>{{ papers.length }}</strong> 份资料，按年级与学科分类，点「下载」跳转网盘保存。
       </p>
     </div>
   </section>

@@ -81,3 +81,17 @@ export function getProgress() {
 export function saveProgress(progress) {
   return request('/progress', { method: 'POST', body: { progress } })
 }
+
+// ===== 试卷资料库 =====
+// 公开读取（无需登录）：返回数据库里的增量条目，与静态 resources.js 按 id 合并展示
+export function getPublicPapers() {
+  return request('/papers', { method: 'GET' })
+}
+// 管理端写入：单个条目对象或条目数组，按 id 覆盖/追加
+export function adminUpsertPapers(papers) {
+  return request('/admin-papers', { method: 'POST', body: Array.isArray(papers) ? { papers } : papers })
+}
+// 管理端删除
+export function adminDeletePaper(id) {
+  return request(`/admin-papers?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
