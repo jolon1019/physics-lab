@@ -75,8 +75,16 @@ router.beforeEach(async (to) => {
   }
 })
 
+// 首屏 PV 由百度统计 hm.js 自动上报，这里跳过首次避免重复计数
+let baiduFirstNav = true
 router.afterEach((to) => {
   document.title = to.meta.title ? `${to.meta.title} · 自主自学实验平台` : '自主自学实验平台'
+  // SPA 路由切换手动上报 PV（history 模式下 hm.js 不会自动统计）
+  if (baiduFirstNav) {
+    baiduFirstNav = false
+  } else if (window._hmt) {
+    window._hmt.push(['_trackPageview', to.fullPath])
+  }
 })
 
 export default router
