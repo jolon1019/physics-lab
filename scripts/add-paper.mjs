@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
-const BASE = (process.env.PAPERS_BASE_URL || 'https://zzzx.xyz').replace(/\/$/, '')
+const BASE = (process.env.PAPERS_BASE_URL || 'https://www.zzzx.xyz').replace(/\/$/, '')
 
 // 解析 .env（不覆盖已有环境变量）
 const envFile = join(ROOT, '.env')
