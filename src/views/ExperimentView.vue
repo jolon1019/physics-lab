@@ -178,8 +178,8 @@ function nextQuiz() {
             <p class="pay-tip">选择套餐后，请联系管理员完成支付与开通</p>
             <div style="display: flex; gap: 10px; justify-content: center; margin-top: 14px">
               <button v-if="!auth.isLoggedIn" class="btn btn-primary" @click="auth.openLogin(route.fullPath)">登录 / 注册</button>
-              <RouterLink v-else to="/resources" class="btn btn-primary">了解会员</RouterLink>
-              <RouterLink to="/" class="btn">返回首页</RouterLink>
+              <RouterLink v-else to="/" class="btn btn-primary">了解会员</RouterLink>
+              <RouterLink to="/lab" class="btn">返回实验首页</RouterLink>
             </div>
           </div>
           <template v-else>

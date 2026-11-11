@@ -5,8 +5,16 @@ import { useAuthStore } from '../stores/auth'
 
 const routes = [
   {
+    // 网站首页：试卷资料库
     path: '/',
     name: 'home',
+    component: () => import('../views/PapersView.vue'),
+    meta: { title: '试卷资料库' }
+  },
+  {
+    // 实验平台首页（独立入口）
+    path: '/lab',
+    name: 'lab',
     component: HomeView,
     meta: { title: '自主自学实验平台' }
   },
@@ -28,12 +36,9 @@ const routes = [
     component: () => import('../views/RecordView.vue'),
     meta: { title: '学习记录', requiresAuth: true }
   },
-  {
-    path: '/resources',
-    name: 'resources',
-    component: () => import('../views/ResourcesView.vue'),
-    meta: { title: '试卷资料库' }
-  },
+  // 旧地址统一跳转到首页
+  { path: '/papers', redirect: '/' },
+  { path: '/resources', redirect: '/' },
   {
     path: '/admin',
     name: 'admin',
@@ -53,7 +58,7 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresAuth) {
     if (!auth.token) {
       auth.openLogin(to.fullPath)
-      return { path: '/' }
+      return { path: '/lab' }
     }
   }
   // 进入实验页前确保付费实验名单已加载，否则门禁失效

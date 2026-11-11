@@ -17,7 +17,7 @@ function progressOf(expId) {
 </script>
 
 <template>
-  <RouterLink to="/" style="color:var(--accent);font-size:14px">← 返回首页</RouterLink>
+  <RouterLink to="/lab" style="color:var(--accent);font-size:14px">← 返回实验首页</RouterLink>
 
   <h2 class="page-title">{{ grade.label }}</h2>
   <p class="page-sub">选择任一实验，进入实验学习</p>

@@ -51,7 +51,7 @@ const steps = [
         <div class="hp-cta">
           <RouterLink to="/experiment/e-motion-desc" class="btn btn-primary hp-btn-lg">开始第一个实验 →</RouterLink>
           <RouterLink to="/record" class="btn hp-btn-lg">查看学习记录</RouterLink>
-          <RouterLink to="/resources" class="btn hp-btn-lg hp-cta-res">试卷资料库</RouterLink>
+          <RouterLink to="/" class="btn hp-btn-lg hp-cta-res">试卷资料库</RouterLink>
         </div>
         <ul class="hp-stats">
           <li><strong>{{ totalExps }}</strong><span>个同步实验</span></li>
@@ -114,7 +114,7 @@ const steps = [
     </section>
 
     <!-- ===== 试卷资料库入口（移动端突出展示，桌面端隐藏） ===== -->
-    <RouterLink to="/resources" class="hp-res-card">
+    <RouterLink to="/" class="hp-res-card">
       <span class="hp-res-ico">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M6 3h9l3 3v15H6z" />

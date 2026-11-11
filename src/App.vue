@@ -10,8 +10,8 @@ import LoginModal from './components/LoginModal.vue'
 import { Analytics } from '@vercel/analytics/vue'
 
 const route = useRoute()
-// 试卷资料库页不展示左侧实验目录（嵌入文档需要整行宽度）
-const isResources = computed(() => route.path === '/resources')
+// 首页即试卷资料库，不展示左侧实验目录（卡片墙需要整行宽度）
+const isPapers = computed(() => route.name === 'home')
 
 // 移动端判定（与 CSS 断点 1180px 对齐）
 const isMobile = ref(typeof window !== 'undefined' && window.matchMedia('(max-width: 1180px)').matches)
@@ -178,9 +178,9 @@ function onGlobalClick() {
       </div>
 
       <div class="user-zone">
-        <!-- 移动端：展开/收起侧边栏目录抽屉（桌面端隐藏；资料库页无目录） -->
+        <!-- 移动端：展开/收起侧边栏目录抽屉（桌面端隐藏；资料库首页无目录） -->
         <button
-          v-if="!isResources"
+          v-if="!isPapers"
           class="nav-hamburger"
           type="button"
           :title="layout.navCollapsed ? '展开实验目录' : '收起实验目录'"
@@ -189,12 +189,11 @@ function onGlobalClick() {
         >
           <span class="nav-toggle-icon">{{ layout.navCollapsed ? '»' : '«' }}</span>
         </button>
-        <!-- 资料库页时此按钮变为返回实验平台入口 -->
+        <!-- 首页是资料库，此按钮进入实验平台；实验站内则返回资料库 -->
         <RouterLink
-          :to="isResources ? '/' : '/resources'"
+          :to="isPapers ? '/lab' : '/'"
           class="nav-toggle-top"
-          :class="{ active: isResources }"
-        >{{ isResources ? '实验平台' : '试卷资料库' }}</RouterLink>
+        >{{ isPapers ? '实验平台' : '试卷资料库' }}</RouterLink>
         <!-- 管理员后台入口 -->
         <RouterLink v-if="auth.isAdmin" to="/admin" class="nav-toggle-top" :class="{ active: $route.path === '/admin' }">后台</RouterLink>
         <button
@@ -247,7 +246,7 @@ function onGlobalClick() {
     >⤢ 退出沉浸</button>
 
     <div class="workspace">
-      <SideNav v-if="!isResources" />
+      <SideNav v-if="!isPapers" />
       <main class="main-grid">
         <RouterView />
       </main>
@@ -256,7 +255,7 @@ function onGlobalClick() {
     <!-- 移动端抽屉遮罩：目录展开时点击收起（资料库页无目录，不渲染） -->
     <div
       class="nav-backdrop"
-      v-if="!layout.navCollapsed && !isResources"
+      v-if="!layout.navCollapsed && !isPapers"
       @click="layout.setNav(true)"
       aria-hidden="true"
     ></div>
