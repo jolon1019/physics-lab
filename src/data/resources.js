@@ -1,5 +1,6 @@
 // 试卷资料库数据（自动生成于腾讯文档，请勿手改；如需更新请重新生成）
 // 来源：https://docs.qq.com/sheet/DSnRwYVRjcUJLUmZR
+// addedAt：该链接写入表格的日期；前端按 addedAt 倒序把新发布置顶
 
 export const RESOURCE_CATEGORIES = [
   { id: 'all', label: '全部' },
@@ -1893,6 +1894,32 @@ export const RESOURCES = [
     tone: "red",
     cover: '',
     downloadUrl: "https://pan.quark.cn/s/e3f60ab93561",
+    passcode: ''
+  },
+  {
+    id: "p-161",
+    title: "25年25中初三上册数学期中试卷",
+    category: "g9",
+    subject: "数学",
+    grade: "九年级",
+    term: "上学期",
+    addedAt: "2026-11-12",
+    tone: "red",
+    cover: '',
+    downloadUrl: "https://pan.quark.cn/s/6feed3e7aca1",
+    passcode: ''
+  },
+  {
+    id: "p-162",
+    title: "26-27年石家庄81中九年级上册期中英语",
+    category: "g9",
+    subject: "英语",
+    grade: "九年级",
+    term: "上学期",
+    addedAt: "2026-11-12",
+    tone: "purple",
+    cover: '',
+    downloadUrl: "https://pan.quark.cn/s/5fd9d74fd2e9",
     passcode: ''
   },
 ]

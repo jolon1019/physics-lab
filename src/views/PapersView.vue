@@ -110,7 +110,11 @@ const filtered = computed(() => {
       .filter(Boolean)
       .join(' ')
     return hay.toLowerCase().includes(k)
-  }).sort((a, b) => CAT_ORDER.indexOf(a.category) - CAT_ORDER.indexOf(b.category))
+  }).sort((a, b) =>
+    // 分类顺序在前；同分类内新发布（addedAt 新）置顶，旧资料保持原有顺序
+    CAT_ORDER.indexOf(a.category) - CAT_ORDER.indexOf(b.category) ||
+    (b.addedAt || '').localeCompare(a.addedAt || '')
+  )
 })
 
 const shown = computed(() => filtered.value.slice(0, limit.value))
@@ -262,6 +266,7 @@ async function copyPasscode(r) {
           <span class="pp-mark">{{ (r.subject || '综合').slice(0, 2) }}</span>
           <span class="pp-foot">{{ r.term }}</span>
         </div>
+        <span v-if="r.addedAt" class="pp-new">新</span>
         <span class="pp-tag">{{ r.category === 'free' ? r.section || '免费' : CAT_LABEL[r.category] }}</span>
       </div>
 
@@ -471,6 +476,20 @@ async function copyPasscode(r) {
   font-weight: 800;
   color: var(--tone, var(--accent));
   background: var(--surface);
+  border: 2px solid var(--line);
+  border-radius: 999px;
+}
+/* 新发布角标（addedAt 有值的卡片） */
+.pp-new {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  z-index: 2;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 900;
+  color: #fff;
+  background: var(--accent);
   border: 2px solid var(--line);
   border-radius: 999px;
 }
@@ -705,6 +724,13 @@ async function copyPasscode(r) {
     top: 3px;
     right: 3px;
     padding: 1px 5px;
+    font-size: 8px;
+    border-width: 1.5px;
+  }
+  .pp-new {
+    top: 3px;
+    left: 3px;
+    padding: 1px 4px;
     font-size: 8px;
     border-width: 1.5px;
   }
