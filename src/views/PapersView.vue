@@ -111,9 +111,10 @@ const filtered = computed(() => {
       .join(' ')
     return hay.toLowerCase().includes(k)
   }).sort((a, b) =>
-    // 分类顺序在前；同分类内新发布（addedAt 新）置顶，旧资料保持原有顺序
-    CAT_ORDER.indexOf(a.category) - CAT_ORDER.indexOf(b.category) ||
-    (b.addedAt || '').localeCompare(a.addedAt || '')
+    // 发布时间从新到旧：有 addedAt 的（新发布）永远排在最前，同日期内按分类顺序；
+    // 旧资料（无 addedAt）保持原有分类顺序
+    (b.addedAt || '').localeCompare(a.addedAt || '') ||
+    CAT_ORDER.indexOf(a.category) - CAT_ORDER.indexOf(b.category)
   )
 })
 
