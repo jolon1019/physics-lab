@@ -290,7 +290,8 @@ function normalizePaper(p) {
     section: pick(p.section),
     brand: pick(p.brand),
     downloadUrl: pick(p.downloadUrl),
-    passcode: pick(p.passcode)
+    passcode: pick(p.passcode),
+    addedAt: pick(p.addedAt)
   }
 }
 
@@ -667,7 +668,12 @@ export async function handleApi(req, res, url) {
     if (!norm.length) return send(res, 400, { message: '没有可写入的试卷条目' })
     const papers = await loadPapers()
     const idx = new Map(papers.map((p, i) => [p.id, i]))
+    const today = new Date().toISOString().slice(0, 10)
     for (const n of norm) {
+      // 上架日期：新条目记为今天，更新时保留原日期，保证「新发布」能一直排在前面
+      if (!n.addedAt) {
+        n.addedAt = idx.has(n.id) ? papers[idx.get(n.id)].addedAt || today : today
+      }
       if (idx.has(n.id)) papers[idx.get(n.id)] = n
       else {
         idx.set(n.id, papers.length)

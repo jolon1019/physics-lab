@@ -9,12 +9,18 @@ const PAGE_SIZE = 24
 
 // 试卷列表：先用静态数据渲染，挂载后拉取数据库增量合并（数据库条目按 id 覆盖静态条目）
 const papers = ref(RESOURCES)
+// 静态库 id 集合：数据库里独有的条目（静态库没有）属于后上架
+const STATIC_IDS = new Set(RESOURCES.map((r) => r.id))
 onMounted(async () => {
   try {
     const { papers: remote } = await getPublicPapers()
     if (Array.isArray(remote) && remote.length) {
       const map = new Map(RESOURCES.map((r) => [r.id, r]))
-      for (const p of remote) map.set(p.id, { ...p })
+      for (const p of remote) {
+        const base = map.get(p.id)
+        // 数据库旧条目可能没存 addedAt，保留静态库里的上架日期，否则会被当成历史资料排到末尾
+        map.set(p.id, { ...base, ...p, addedAt: p.addedAt || base?.addedAt || '' })
+      }
       papers.value = [...map.values()]
     }
   } catch {
@@ -98,6 +104,10 @@ const kinds = computed(() => {
   return KIND_ORDER.filter((k) => m.has(k)).map((k) => ({ name: k, n: m.get(k) }))
 })
 
+// 上架时间：静态库取 addedAt；数据库新增但没存日期的条目一律按「最新」排
+const pubAt = (r) => r.addedAt || (STATIC_IDS.has(r.id) ? '' : '9999-12-31')
+const isNew = (r) => !!pubAt(r)
+
 const filtered = computed(() => {
   const k = keyword.value.trim().toLowerCase()
   return papers.value.filter((r) => {
@@ -111,9 +121,8 @@ const filtered = computed(() => {
       .join(' ')
     return hay.toLowerCase().includes(k)
   }).sort((a, b) =>
-    // 发布时间从新到旧：有 addedAt 的（新发布）永远排在最前，同日期内按分类顺序；
-    // 旧资料（无 addedAt）保持原有分类顺序
-    (b.addedAt || '').localeCompare(a.addedAt || '') ||
+    // 按上架时间从新到旧；无日期的历史资料保持原分类顺序
+    pubAt(b).localeCompare(pubAt(a)) ||
     CAT_ORDER.indexOf(a.category) - CAT_ORDER.indexOf(b.category)
   )
 })
@@ -267,7 +276,7 @@ async function copyPasscode(r) {
           <span class="pp-mark">{{ (r.subject || '综合').slice(0, 2) }}</span>
           <span class="pp-foot">{{ r.term }}</span>
         </div>
-        <span v-if="r.addedAt" class="pp-new">新</span>
+        <span v-if="isNew(r)" class="pp-new">新</span>
         <span class="pp-tag">{{ r.category === 'free' ? r.section || '免费' : CAT_LABEL[r.category] }}</span>
       </div>
 
