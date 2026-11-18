@@ -9,8 +9,6 @@ const PAGE_SIZE = 24
 
 // 试卷列表：先用静态数据渲染，挂载后拉取数据库增量合并（数据库条目按 id 覆盖静态条目）
 const papers = ref(RESOURCES)
-// 静态库 id 集合：数据库里独有的条目（静态库没有）属于后上架
-const STATIC_IDS = new Set(RESOURCES.map((r) => r.id))
 onMounted(async () => {
   try {
     const { papers: remote } = await getPublicPapers()
@@ -104,9 +102,11 @@ const kinds = computed(() => {
   return KIND_ORDER.filter((k) => m.has(k)).map((k) => ({ name: k, n: m.get(k) }))
 })
 
-// 上架时间：静态库取 addedAt；数据库新增但没存日期的条目一律按「最新」排
-const pubAt = (r) => r.addedAt || (STATIC_IDS.has(r.id) ? '' : '9999-12-31')
-const isNew = (r) => !!pubAt(r)
+// 上架日期：数据库条目上传时写入；没有日期的历史数据按旧资料排在后面，不再算「最新」
+const pubAt = (r) => r.addedAt || ''
+// 只有最近一天上架的那批才显示「新」角标，避免十几条老数据全挂「新」
+const latestAt = computed(() => papers.value.reduce((m, r) => (r.addedAt > m ? r.addedAt : m), ''))
+const isNew = (r) => !!r.addedAt && r.addedAt === latestAt.value
 
 const filtered = computed(() => {
   const k = keyword.value.trim().toLowerCase()
