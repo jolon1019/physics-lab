@@ -149,7 +149,28 @@ function metaOf(r) {
   return [r.grade, kindOf(r), r.subject].filter(Boolean).join(' · ')
 }
 
+// 百度统计自定义事件：下载/复制提取码都是站外行为，不产生 PV，
+// 必须用 _trackEvent 主动上报才能在「事件分析」里看到次数
+function trackEvent(action, label) {
+  if (window._hmt) window._hmt.push(['_trackEvent', '试卷下载', action, label])
+}
+
+// 网盘类型从链接域名判断，作为事件的「行为」维度，方便按盘汇总
+function panOf(url) {
+  if (/pan\.quark\.cn/.test(url)) return '夸克网盘'
+  if (/pan\.baidu\.com/.test(url)) return '百度网盘'
+  if (/cloud\.189\.cn/.test(url)) return '天翼云盘'
+  if (/pan\.xunlei\.com|xl\.cn/.test(url)) return '迅雷网盘'
+  if (/alipan|aliyundrive/.test(url)) return '阿里云盘'
+  return '其他'
+}
+
+function trackDownload(r) {
+  trackEvent(panOf(r.downloadUrl), r.title)
+}
+
 async function copyPasscode(r) {
+  trackEvent('复制提取码', r.title)
   try {
     await navigator.clipboard.writeText(r.passcode)
     copied.value = r.id
@@ -290,6 +311,7 @@ async function copyPasscode(r) {
             :href="r.downloadUrl"
             target="_blank"
             rel="noopener"
+            @click="trackDownload(r)"
           >下载</a>
           <span v-else class="pp-dl pending">待补充</span>
           <button
