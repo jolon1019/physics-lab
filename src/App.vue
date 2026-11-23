@@ -11,7 +11,8 @@ import { Analytics } from '@vercel/analytics/vue'
 
 const route = useRoute()
 // 首页即试卷资料库，不展示左侧实验目录（卡片墙需要整行宽度）
-const isPapers = computed(() => route.name === 'home')
+// 资料库与题库同为整行宽内容页，不展示左侧实验目录
+const isPapers = computed(() => route.name === 'home' || route.name === 'bank')
 
 // 移动端判定（与 CSS 断点 1180px 对齐）
 const isMobile = ref(typeof window !== 'undefined' && window.matchMedia('(max-width: 1180px)').matches)
@@ -194,6 +195,7 @@ function onGlobalClick() {
           :to="isPapers ? '/lab' : '/'"
           class="nav-toggle-top"
         >{{ isPapers ? '实验平台' : '试卷资料库' }}</RouterLink>
+        <RouterLink to="/bank" class="nav-toggle-top" :class="{ active: route.name === 'bank' }">题库</RouterLink>
         <!-- 管理员后台入口 -->
         <RouterLink v-if="auth.isAdmin" to="/admin" class="nav-toggle-top" :class="{ active: $route.path === '/admin' }">后台</RouterLink>
         <button

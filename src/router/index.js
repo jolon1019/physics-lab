@@ -19,6 +19,13 @@ const routes = [
     meta: { title: '自主自学实验平台' }
   },
   {
+    // 中心题库：题目标签检索 + 跨试卷关联
+    path: '/bank',
+    name: 'bank',
+    component: () => import('../views/QuestionBankView.vue'),
+    meta: { title: '题库检索' }
+  },
+  {
     path: '/chapters/:grade',
     name: 'chapters',
     component: () => import('../views/ChaptersView.vue'),

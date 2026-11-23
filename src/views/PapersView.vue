@@ -2,18 +2,34 @@
 // 试卷资料库（卡片墙）：分类 + 学科 + 搜索三级筛选，点「下载」跳转网盘
 // 数据 = 静态 resources.js（基础库）+ /api/papers 数据库增量（按 id 合并，API 优先）
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { RESOURCE_CATEGORIES, RESOURCES } from '../data/resources'
+import { PAPER_EXTRAS } from '../data/paperExtras'
 import { getPublicPapers } from '../lib/api'
+import PaperPreviewModal from '../components/PaperPreviewModal.vue'
 
 const PAGE_SIZE = 24
+const route = useRoute()
+const router = useRouter()
 
-// 试卷列表：先用静态数据渲染，挂载后拉取数据库增量合并（数据库条目按 id 覆盖静态条目）
-const papers = ref(RESOURCES)
+// 试卷列表：静态基础库，挂载后拉取数据库增量合并（数据库条目按 id 覆盖静态条目）
+const BASE_LIST = [...RESOURCES]
+const papers = ref(BASE_LIST)
+
+// 试卷预览：PAPER_EXTRAS 登记 previewUrl 的试卷才显示「预览试卷」按钮
+const preview = ref(null) // { paper, page }
+const hasPreview = (r) => !!PAPER_EXTRAS[r.id]?.previewUrl
+function openPreview(r, page = 1) {
+  preview.value = { paper: r, page }
+  // 预览打开即上报事件，后续可统计每份卷的预览热度
+  trackEvent('预览试卷', r.title)
+}
+
 onMounted(async () => {
   try {
     const { papers: remote } = await getPublicPapers()
     if (Array.isArray(remote) && remote.length) {
-      const map = new Map(RESOURCES.map((r) => [r.id, r]))
+      const map = new Map(BASE_LIST.map((r) => [r.id, r]))
       for (const p of remote) {
         const base = map.get(p.id)
         // 数据库旧条目可能没存 addedAt，保留静态库里的上架日期，否则会被当成历史资料排到末尾
@@ -23,6 +39,14 @@ onMounted(async () => {
     }
   } catch {
     /* 接口不可用时保持静态数据 */
+  }
+  // 题库页「预览原卷」带 ?preview=id&page=n 跳转过来，自动打开预览并定位页码。
+  // 必须放在远程合并之后：目标试卷（如 p-174）可能只存在于数据库里
+  const wantId = route.query.preview
+  if (wantId) {
+    const target = papers.value.find((r) => r.id === wantId)
+    if (target) openPreview(target, Number(route.query.page) || 1)
+    router.replace({ query: {} })
   }
 })
 
@@ -305,6 +329,7 @@ async function copyPasscode(r) {
         <h3 class="pp-title" :title="r.title">{{ r.title }}</h3>
         <p class="pp-meta">{{ metaOf(r) }}</p>
         <div class="pp-actions">
+          <button v-if="hasPreview(r)" class="pp-dl ghost" @click="openPreview(r)">预览试卷</button>
           <a
             v-if="r.downloadUrl"
             class="pp-dl"
@@ -330,6 +355,16 @@ async function copyPasscode(r) {
   <div v-if="rest" class="pp-more-wrap">
     <button class="pp-more" @click="limit += PAGE_SIZE">加载更多（还有 {{ rest }} 份）</button>
   </div>
+
+  <!-- 全屏预览模态框（不跳转页面） -->
+  <PaperPreviewModal
+    v-if="preview"
+    :title="preview.paper.title"
+    :url="PAPER_EXTRAS[preview.paper.id].previewUrl"
+    :paper-id="preview.paper.id"
+    :start-page="preview.page"
+    @close="preview = null"
+  />
 </template>
 
 <style scoped>
@@ -653,6 +688,15 @@ async function copyPasscode(r) {
   background: var(--surface-2);
   box-shadow: none;
   cursor: not-allowed;
+}
+/* 预览按钮：与下载按钮同款描边风格，白底做主次区分 */
+.pp-dl.ghost {
+  color: var(--text-h);
+  background: var(--surface);
+  border: 2px solid var(--line);
+}
+.pp-dl.ghost:hover {
+  background: var(--accent-soft);
 }
 .pp-code {
   padding: 7px 9px;

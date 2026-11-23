@@ -56,3 +56,7 @@ server/data/
 
 .vercel
 .env*
+
+tools/paper-figures/*.svg
+tools/paper-figures/contact-*.png
+tools/paper-figures/verify-report-*.txt
