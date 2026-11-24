@@ -150,7 +150,7 @@ def clean(gray: np.ndarray) -> np.ndarray:
         bx0, bx1 = min(xs), max(xe)
         by0, by1 = cl['y0'], cl['y1']
         # 单行守卫：跨多行的串联簇、以及含多个大间隔的"分组标注"（图1/图2/A.B.C.D.）不算题干行
-        if by1 - by0 > 48:
+        if by1 - by0 > 32:
             continue
         if sum(1 for g in gaps if g > 60) >= 2:
             continue
@@ -170,6 +170,51 @@ def clean(gray: np.ndarray) -> np.ndarray:
         cx, cy = cent[i]
         if not (ux0 - 6 <= cx <= ux1 + 6 and uy0 - 6 <= cy <= uy1 + 6):
             removed.add(i)
+
+    # 规则E：同行级联——若某字符的同行邻居已被判定为题干文字，则该字符也一并清除
+    # （用于抹掉坐标轴单位/图例等被保护带"切了一半"的残留词，如"年龄/岁""等级"）
+    for _ in range(2):
+        add = set()
+        for i in charlike:
+            if i in removed:
+                continue
+            cx, cy = cent[i]
+            for j in charlike:
+                if j == i or j not in removed:
+                    continue
+                jx, jy = cent[j]
+                if abs(jx - cx) <= 26 and abs(jy - cy) <= 10:
+                    add.add(i)
+                    break
+        removed |= add
+
+    # 规则K：孤立字母/数字标注回保——距结构 30px 内、且同行无相邻字符的单个字符，
+    # 视为顶点/端点标注（如三角形上方的 E、B），即使落在保护带外也保留
+    cl_set = set(charlike)
+    for i in list(removed):
+        if i not in cl_set:
+            continue
+        cx, cy = cent[i]
+        isolated = True
+        for j in charlike:
+            if j == i:
+                continue
+            jx, jy = cent[j]
+            if abs(jx - cx) <= 22 and abs(jy - cy) <= 12:
+                isolated = False
+                break
+        if not isolated:
+            continue
+        near = False
+        for t in tier1:
+            x, y, w, h, a = stats[t]
+            dx = max(x - cx, cx - (x + w), 0)
+            dy = max(y - cy, cy - (y + h), 0)
+            if max(dx, dy) <= 30:
+                near = True
+                break
+        if near:
+            removed.discard(i)
 
     out = gray.copy()
     if removed:
