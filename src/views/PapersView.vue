@@ -16,9 +16,9 @@ const router = useRouter()
 const BASE_LIST = [...RESOURCES]
 const papers = ref(BASE_LIST)
 
-// 试卷预览：PAPER_EXTRAS 登记 previewUrl 的试卷才显示「预览试卷」按钮
+// 试卷预览：已不再托管原卷 PDF，「预览试卷」打开的是按原版式重排的题目（按题号顺序）
 const preview = ref(null) // { paper, page }
-const hasPreview = (r) => !!PAPER_EXTRAS[r.id]?.previewUrl
+const hasPreview = (r) => !!PAPER_EXTRAS[r.id]?.retypeset
 function openPreview(r, page = 1) {
   preview.value = { paper: r, page }
   // 预览打开即上报事件，后续可统计每份卷的预览热度
@@ -45,7 +45,7 @@ onMounted(async () => {
   const wantId = route.query.preview
   if (wantId) {
     const target = papers.value.find((r) => r.id === wantId)
-    // 只有仍托管原卷（有 previewUrl）的试卷才打开预览，避免弹出空模态框
+    // 只有登记了重排版题目的试卷才打开预览，避免弹出空模态框
     if (target && hasPreview(target)) openPreview(target, Number(route.query.page) || 1)
     router.replace({ query: {} })
   }
@@ -361,7 +361,7 @@ async function copyPasscode(r) {
   <PaperPreviewModal
     v-if="preview"
     :title="preview.paper.title"
-    :url="PAPER_EXTRAS[preview.paper.id].previewUrl"
+    :url="PAPER_EXTRAS[preview.paper.id]?.previewUrl || ''"
     :paper-id="preview.paper.id"
     :start-page="preview.page"
     @close="preview = null"

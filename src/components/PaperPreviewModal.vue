@@ -8,16 +8,19 @@ import PaperQuestion from './PaperQuestion.vue'
 
 const props = defineProps({
   title: { type: String, default: '试卷预览' },
-  url: { type: String, required: true },
+  // 原卷 PDF 地址：已不再托管原卷，留空则直接进「重排版」题目视图
+  url: { type: String, default: '' },
   paperId: { type: String, default: '' },
   startPage: { type: Number, default: 1 }
 })
 const emit = defineEmits(['close'])
 
+const hasPdf = computed(() => !!props.url)
+
 const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
 const WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
 
-const mode = ref('pdf')
+const mode = ref(hasPdf.value ? 'pdf' : 'text')
 const loading = ref(true)
 const error = ref('')
 const pageNum = ref(props.startPage)
@@ -30,7 +33,9 @@ const sideQ = ref(null) // 右侧单题查看面板当前题目
 
 // 重排版元数据：未登记的试卷不显示切换按钮
 const retypeset = computed(() => (props.paperId ? PAPER_EXTRAS[props.paperId]?.retypeset : null))
-const paperQuestions = computed(() => QUESTIONS.filter((q) => q.paperId === props.paperId))
+const paperQuestions = computed(() =>
+  QUESTIONS.filter((q) => q.paperId === props.paperId).slice().sort((a, b) => a.number - b.number)
+)
 // 按大题切分组（from/to 为题库题目 id）
 const groups = computed(() => {
   if (!retypeset.value) return []
@@ -94,11 +99,8 @@ async function zoom(d) {
   await renderPage()
 }
 
-// 切到重排版：滚动到来源页对应的第一个题目并短暂高亮
-async function switchMode(m) {
-  if (mode.value === m) return
-  mode.value = m
-  if (m !== 'text') { sideQ.value = null; return }
+// 定位到来源页对应的第一个题目并短暂高亮
+async function focusStartQuestion() {
   await nextTick()
   const first = paperQuestions.value.find((q) => q.page === props.startPage)
   if (!first) return
@@ -109,6 +111,15 @@ async function switchMode(m) {
     clearTimeout(hlTimer)
     hlTimer = setTimeout(() => (highlightId.value = ''), 1800)
   }
+}
+
+// 切到重排版：滚动到来源页对应的第一个题目并短暂高亮
+async function switchMode(m) {
+  if (mode.value === m) return
+  if (m === 'pdf' && !hasPdf.value) return
+  mode.value = m
+  if (m !== 'text') { sideQ.value = null; return }
+  await focusStartQuestion()
 }
 
 function onKey(e) {
@@ -128,6 +139,12 @@ function toggleSide(q) {
 onMounted(async () => {
   dpr = window.devicePixelRatio || 1
   window.addEventListener('keydown', onKey)
+  // 无原卷时直接展示重排版题目，不再请求 PDF
+  if (!hasPdf.value) {
+    loading.value = false
+    await focusStartQuestion()
+    return
+  }
   try {
     if (!window.pdfjsLib) await loadScript(PDFJS)
     window.pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER
@@ -161,7 +178,7 @@ onBeforeUnmount(() => {
           <span v-if="mode === 'pdf' && totalPages" class="pv-pageinfo">第 {{ pageNum }} / {{ totalPages }} 页</span>
         </div>
         <div class="pv-tools">
-          <div v-if="retypeset" class="pv-mode">
+          <div v-if="retypeset && hasPdf" class="pv-mode">
             <button class="pv-tab" :class="{ on: mode === 'pdf' }" @click="switchMode('pdf')">原卷</button>
             <button class="pv-tab" :class="{ on: mode === 'text' }" @click="switchMode('text')">重排版</button>
           </div>
