@@ -48,6 +48,42 @@ export const PAPER_EXTRAS = {
       ]
     }
   },
+  // 石家庄81中九年级上册期中物理
+  'p-177': {
+    retypeset: {
+      title: '2026—2027学年九年级上学期期中试卷',
+      subtitle: '物理　共 20 题',
+      sections: [
+        { title: '一. 单项选择题（共 10 小题）', from: 's81w-q1', to: 's81w-q10' },
+        { title: '二. 填空题（共 5 小题）', from: 's81w-q11', to: 's81w-q15' },
+        { title: '三. 实验探究题（共 3 小题）', from: 's81w-q16', to: 's81w-q18' },
+        { title: '四. 计算题（共 2 小题）', from: 's81w-q19', to: 's81w-q20' }
+      ]
+    }
+  },
+  // 石家庄81中九上期中化学
+  'p-180': {
+    retypeset: {
+      title: '2026—2027学年九年级上学期期中试卷',
+      subtitle: '化学　共 14 题（扫描件仅含第 1—4 页）',
+      sections: [
+        { title: '一. 单选题（共 10 小题）', from: 's81c-q1', to: 's81c-q10' },
+        { title: '二. 填空题（共 4 小题）', from: 's81c-q11', to: 's81c-q14' }
+      ]
+    }
+  },
+  // 邯郸十一中七上期中数学
+  'p-178': {
+    retypeset: {
+      title: '2026—2027学年第一学期初一年级期中考试',
+      subtitle: '数学试卷　总分 120 分　考试时间 90 分钟',
+      sections: [
+        { title: '一. 选择题（本大题满分 36 分，共 12 小题）', from: 'sy7-q1', to: 'sy7-q12' },
+        { title: '二. 填空题（本大题满分 12 分，共 4 小题）', from: 'sy7-q13', to: 'sy7-q16' },
+        { title: '三. 解答题（本大题共 8 个小题，共 72 分）', from: 'sy7-q17', to: 'sy7-q24' }
+      ]
+    }
+  },
   // 锦玉中学八上期中数学
   'p-182': {
     retypeset: {
