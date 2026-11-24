@@ -72,6 +72,18 @@ export const PAPER_EXTRAS = {
       ]
     }
   },
+  // 邯郸汉光中学八上期中数学
+  'p-175': {
+    retypeset: {
+      title: '初二数学期中测试卷',
+      subtitle: '（时间 120 分钟　满分 120 分）',
+      sections: [
+        { title: '一. 选择题（共 12 小题，每小题 3 分，共 36 分）', from: 'hg8-q1', to: 'hg8-q12' },
+        { title: '二. 填空题（共 4 小题，每题 3 分，共 12 分）', from: 'hg8-q13', to: 'hg8-q16' },
+        { title: '三. 解答题（共 8 小题，共 72 分）', from: 'hg8-q17', to: 'hg8-q24' }
+      ]
+    }
+  },
   // 邯郸十一中八上期中数学
   'p-173': {
     retypeset: {
