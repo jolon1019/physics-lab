@@ -65,3 +65,6 @@ tools/paper-figures/verify-report-*.txt
 public/figures/
 public/papers/
 
+# 发布用 Vercel Token（明文凭据，切勿提交）
+.vercel-token
+
