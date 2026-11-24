@@ -72,6 +72,18 @@ export const PAPER_EXTRAS = {
       ]
     }
   },
+  // 邯郸十一中八上期中数学
+  'p-173': {
+    retypeset: {
+      title: '2026—2027学年第一学期初二年级期中考试',
+      subtitle: '数学试卷　总分 120 分',
+      sections: [
+        { title: '一. 选择题（共 12 小题，每题 3 分，共 36 分）', from: 'sy8-q1', to: 'sy8-q12' },
+        { title: '二. 填空题（共 4 小题，每题 3 分，共 12 分）', from: 'sy8-q13', to: 'sy8-q16' },
+        { title: '三. 解答题（共 8 小题）', from: 'sy8-q17', to: 'sy8-q24' }
+      ]
+    }
+  },
   // 邯郸十一中七上期中数学
   'p-178': {
     retypeset: {
