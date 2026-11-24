@@ -60,3 +60,8 @@ server/data/
 tools/paper-figures/*.svg
 tools/paper-figures/contact-*.png
 tools/paper-figures/verify-report-*.txt
+
+# 题库配图（体积较大，随 Vercel CLI 直传，不入库）
+public/figures/
+public/papers/
+

@@ -1,0 +1,17 @@
+.git
+node_modules
+dist
+dist-ssr
+.env
+.env.*
+!.env.example
+server/data
+.vercel
+.vscode
+.idea
+*.log
+check_vm.py
+check_vm_page.py
+check_zoom.py
+fig-demo
+tools/paper-figures

@@ -4,8 +4,11 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { DIFFICULTIES, QUESTIONS, QUESTION_TYPES, fmtMath } from '../data/questionBank'
+import { PAPER_EXTRAS } from '../data/paperExtras'
 
 const router = useRouter()
+// 只有仍托管原卷的试卷才给「预览原卷」入口
+const hasSource = (q) => !!PAPER_EXTRAS[q.paperId]?.previewUrl
 
 const activeType = ref('all')
 const activeDiff = ref('all')
@@ -113,7 +116,7 @@ const DIFF_CLASS = { 易: 'd-easy', 中: 'd-mid', 难: 'd-hard' }
           <span v-for="kp in q.knowledgePoints" :key="kp" class="qb-kp"># {{ kp }}</span>
         </div>
         <span class="qb-paper" :title="q.paperTitle">来源：{{ q.paperTitle }}</span>
-        <button class="qb-src" @click="previewSource(q)">预览原卷 · 第 {{ q.page }} 页</button>
+        <button v-if="hasSource(q)" class="qb-src" @click="previewSource(q)">预览原卷 · 第 {{ q.page }} 页</button>
       </div>
     </article>
   </div>

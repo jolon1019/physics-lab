@@ -45,7 +45,8 @@ onMounted(async () => {
   const wantId = route.query.preview
   if (wantId) {
     const target = papers.value.find((r) => r.id === wantId)
-    if (target) openPreview(target, Number(route.query.page) || 1)
+    // 只有仍托管原卷（有 previewUrl）的试卷才打开预览，避免弹出空模态框
+    if (target && hasPreview(target)) openPreview(target, Number(route.query.page) || 1)
     router.replace({ query: {} })
   }
 })

@@ -1,9 +1,7 @@
-// 试卷扩展信息：预览 PDF 地址 + 重排版试卷头（预览内容与下载文件同源，保证一致）
-// 每份支持预览的试卷在此登记 id → previewUrl；后续接入真实试卷只需加条目
+// 试卷扩展信息：重排版试卷头（不再托管原卷 PDF，只保留题目图形与重排正文）
 export const PAPER_EXTRAS = {
-  // 汉光中学九上期中数学：PDF 已本地托管在 public/papers/
+  // 汉光中学九上期中数学
   'p-174': {
-    previewUrl: '/papers/hanguang-g9-midterm.pdf',
     retypeset: {
       title: '初三数学测试卷',
       subtitle: '考试时间：120分钟　满分：120分',
@@ -14,9 +12,8 @@ export const PAPER_EXTRAS = {
       ]
     }
   },
-  // 锦玉中学八上期中数学：PDF 已本地托管在 public/papers/
+  // 锦玉中学八上期中数学
   'p-182': {
-    previewUrl: '/papers/jinyu-g8-midterm-math.pdf',
     retypeset: {
       title: '初二数学测试卷',
       subtitle: '考试时间：120分钟　满分：120分',
