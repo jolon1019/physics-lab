@@ -214,11 +214,17 @@ async function nativeShare() {
   }
 }
 
-function downloadCard() {
+async function downloadCard() {
+  // dataURL → Blob 显式 image/png，避免部分浏览器存成未知格式
+  const blob = await (await fetch(shareCard.value)).blob()
+  const url = URL.createObjectURL(new Blob([blob], { type: 'image/png' }))
   const a = document.createElement('a')
-  a.href = shareCard.value
+  a.href = url
   a.download = `题卡-第${shareQ.value?.number ?? ''}题.png`
+  document.body.appendChild(a)
   a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 5000)
 }
 
 const DIFF_CLASS = { 易: 'd-easy', 中: 'd-mid', 难: 'd-hard' }
